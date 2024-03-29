@@ -33,7 +33,7 @@ jobs:
         run: "./scripts/mkenv.sh service.${{ env.CURRENT_BRANCH }}.yaml"
         env:
           IMAGE: "${{ env.GCR_HOST }}/${{ env.GOOGLE_PROJECT_ID }}/${{ env.GCR_IMAGE_NAME }}:${{ env.CURRENT_BRANCH }}-${{ github.sha }}"
-          SERVICE: ${{ env.CURRENT_BRANCH =='production' && 'prod-dojo' || 'staging-dojo' }}
+          SERVICE: ${{ env.CURRENT_BRANCH =='production' && 'prod-gatewayapp' || 'staging-gatewayapp' }}
           BSV_NETWORK: ${{ env.CURRENT_BRANCH =='production' && 'mainnet' || 'testnet' }}
           NODE_ENV: 'production'
           SPAWN_NGINX: 'yes'
