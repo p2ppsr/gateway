@@ -6,6 +6,7 @@ const routes = require('./routes')
 const authrite = require('authrite-express')
 const { SERVER_PRIVATE_KEY, SPAWN_NGINX } = process.env
 const path = require('path')
+const knex = require('knex')(require('../knexfile.js'))
 
 const HTTP_PORT = process.env.HTTP_PORT || 3001
 const ROUTING_PREFIX = process.env.ROUTING_PREFIX || '/api'
@@ -82,5 +83,6 @@ app.listen(HTTP_PORT, async () => {
     console.log('Gateway Payment Server listening on port', HTTP_PORT)
     if (SPAWN_NGINX === 'yes') {
         spawn('nginx', [], { stdio: [process.stdin, process.stdout, process.stderr] })
+        await knex.migrate.latest()
     }
 })
