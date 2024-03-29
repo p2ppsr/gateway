@@ -10,7 +10,7 @@ env:
   CWI_NPM_TOKEN: ${{ secrets.CWI_NPM_TOKEN }}
   GCR_HOST: us.gcr.io
   GOOGLE_PROJECT_ID: babbage-private
-  GCR_IMAGE_NAME: gateway-payment-server
+  GCR_IMAGE_NAME: gatewayapp
 
 jobs:
   build:
@@ -53,4 +53,3 @@ jobs:
         with:
           metadata: "service.${{ env.CURRENT_BRANCH }}.yaml"
           region: us-west1
-          
