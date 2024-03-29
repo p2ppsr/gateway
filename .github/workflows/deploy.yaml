@@ -53,6 +53,4 @@ jobs:
         with:
           metadata: "service.${{ env.CURRENT_BRANCH }}.yaml"
           region: us-west1
-      - name: Set Min Instances and Enable CPU Boost
-        run: |
-          gcloud run services update ${{ env.CURRENT_BRANCH =='production' && 'prod-gateway-payment-server' || 'staging-gateway-payment-server' }} --min-instances=1 --cpu-boost --region=us-west1
+          
