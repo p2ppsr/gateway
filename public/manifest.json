@@ -1,0 +1,20 @@
+{
+  "short_name": "Gateway",
+  "name": "Gateway — Simple Bitcoin Payments",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "babbage": {
+    "protocolPermissions": {
+      "3241645161d8": "Needs permission to derive a public key used in payment for an invoice.",
+      "authrite message signature": "Needs permission to make authenticated requests to the payment server.",
+      "identity key": "Needs permission to identify you to the payment server."
+    }
+  }
+}
