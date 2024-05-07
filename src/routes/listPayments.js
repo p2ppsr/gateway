@@ -30,7 +30,10 @@ module.exports = {
             // Respond with the list of payments
             res.status(200).json({
                 status: 'success',
-                data: payments,
+                data: payments.map(x => ({
+                    ...x,
+                    amount: x.amount.slice(-2)
+                })),
                 message: 'Payments fetched successfully'
             });
         } catch (error) {
