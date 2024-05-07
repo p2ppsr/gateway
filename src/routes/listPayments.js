@@ -32,7 +32,7 @@ module.exports = {
                 status: 'success',
                 data: payments.map(x => ({
                     ...x,
-                    amount: x.amount.slice(-2)
+                    amount: x.amount.slice(0, -2)
                 })),
                 message: 'Payments fetched successfully'
             });
