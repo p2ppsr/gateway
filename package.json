@@ -9,6 +9,8 @@
     "@mui/icons-material": "^5.15.17",
     "@mui/material": "^5.15.7",
     "@mui/styles": "^5.15.14",
+    "amountinator": "^0.1.17",
+    "amountinator-react": "^0.1.13",
     "authrite-express": "^0.4.12",
     "authrite-js": "^0.4.13",
     "body-parser": "^1.20.2",

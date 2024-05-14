@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Typography,
   TextField,
@@ -7,6 +7,7 @@ import {
   Grid,
   Paper,
   Box,
+  InputAdornment,
 } from '@mui/material';
 import PayButton from '../../components/PayButton';
 import checkForMetaNetClient from '../../utils/checkForMetaNetClient';
@@ -16,6 +17,8 @@ import useStyles from './style';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from '@mui/material/styles';
+import { AmountInputField } from 'amountinator-react';
+import { CurrencyConverter } from 'amountinator';
 
 const CodeSnippet = ({ code, language }) => {
   const theme = useTheme();
@@ -47,6 +50,9 @@ const Create: React.FC = () => {
   min-width: 10em;
 }`
   );
+  const [amountInSats, setAmountInSats] = useState(1000)
+  const [currencySymbol, setCurrencySymbol] = useState('$')
+  const currencyConverter = new CurrencyConverter()
   const classes = useStyles();
   const theme = useTheme();
 
@@ -66,6 +72,32 @@ const Create: React.FC = () => {
   const handleCustomCSSChange = (event) => {
     setCustomCSS(event.target.value);
   };
+
+  useEffect(() => {
+    (async () => {
+      await currencyConverter.initialize()
+      setCurrencySymbol(currencyConverter.getCurrencySymbol())
+      const satoshis = await currencyConverter.convertCurrency(Number(paymentAmount), currencyConverter.preferredCurrency, 'BSV')
+      setAmountInSats(satoshis || 1000)
+    })()
+  }, [])
+
+  const handleAmountChange = useCallback(async (event: any) => {
+    const input = event.target.value.replace(/[^0-9.]/g, '')
+    // setPaymentAmount(paymentAmount) // ??
+    setPaymentAmount(input)
+    setShowCode(false);
+    console.log('entered', input)
+    // if (input !== paymentAmount) {
+    try {
+      const satoshis = await currencyConverter.convertCurrency(Number(input), currencyConverter.preferredCurrency, 'BSV')
+      console.log('amount', satoshis)
+      setAmountInSats(satoshis || 1000)
+    } catch (error) {
+      console.error('Error converting currency:', error)
+    }
+    // }
+  }, [])
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -139,17 +171,18 @@ const Create: React.FC = () => {
                   className={classes.textField}
                 />
                 <TextField
-                  label="Amount BSV"
+                  label="Tip Amount"
                   value={paymentAmount}
-                  onChange={(e) => {
-                    setPaymentAmount(e.target.value);
-                    setShowCode(false);
-                  }}
+                  onChange={handleAmountChange}
                   type="number"
                   fullWidth
                   margin="normal"
                   className={classes.textField}
+                  InputProps={{
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>
+                  }}
                 />
+
                 <TextField
                   label="Custom CSS"
                   value={customCSS}
@@ -206,7 +239,7 @@ ${customCSS}
 <div
   data-merchant="${merchant}"
   data-button="${buttonID}"
-  data-amount="${paymentAmount}"
+  data-amount="${amountInSats}"
   data-currency="BSV"
   data-text="${buttonText}"
   data-server="${location.protocol}//${location.host}"
