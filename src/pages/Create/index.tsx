@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Typography,
   TextField,
@@ -8,20 +8,20 @@ import {
   Paper,
   Box,
   InputAdornment,
-} from '@mui/material';
-import PayButton from '../../components/PayButton';
-import checkForMetaNetClient from '../../utils/checkForMetaNetClient';
-import { getPublicKey } from '@babbage/sdk-ts';
-import authrite from '../../utils/Authrite';
-import useStyles from './style';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { useTheme } from '@mui/material/styles';
-import { AmountInputField } from 'amountinator-react';
-import { CurrencyConverter } from 'amountinator';
+} from '@mui/material'
+import PayButton from '../../components/PayButton'
+import checkForMetaNetClient from '../../utils/checkForMetaNetClient'
+import { getPublicKey } from '@babbage/sdk-ts'
+import authrite from '../../utils/Authrite'
+import useStyles from './style'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useTheme } from '@mui/material/styles'
+import { AmountInputField } from 'amountinator-react'
+import { CurrencyConverter } from 'amountinator'
 
 const CodeSnippet = ({ code, language }) => {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <SyntaxHighlighter
@@ -32,46 +32,46 @@ const CodeSnippet = ({ code, language }) => {
     >
       {code.trim()}
     </SyntaxHighlighter>
-  );
-};
+  )
+}
 
 const Create: React.FC = () => {
-  const [buttonText, setButtonText] = useState('Pay Now');
-  const [paymentAmount, setPaymentAmount] = useState('5');
-  const [merchant, setMerchant] = useState('');
-  const [buttonID, setButtonID] = useState('');
-  const [showCode, setShowCode] = useState(false);
-  const [hasMetaNet, setHasMetaNet] = useState(false);
+  const [buttonText, setButtonText] = useState('Pay Now')
+  const [paymentAmount, setPaymentAmount] = useState('5')
+  const [merchant, setMerchant] = useState('')
+  const [buttonID, setButtonID] = useState('')
+  const [showCode, setShowCode] = useState(false)
+  const [hasMetaNet, setHasMetaNet] = useState(false)
   const [customCSS, setCustomCSS] = useState(
     `.customCSS {
-  border-radius: 2em;
-  border: none;
-  padding: 0.7em;
-  min-width: 10em;
+  border-radius: 2em
+  border: none
+  padding: 0.7em
+  min-width: 10em
 }`
-  );
+  )
   const [amountInSats, setAmountInSats] = useState(1000)
   const [currencySymbol, setCurrencySymbol] = useState('$')
   const currencyConverter = new CurrencyConverter()
-  const classes = useStyles();
-  const theme = useTheme();
+  const classes = useStyles()
+  const theme = useTheme()
 
   useEffect(() => {
     (async () => {
-      const metaNetClient = await checkForMetaNetClient();
+      const metaNetClient = await checkForMetaNetClient()
       if (metaNetClient === 0) {
-        setHasMetaNet(false);
+        setHasMetaNet(false)
       } else {
-        const identity = await getPublicKey({ identityKey: true });
-        setMerchant(identity);
-        setHasMetaNet(true);
+        const identity = await getPublicKey({ identityKey: true })
+        setMerchant(identity)
+        setHasMetaNet(true)
       }
-    })();
-  }, []);
+    })()
+  }, [])
 
   const handleCustomCSSChange = (event) => {
-    setCustomCSS(event.target.value);
-  };
+    setCustomCSS(event.target.value)
+  }
 
   useEffect(() => {
     (async () => {
@@ -86,7 +86,7 @@ const Create: React.FC = () => {
     const input = event.target.value.replace(/[^0-9.]/g, '')
     // setPaymentAmount(paymentAmount) // ??
     setPaymentAmount(input)
-    setShowCode(false);
+    setShowCode(false)
     console.log('entered', input)
     // if (input !== paymentAmount) {
     try {
@@ -100,21 +100,21 @@ const Create: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    const styleElement = document.createElement('style');
-    styleElement.id = 'custom-button-styles';
-    styleElement.innerHTML = customCSS;
-    document.head.appendChild(styleElement);
+    const styleElement = document.createElement('style')
+    styleElement.id = 'custom-button-styles'
+    styleElement.innerHTML = customCSS
+    document.head.appendChild(styleElement)
 
     return () => {
-      document.head.removeChild(styleElement);
-    };
-  }, [customCSS]);
+      document.head.removeChild(styleElement)
+    }
+  }, [customCSS])
 
   const handleSubmit = async () => {
     if (!hasMetaNet) {
       return alert(
         'Download MetaNet Client!\n\nhttps://projectbabbage.com/metanet-client'
-      );
+      )
     }
     const createResponse = await authrite.request(
       `${location.protocol}//${location.host}/api/createButton`,
@@ -128,11 +128,11 @@ const Create: React.FC = () => {
           accepts: 'BSV',
         }),
       }
-    );
-    const create = JSON.parse(new TextDecoder().decode(createResponse.body));
-    setButtonID(create.buttonId);
-    setShowCode(true);
-  };
+    )
+    const create = JSON.parse(new TextDecoder().decode(createResponse.body))
+    setButtonID(create.buttonId)
+    setShowCode(true)
+  }
 
   return (
     <Box className={classes.root}>
@@ -163,8 +163,8 @@ const Create: React.FC = () => {
                   label="Button Text"
                   value={buttonText}
                   onChange={(e) => {
-                    setButtonText(e.target.value);
-                    setShowCode(false);
+                    setButtonText(e.target.value)
+                    setShowCode(false)
                   }}
                   fullWidth
                   margin="normal"
@@ -267,7 +267,7 @@ ${customCSS}
         </Box>
       </Container>
     </Box>
-  );
-};
+  )
+}
 
-export default Create;
+export default Create

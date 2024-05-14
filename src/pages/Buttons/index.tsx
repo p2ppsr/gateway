@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   Container,
   Typography,
@@ -17,59 +17,59 @@ import {
   Button,
   useTheme,
   Box
-} from '@mui/material';
-import authrite from '../../utils/Authrite';
+} from '@mui/material'
+import authrite from '../../utils/Authrite'
 
 interface PaymentButton {
-  button_id: string;
-  amount: number;
-  currency: string;
-  variable_amount: boolean;
-  multi_use: boolean;
-  used: boolean;
-  accepts: string;
-  total_paid: number;
+  button_id: string
+  amount: number
+  currency: string
+  variable_amount: boolean
+  multi_use: boolean
+  used: boolean
+  accepts: string
+  total_paid: number
 }
 
 const PaymentButtonsList: React.FC = () => {
-  const [buttons, setButtons] = useState<PaymentButton[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all');
+  const [buttons, setButtons] = useState<PaymentButton[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
 
-  const theme = useTheme();
+  const theme = useTheme()
 
   const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
-    setLoading(true);
-    setError('');
+    setLoading(true)
+    setError('')
     try {
-      let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`;
+      let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
       if (usedFilter !== 'all') {
-        url += `&usage=${usedFilter}`;
+        url += `&usage=${usedFilter}`
       }
       const response = await authrite.request(url, {
         method: 'GET',
-      });
-      const data = JSON.parse(new TextDecoder().decode(response.body));
+      })
+      const data = JSON.parse(new TextDecoder().decode(response.body))
       if (data.status === 'error') {
-        throw new Error(response.message);
+        throw new Error(response.message)
       }
-      setButtons(data.data);
+      setButtons(data.data)
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchButtons(page, sortOrder, usedFilter);
-  }, [page, sortOrder, usedFilter]);
+    fetchButtons(page, sortOrder, usedFilter)
+  }, [page, sortOrder, usedFilter])
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Typography color="error">Error: {error}</Typography>;
+  if (loading) return <CircularProgress />
+  if (error) return <Typography color="error">Error: {error}</Typography>
 
   return (
     <Container style={{ backgroundColor: theme.palette.background.default, padding: theme.spacing(4) }}>
@@ -141,7 +141,7 @@ const PaymentButtonsList: React.FC = () => {
         </Button>
       </Box>
     </Container>
-  );
-};
+  )
+}
 
-export default PaymentButtonsList;
+export default PaymentButtonsList

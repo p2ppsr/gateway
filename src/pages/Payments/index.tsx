@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   CircularProgress,
   Container,
@@ -13,72 +13,72 @@ import {
   TableContainer,
   IconButton,
   Box,
-} from '@mui/material';
-import { ArrowBack, ArrowForward, Sort } from '@mui/icons-material';
-import authrite from '../../utils/Authrite';
-import { submitDirectTransaction } from '@babbage/sdk-ts';
-import { getPaymentAddress } from 'sendover';
-import { Transaction, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk';
+} from '@mui/material'
+import { ArrowBack, ArrowForward, Sort } from '@mui/icons-material'
+import authrite from '../../utils/Authrite'
+import { submitDirectTransaction } from '@babbage/sdk-ts'
+import { getPaymentAddress } from 'sendover'
+import { Transaction, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk'
 
 interface Payment {
-  payment_id: string;
-  button_id: string;
-  amount: number;
-  currency: string;
-  completed: boolean;
-  is_new: boolean;
-  transaction_info: string;
-  merchant_id: string;
+  payment_id: string
+  button_id: string
+  amount: number
+  currency: string
+  completed: boolean
+  is_new: boolean
+  transaction_info: string
+  merchant_id: string
 }
 
 const PaymentsList: React.FC = () => {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const [page, setPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   const fetchPayments = async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true)
+    setError('')
     try {
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`;
-      const response = await authrite.request(url, { method: 'GET' });
-      const data = JSON.parse(new TextDecoder().decode(response.body));
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
+      const response = await authrite.request(url, { method: 'GET' })
+      const data = JSON.parse(new TextDecoder().decode(response.body))
       if (data.status === 'error') {
-        throw new Error(response.message);
+        throw new Error(response.message)
       }
-      setPayments(data.data);
+      setPayments(data.data)
     } catch (err: any) {
-      setError(`Fetching payments failed: ${err.message}`);
+      setError(`Fetching payments failed: ${err.message}`)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const acknowledgePayment = async (payment: Payment) => {
     try {
-      const transaction = JSON.parse(payment.transaction_info);
+      const transaction = JSON.parse(payment.transaction_info)
       const derivedPubKey = getPaymentAddress({
         senderPrivateKey: '0000000000000000000000000000000000000000000000000000000000000001',
         recipientPublicKey: payment.merchant_id,
         invoiceNumber: `2-3241645161d8-${payment.payment_id} 1`,
         returnType: 'publicKey',
-      });
-      const expectedAmount = Math.round(payment.amount * 100000000);
+      })
+      const expectedAmount = Math.round(payment.amount * 100000000)
 
-      const pkh = new P2PKH();
-      const derivedScript = pkh.lock(PublicKey.fromString(derivedPubKey).toHash()).toHex();
-      const bsvtx = Transaction.fromHex(transaction.rawTx);
+      const pkh = new P2PKH()
+      const derivedScript = pkh.lock(PublicKey.fromString(derivedPubKey).toHash()).toHex()
+      const bsvtx = Transaction.fromHex(transaction.rawTx)
       const index = bsvtx.outputs.findIndex(
         (x) => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
-      );
+      )
       if (index === -1) {
-        throw new Error('Could not discover our output of this transaction.');
+        throw new Error('Could not discover our output of this transaction.')
       }
       const anyonePub = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
         .toPublicKey()
-        .toDER();
+        .toDER()
       transaction.outputs = [
         {
           vout: index,
@@ -87,7 +87,7 @@ const PaymentsList: React.FC = () => {
           derivationSuffix: '1',
           senderIdentityKey: anyonePub,
         },
-      ];
+      ]
 
       const success = await submitDirectTransaction({
         protocol: '3241645161d8',
@@ -96,9 +96,9 @@ const PaymentsList: React.FC = () => {
         transaction,
         note: 'Receive a payment',
         amount: Math.round(payment.amount * 100000000),
-      });
+      })
       if (!success.referenceNumber) {
-        throw new Error('Unable to submit incoming payment.');
+        throw new Error('Unable to submit incoming payment.')
       }
       const response = await authrite.request(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
         method: 'POST',
@@ -106,23 +106,23 @@ const PaymentsList: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ paymentId: payment.payment_id }),
-      });
-      const data = JSON.parse(new TextDecoder().decode(response.body));
+      })
+      const data = JSON.parse(new TextDecoder().decode(response.body))
       if (data.status === 'error') {
-        throw new Error(response.message);
+        throw new Error(response.message)
       }
-      await fetchPayments(); // Refresh the list to show the updated status
+      await fetchPayments() // Refresh the list to show the updated status
     } catch (err: any) {
-      setError(`Acknowledging payment failed: ${err.message}`);
+      setError(`Acknowledging payment failed: ${err.message}`)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchPayments();
-  }, [page, sortOrder]);
+    fetchPayments()
+  }, [page, sortOrder])
 
-  if (loading) return <CircularProgress />;
-  if (error) return <Typography color="error">{error}</Typography>;
+  if (loading) return <CircularProgress />
+  if (error) return <Typography color="error">{error}</Typography>
 
   return (
     <Container>
@@ -184,7 +184,7 @@ const PaymentsList: React.FC = () => {
         </Button>
       </Box>
     </Container>
-  );
-};
+  )
+}
 
-export default PaymentsList;
+export default PaymentsList
