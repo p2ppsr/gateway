@@ -44,10 +44,10 @@ const Create: React.FC = () => {
   const [hasMetaNet, setHasMetaNet] = useState(false)
   const [customCSS, setCustomCSS] = useState(
     `.customCSS {
-  border-radius: 2em
-  border: none
-  padding: 0.7em
-  min-width: 10em
+  border-radius: 2em;
+  border: none;
+  padding: 0.7em;
+  min-width: 10em;
 }`
   )
   const [amountInSats, setAmountInSats] = useState(1000)
