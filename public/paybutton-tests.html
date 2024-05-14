@@ -2,21 +2,40 @@
 <html lang="en">
 
 <head>
-    <meta charset="utf-8" />
+    <!-- <meta charset="utf-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="Babbage app powered by the Bitcoin SV (BSV) blockchain" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/manifest.json" /> -->
     <title>Gateway</title>
-    <script defer="defer" src="/pay.js"></script>
+    <script src="./pay.js"></script>
 </head>
 
 <body>
-    <div class="gateway-paybutton" data-merchant="0216dc3ec2ceda65bfa90d6cceaf8f1955311a45df0fc630c9a18de984577959ef"
-        data-button="b7a43a0dc22f995d452c90ff" data-amount="0.00001033" data-currency="BSV" data-text="Pay Now"
-        data-server="http://localhost:3000">
-    </div>
+<style>
+.customCSS {
+  background: linear-gradient(45deg, #ff6b6b, #f4d03f);
+  color: white;
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  width: '100px';
+  height: '50px';
+}
+</style>
+<div
+  class="gateway-paybutton"
+  data-merchant="02ce39558560fe2219636460b1ce1d8bb5760097656bf2bf21f7d1db422223c4ee"
+  data-button="005f27395f2f47ba738b7b17"
+  data-amount="0.0001"
+  data-currency="BSV"
+  data-text="Buy me a Coffee"
+  data-server="http://localhost:3000"
+></div>
 </body>
 
 </html>

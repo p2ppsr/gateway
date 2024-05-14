@@ -1,209 +1,134 @@
-import React, { ReactNode } from 'react'
-import {
-    createTheme, ThemeProvider, StyledEngineProvider
-} from '@mui/material/styles'
-import { makeStyles } from '@mui/styles'
+import React, { ReactNode, useMemo, useState } from 'react';
+import { createTheme, ThemeProvider, StyledEngineProvider, Theme } from '@mui/material/styles';
+import { makeStyles, createStyles } from '@mui/styles';
 
-const baseTheme = createTheme({
-    spacing: 8,
-    typography: {
-        a: {
-            fontWeight: 'medium'
-        },
-        h1: {
-            fontFamily: 'Satoshi',
-            fontWeight: 'bold',
-            fontSize: '3em',
-            color: '#424242'
-        },
-        h2: {
-            fontFamily: 'Satoshi',
-            fontWeight: 'bold',
-            fontSize: '2.5em',
-            color: '#424242'
-        },
-        h3: {
-            fontFamily: 'Satoshi',
-            fontWeight: 'normal',
-            fontSize: '2em',
-            color: '#424242'
-        },
-        h4: {
-            fontFamily: 'Satoshi',
-            fontSize: '1.75em',
-            color: '#424242'
-        },
-        h5: {
-            fontFamily: 'Satoshi',
-            fontSize: '1.5em',
-            color: '#424242'
-        },
-        h6: {
-            fontFamily: 'Satoshi',
-            fontSize: '1.25em',
-            color: '#424242'
-        }
-    },
-    palette: {
-        primary: {
-            main: '#424242'
-        },
-        secondary: {
-            main: '#FC433F'
-        },
-        cli: {
-            main: '#31C4A0'
-        }
-    },
-    overrides: {
-        footerBackground: 'white',
-        footerText: '#424242',
-        navTextInactive: '#F68A8A',
-        logoText: '#424242',
-        lilDiv: '#DDE7FF'
-    },
-    maxContentWidth: '1440px'
-})
+const commonTypography = {
+  fontFamily: 'Satoshi',
+  color: '#424242',
+};
 
-const extendedTheme = theme => ({
-    ...theme,
-    typography: {
-        ...theme.typography,
-        h1: {
-            ...theme.typography.h1,
-            [theme.breakpoints.down('md')]: {
-                fontSize: '1.8em'
-            }
-        },
-        h2: {
-            ...theme.typography.h2,
-            [theme.breakpoints.down('md')]: {
-                fontSize: '1.6em'
-            }
-        }
-    },
-    templates: {
-        page_wrap: {
-            maxWidth: `min(${theme.maxContentWidth}, 100vw)`,
-            margin: 'auto',
-            boxSizing: 'border-box',
-            padding: theme.spacing(7),
-            [theme.breakpoints.down('lg')]: {
-                padding: theme.spacing(5)
-            },
-            [theme.breakpoints.down('md')]: {
-                padding: theme.spacing(3)
-            },
-            [theme.breakpoints.down('sm')]: {
-                padding: theme.spacing(1)
-            }
-        },
-        subheading: {
-            fontWeight: 'bold',
-            fontSize: '24px',
-            width: '90%',
-            maxWidth: '600px',
-            color: '#424242',
-            textAlign: 'center',
-            margin: 'auto',
-            [theme.breakpoints.up('lg')]: {
-                fontSize: '32px'
-            }
-        },
-        subheading_drk: {
-            fontWeight: 'bold',
-            fontSize: '24px',
-            width: '90%',
-            color: '#FFF',
-            maxWidth: '600px',
-            textAlign: 'center',
-            margin: 'auto',
-            [theme.breakpoints.up('lg')]: {
-                fontSize: '32px'
-            }
-        },
-        subheading_f: {
-            fontWeight: 'bold',
-            fontSize: '24px',
-            width: '90%',
-            color: '#424242',
-            maxWidth: '600px',
-            textAlign: 'left',
-            [theme.breakpoints.up('lg')]: {
-                fontSize: '32px'
-            }
-        },
-        subheading_f_drk: {
-            fontWeight: 'bold',
-            fontSize: '24px',
-            width: '90%',
-            color: '#FFF',
-            maxWidth: '600px',
-            textAlign: 'left',
-            [theme.breakpoints.up('lg')]: {
-                fontSize: '32px'
-            }
-        }
-    }
-})
+const lightTheme = createTheme({
+  spacing: 8,
+  typography: {
+    ...commonTypography,
+    h1: { fontWeight: 'bold', fontSize: '3em' },
+    h2: { fontWeight: 'bold', fontSize: '2.5em' },
+    h3: { fontWeight: 'normal', fontSize: '2em' },
+    h4: { fontSize: '1.75em' },
+    h5: { fontSize: '1.5em' },
+    h6: { fontSize: '1.25em' },
+  },
+  palette: {
+    mode: 'light',
+    primary: { main: '#424242' },
+    secondary: { main: '#FC433F' },
+    background: { default: '#ffffff' },
+  },
+  maxContentWidth: '1440px',
+});
 
-const useStyles = makeStyles({
-    '@global html': {
-        padding: '0px',
-        margin: '0px'
+const darkTheme = createTheme({
+  spacing: 8,
+  typography: {
+    ...commonTypography,
+    h1: { fontWeight: 'bold', fontSize: '3em', color: '#ffffff' },
+    h2: { fontWeight: 'bold', fontSize: '2.5em', color: '#ffffff' },
+    h3: { fontWeight: 'normal', fontSize: '2em', color: '#ffffff' },
+    h4: { fontSize: '1.75em', color: '#ffffff' },
+    h5: { fontSize: '1.5em', color: '#ffffff' },
+    h6: { fontSize: '1.25em', color: '#ffffff' },
+  },
+  palette: {
+    mode: 'dark',
+    primary: { main: '#ffffff' },
+    secondary: { main: '#FC433F' },
+    background: { default: '#121212' },
+  },
+  maxContentWidth: '1440px',
+});
+
+const extendedTheme = (theme: Theme) => ({
+  ...theme,
+  typography: {
+    ...theme.typography,
+    h1: {
+      ...theme.typography.h1,
+      [theme.breakpoints.down('md')]: { fontSize: '1.8em' },
     },
-    '@global body': {
-        padding: '0px',
-        margin: '0px',
-        fontFamily: 'helvetica'
+    h2: {
+      ...theme.typography.h2,
+      [theme.breakpoints.down('md')]: { fontSize: '1.6em' },
+    },
+  },
+  templates: {
+    page_wrap: {
+      maxWidth: `min(${theme.maxContentWidth}, 100vw)`,
+      margin: 'auto',
+      boxSizing: 'border-box',
+      padding: theme.spacing(7),
+      [theme.breakpoints.down('lg')]: { padding: theme.spacing(5) },
+      [theme.breakpoints.down('md')]: { padding: theme.spacing(3) },
+      [theme.breakpoints.down('sm')]: { padding: theme.spacing(1) },
+    },
+    subheading: {
+      fontWeight: 'bold',
+      fontSize: '24px',
+      width: '90%',
+      maxWidth: '600px',
+      color: theme.palette.mode === 'dark' ? '#FFF' : '#424242',
+      textAlign: 'center',
+      margin: 'auto',
+      [theme.breakpoints.up('lg')]: { fontSize: '32px' },
+    },
+    subheading_f: {
+      fontWeight: 'bold',
+      fontSize: '24px',
+      width: '90%',
+      color: theme.palette.mode === 'dark' ? '#FFF' : '#424242',
+      maxWidth: '600px',
+      textAlign: 'left',
+      [theme.breakpoints.up('lg')]: { fontSize: '32px' },
+    },
+  },
+});
+
+const useStyles = makeStyles((theme: Theme) =>
+  createStyles({
+    '@global html, body': {
+      padding: '0px',
+      margin: '0px',
+      fontFamily: 'helvetica',
+      backgroundColor: theme.palette.background.default,
+      color: theme.palette.mode === 'dark' ? '#ffffff' : '#424242'
     },
     '@global a': {
-        textDecoration: 'none',
-        color: '#FC433F'
+      textDecoration: 'none',
+      color: '#FC433F',
     },
-    '@global h1': {
-        fontWeight: 'bold',
-        fontSize: '2.5em',
-        color: '#424242'
-    },
-    '@global h2': {
-        fontWeight: 'bold',
-        fontSize: '1.7em',
-        color: '#424242'
-    },
-    '@global h3': {
+  })
+);
 
-        fontSize: '1.4em',
-        color: '#424242'
-    },
-    '@global h4': {
-        fontSize: '1.25em',
-        color: '#424242'
-    },
-    '@global h5': {
-        fontSize: '1.1em',
-        color: '#424242'
-    },
-    '@global h6': {
-        fontSize: '1em',
-        color: '#424242'
-    }
-})
+const GlobalStyles = () => {
+  useStyles();
+  return null;
+};
 
-/**
- * Defines global styles and the theme
- */
-const Theme = ({ children }: { children: ReactNode }) => {
-    useStyles() // Applies global styles
-    return (
-        <StyledEngineProvider injectFirst>
-            <ThemeProvider theme={baseTheme}>
-                <ThemeProvider theme={extendedTheme}>
-                    {children}
-                </ThemeProvider>
-            </ThemeProvider>
-        </StyledEngineProvider>
-    )
-}
+const ThemeWrapper = ({ children }: { children: ReactNode }) => {
+  const [mode, setMode] = useState<'light' | 'dark'>('dark'); // Default to dark mode
 
-export default Theme
+  const theme = useMemo(() => {
+    const base = mode === 'light' ? lightTheme : darkTheme;
+    return createTheme(extendedTheme(base));
+  }, [mode]);
+
+  return (
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={theme}>
+        <GlobalStyles />
+        {children}
+      </ThemeProvider>
+    </StyledEngineProvider>
+  );
+};
+
+export default ThemeWrapper;
