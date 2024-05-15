@@ -13,6 +13,7 @@ import Buttons from './pages/Buttons'
 import Payments from './pages/Payments'
 import Actions from './pages/Actions'
 import Money from './pages/Money'
+import Home from './pages/Home'
 
 const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
@@ -44,7 +45,8 @@ const App = () => {
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
-          <Route path="/" element={<Create />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/create" element={<Create />} />
           <Route path="/buttons" element={<Buttons />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/actions" element={<Actions />} />

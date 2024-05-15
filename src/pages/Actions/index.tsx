@@ -49,7 +49,7 @@ const PaymentActionsList: React.FC = () => {
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom paddingTop='1em'>
         My Payment Actions
       </Typography>
       <Paper elevation={3}>

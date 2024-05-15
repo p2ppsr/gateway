@@ -81,7 +81,7 @@ const PayButton = ({
   if (!paid) {
     return (
       <button
-        className="customCSS"
+        className="gateway-button-styles"
         onClick={handleClick}
         disabled={loading}
       >

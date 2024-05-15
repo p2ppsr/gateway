@@ -1,11 +1,11 @@
-import React, { ReactNode, useMemo, useState } from 'react';
-import { createTheme, ThemeProvider, StyledEngineProvider, Theme } from '@mui/material/styles';
-import { makeStyles, createStyles } from '@mui/styles';
+import React, { ReactNode, useMemo, useState } from 'react'
+import { createTheme, ThemeProvider, StyledEngineProvider, Theme } from '@mui/material/styles'
+import { makeStyles, createStyles } from '@mui/styles'
 
 const commonTypography = {
   fontFamily: 'Satoshi',
   color: '#424242',
-};
+}
 
 const lightTheme = createTheme({
   spacing: 8,
@@ -25,7 +25,7 @@ const lightTheme = createTheme({
     background: { default: '#ffffff' },
   },
   maxContentWidth: '1440px',
-});
+})
 
 const darkTheme = createTheme({
   spacing: 8,
@@ -41,11 +41,11 @@ const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: { main: '#ffffff' },
-    secondary: { main: '#FC433F' },
-    background: { default: '#121212' },
+    secondary: { main: '#5E59F9' },
+    background: { default: '#323537' },
   },
   maxContentWidth: '1440px',
-});
+})
 
 const extendedTheme = (theme: Theme) => ({
   ...theme,
@@ -90,7 +90,7 @@ const extendedTheme = (theme: Theme) => ({
       [theme.breakpoints.up('lg')]: { fontSize: '32px' },
     },
   },
-});
+})
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -106,20 +106,20 @@ const useStyles = makeStyles((theme: Theme) =>
       color: '#FC433F',
     },
   })
-);
+)
 
 const GlobalStyles = () => {
-  useStyles();
-  return null;
-};
+  useStyles()
+  return null
+}
 
 const ThemeWrapper = ({ children }: { children: ReactNode }) => {
-  const [mode, setMode] = useState<'light' | 'dark'>('dark'); // Default to dark mode
+  const [mode, setMode] = useState<'light' | 'dark'>('dark') // Default to dark mode
 
   const theme = useMemo(() => {
-    const base = mode === 'light' ? lightTheme : darkTheme;
-    return createTheme(extendedTheme(base));
-  }, [mode]);
+    const base = mode === 'light' ? lightTheme : darkTheme
+    return createTheme(extendedTheme(base))
+  }, [mode])
 
   return (
     <StyledEngineProvider injectFirst>
@@ -128,7 +128,7 @@ const ThemeWrapper = ({ children }: { children: ReactNode }) => {
         {children}
       </ThemeProvider>
     </StyledEngineProvider>
-  );
-};
+  )
+}
 
-export default ThemeWrapper;
+export default ThemeWrapper

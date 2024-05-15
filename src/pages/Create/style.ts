@@ -7,7 +7,7 @@ const useStyles = makeStyles((theme) => ({
       ? 'linear-gradient(135deg, #3a3d40 0%, #181818 100%)'
       : 'linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%)',
     color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-    paddingTop: theme.spacing(8),
+    paddingTop: theme.spacing(2),
     paddingBottom: theme.spacing(8),
     '& h3, & h2, & h4, & h5, & h6, & .MuiTypography-subtitle1': {
       color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
@@ -52,7 +52,7 @@ const useStyles = makeStyles((theme) => ({
   },
   centeredHeader: {
     textAlign: 'center',
-    marginBottom: theme.spacing(4),
+    marginBottom: theme.spacing(7),
     color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
   },
   textField: {

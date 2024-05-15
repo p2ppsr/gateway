@@ -1,4 +1,4 @@
-import { createStyles, Theme } from '@mui/material/styles';
+import { createStyles, Theme } from '@mui/material/styles'
 
 export default (theme: Theme) =>
   createStyles({
@@ -31,10 +31,10 @@ export default (theme: Theme) =>
     moneyLink: {
       color: theme.palette.secondary.contrastText,
       backgroundColor: theme.palette.secondary.main,
-      padding: theme.spacing(1),
+      padding: theme.spacing(0.5, 1),
       borderRadius: theme.shape.borderRadius,
       '&:hover': {
         backgroundColor: theme.palette.secondary.light,
       },
     },
-  });
+  })

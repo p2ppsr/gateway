@@ -43,7 +43,7 @@ const Create: React.FC = () => {
   const [showCode, setShowCode] = useState(false)
   const [hasMetaNet, setHasMetaNet] = useState(false)
   const [customCSS, setCustomCSS] = useState(
-    `.customCSS {
+    `.gateway-button-styles {
   border-radius: 2em;
   border: none;
   padding: 0.7em;
@@ -237,6 +237,7 @@ const Create: React.FC = () => {
 ${customCSS}
 </style>` : ''}
 <div
+  class="gateway-paybutton"
   data-merchant="${merchant}"
   data-button="${buttonID}"
   data-amount="${amountInSats}"
