@@ -126,7 +126,7 @@ const PaymentsList: React.FC = () => {
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom paddingTop='1em'>
         Payments
       </Typography>
       <TableContainer component={Paper}>
@@ -167,7 +167,7 @@ const PaymentsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {payments.length === 0 && <Typography>No payments found.</Typography>}
+      {payments.length === 0 && <Typography paddingTop='1em'>No payments found.</Typography>}
       <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
         <IconButton onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           <ArrowBack />
