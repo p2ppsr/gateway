@@ -21,18 +21,18 @@ const App = () => {
   useEffect(() => {
     (async () => {
       try {
-        // const statusResponse = await Authrite.request(
-        //   `${location.protocol}//${location.host}/api/getStatus`, {
-        //   method: 'GET'
-        // })
-        // const status = JSON.parse(
-        //   new TextDecoder().decode(statusResponse.body)
-        // )
-        // setIsAdmin(status.isAdmin)
-        // const metanetNetwork = await getNetwork()
-        // if (status.network !== metanetNetwork) {
-        //   alert(`WARNING! Your MetaNet Client is using ${metanetNetwork} but the payment server is using ${status.network}!\n\nPlease be aware of which network you are using.`)
-        // }
+        const statusResponse = await Authrite.request(
+          `${window.location.protocol}//${window.location.host}/api/getStatus`, {
+          method: 'GET'
+        })
+        const status = JSON.parse(
+          new TextDecoder().decode(statusResponse.body)
+        )
+        setIsAdmin(status.isAdmin)
+        const metanetNetwork = await getNetwork()
+        if (status.network !== metanetNetwork) {
+          window.alert(`WARNING! Your MetaNet Client is using ${metanetNetwork} but the payment server is using ${status.network}!\n\nPlease be aware of which network you are using.`)
+        }
       } catch (e) {
         console.error(e)
       }
