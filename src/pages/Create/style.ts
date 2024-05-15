@@ -3,9 +3,6 @@ import { makeStyles } from '@mui/styles';
 const useStyles = makeStyles((theme) => ({
   root: {
     minHeight: '100vh',
-    background: theme.palette.mode === 'dark'
-      ? 'linear-gradient(135deg, #3a3d40 0%, #181818 100%)'
-      : 'linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%)',
     color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
     paddingTop: theme.spacing(2),
     paddingBottom: theme.spacing(8),
