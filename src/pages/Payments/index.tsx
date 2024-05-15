@@ -123,7 +123,16 @@ const PaymentsList: React.FC = () => {
     fetchPayments()
   }, [page, sortOrder])
 
-  if (loading) return <CircularProgress />
+  if (loading) return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh'
+    }}>
+      <CircularProgress />
+    </div>
+  )
   if (error) return <Typography color="error">{error}</Typography>
 
   return (

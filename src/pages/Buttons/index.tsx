@@ -78,7 +78,16 @@ const PaymentButtonsList: React.FC = () => {
     fetchButtons(page, sortOrder, usedFilter)
   }, [page, sortOrder, usedFilter])
 
-  if (loading) return <CircularProgress />
+  if (loading) return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '100vh'
+    }}>
+      <CircularProgress />
+    </div>
+  )
   if (error) return <Typography color="error">Error: {error}</Typography>
 
   return (
