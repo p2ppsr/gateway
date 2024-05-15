@@ -4,7 +4,7 @@ const useStyles = makeStyles((theme) => ({
   root: {
     minHeight: '100vh',
     color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-    paddingTop: theme.spacing(2),
+    paddingTop: theme.spacing(1),
     paddingBottom: theme.spacing(8),
     '& h3, & h2, & h4, & h5, & h6, & .MuiTypography-subtitle1': {
       color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',

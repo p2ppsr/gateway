@@ -89,6 +89,11 @@ const extendedTheme = (theme: Theme) => ({
       textAlign: 'left',
       [theme.breakpoints.up('lg')]: { fontSize: '32px' },
     },
+    centeredHeader: {
+      textAlign: 'center',
+      marginBottom: theme.spacing(7),
+      color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+    }
   },
 })
 

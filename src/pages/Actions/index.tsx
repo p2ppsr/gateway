@@ -6,9 +6,11 @@ import {
   Paper,
   Box,
 } from '@mui/material'
+import { useTheme } from '@emotion/react'
 // import authrite from '../../utils/Authrite'
 
 const PaymentActionsList: React.FC = () => {
+  const theme = useTheme()
   // const [loading, setLoading] = useState(true)
   // const [error, setError] = useState('')
   // const [page, setPage] = useState(1)
@@ -49,9 +51,17 @@ const PaymentActionsList: React.FC = () => {
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom paddingTop='1em'>
-        My Payment Actions
-      </Typography>
+      <Box style={{
+        textAlign: 'center',
+        marginBottom: theme.spacing(4),
+        marginTop: theme.spacing(5),
+        color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+      }}>
+        <Typography variant="h2">Payment Actions</Typography>
+        <Typography variant="subtitle1">
+          Manage the specialized payment actions you have created.
+        </Typography>
+      </Box>
       <Paper elevation={3}>
         <Box p={3}>
           <Typography variant="body1">

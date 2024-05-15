@@ -19,6 +19,7 @@ import {
   Box
 } from '@mui/material'
 import authrite from '../../utils/Authrite'
+import { makeStyles } from '@mui/styles'
 
 interface PaymentButton {
   button_id: string
@@ -31,6 +32,14 @@ interface PaymentButton {
   total_paid: number
 }
 
+const useStyles = makeStyles((theme) => ({
+  centeredHeader: {
+    textAlign: 'center',
+    marginBottom: theme.spacing(3),
+    color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+  },
+}))
+
 const PaymentButtonsList: React.FC = () => {
   const [buttons, setButtons] = useState<PaymentButton[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +49,7 @@ const PaymentButtonsList: React.FC = () => {
   const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
 
   const theme = useTheme()
+  const classes = useStyles({ theme });
 
   const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
     setLoading(true)
@@ -73,9 +83,12 @@ const PaymentButtonsList: React.FC = () => {
 
   return (
     <Container style={{ backgroundColor: theme.palette.background.default, padding: theme.spacing(4) }}>
-      <Typography variant="h4" gutterBottom>
-        Payment Buttons
-      </Typography>
+      <Box className={classes.centeredHeader}>
+        <Typography variant="h2">Payment Buttons</Typography>
+        <Typography variant="subtitle1">
+          View all the payment buttons you have created
+        </Typography>
+      </Box>
       <FormControl variant="outlined" fullWidth margin="normal">
         <InputLabel>Filter by usage</InputLabel>
         <Select

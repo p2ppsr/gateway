@@ -19,6 +19,7 @@ import authrite from '../../utils/Authrite'
 import { submitDirectTransaction } from '@babbage/sdk-ts'
 import { getPaymentAddress } from 'sendover'
 import { Transaction, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk'
+import { useTheme } from '@emotion/react'
 
 interface Payment {
   payment_id: string
@@ -37,6 +38,7 @@ const PaymentsList: React.FC = () => {
   const [error, setError] = useState<string>('')
   const [page, setPage] = useState(1)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const theme = useTheme()
 
   const fetchPayments = async () => {
     setLoading(true)
@@ -126,9 +128,17 @@ const PaymentsList: React.FC = () => {
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom paddingTop='1em'>
-        Payments
-      </Typography>
+      <Box style={{
+        textAlign: 'center',
+        marginBottom: theme.spacing(4),
+        marginTop: theme.spacing(5),
+        color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+      }}>
+        <Typography variant="h2">Payments</Typography>
+        <Typography variant="subtitle1">
+          Acknowledge your incoming payments
+        </Typography>
+      </Box>
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
