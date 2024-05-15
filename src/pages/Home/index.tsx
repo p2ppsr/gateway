@@ -63,7 +63,7 @@ const HomePage: React.FC = () => {
             </Typography>
             <Typography variant="body1" sx={{ mb: 4, color: '#ffffff' }}>
               Easily integrates with your favorite platforms including
-              WordPress, HTML, Weebly, Wix, Google Sites.
+              WordPress, HTML, Weebly, Wix, and Google Sites.
             </Typography>
             <GradientButton variant="contained" onClick={() => navigate('/create')}>
               CREATE A BUTTON
