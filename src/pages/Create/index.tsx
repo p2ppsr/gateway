@@ -75,10 +75,14 @@ const Create: React.FC = () => {
 
   useEffect(() => {
     (async () => {
-      await currencyConverter.initialize()
-      setCurrencySymbol(currencyConverter.getCurrencySymbol())
-      const satoshis = await currencyConverter.convertCurrency(Number(paymentAmount), currencyConverter.preferredCurrency, 'BSV')
-      setAmountInSats(satoshis || 1000)
+      try {
+        await currencyConverter.initialize()
+        setCurrencySymbol(currencyConverter.getCurrencySymbol())
+        const satoshis = await currencyConverter.convertCurrency(Number(paymentAmount), currencyConverter.preferredCurrency, 'BSV')
+        setAmountInSats(satoshis || 1000)
+      } catch (error) {
+        console.error('Failed to fetch currency:', error)
+      }
     })()
   }, [])
 

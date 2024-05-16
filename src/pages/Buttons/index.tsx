@@ -42,7 +42,7 @@ const useStyles = makeStyles((theme) => ({
 
 const PaymentButtonsList: React.FC = () => {
   const [buttons, setButtons] = useState<PaymentButton[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -52,9 +52,9 @@ const PaymentButtonsList: React.FC = () => {
   const classes = useStyles({ theme });
 
   const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
-    setLoading(true)
     setError('')
     try {
+      setLoading(true)
       let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
       if (usedFilter !== 'all') {
         url += `&usage=${usedFilter}`
@@ -75,7 +75,9 @@ const PaymentButtonsList: React.FC = () => {
   }
 
   useEffect(() => {
-    fetchButtons(page, sortOrder, usedFilter)
+    (async () => {
+      await fetchButtons(page, sortOrder, usedFilter)
+    })()
   }, [page, sortOrder, usedFilter])
 
   if (loading) return (
@@ -88,7 +90,16 @@ const PaymentButtonsList: React.FC = () => {
       <CircularProgress />
     </div>
   )
-  if (error) return <Typography color="error">Error: {error}</Typography>
+  if (error) return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      minHeight: '90vh'
+    }}>
+      <Typography color="error">Error: {error}</Typography>
+    </div>
+  )
 
   return (
     <Container style={{ backgroundColor: theme.palette.background.default, padding: theme.spacing(4) }}>

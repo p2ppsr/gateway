@@ -5,18 +5,28 @@ export default (theme: Theme) =>
     navbar: {
       boxShadow: theme.shadows[3],
       marginBottom: theme.spacing(1),
+      maxWidth: '1920px',
+      margin: '0 auto',
     },
     toolbar: {
       display: 'flex',
       justifyContent: 'space-between',
+      alignItems: 'center',
+      position: 'relative',
     },
     logo: {
       fontWeight: 'bold',
       cursor: 'pointer',
     },
+    navLinksWrapper: {
+      display: 'flex',
+      flex: 1,
+      justifyContent: 'center',
+      position: 'relative',
+    },
     navLinks: {
       display: 'flex',
-      gap: theme.spacing(2),
+      gap: theme.spacing(4),
     },
     link: {
       color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
@@ -36,5 +46,9 @@ export default (theme: Theme) =>
       '&:hover': {
         backgroundColor: theme.palette.secondary.light,
       },
+    },
+    moneyLinkWrapper: {
+      position: 'absolute',
+      right: 0,
     },
   })

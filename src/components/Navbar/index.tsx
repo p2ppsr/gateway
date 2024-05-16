@@ -64,43 +64,49 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
             </Drawer>
           </>
         ) : (
-          <div className={classes.navLinks}>
-            <Button
-              component={Link}
-              to='/'
-              className={location.pathname === '/' ? classes.activeLink : classes.link}
-            >
-              Home
-            </Button>
-            <Button
-              component={Link}
-              to='/create'
-              className={location.pathname === '/create' ? classes.activeLink : classes.link}
-            >
-              Create a Button
-            </Button>
-            <Button
-              component={Link}
-              to='/buttons'
-              className={location.pathname === '/buttons' ? classes.activeLink : classes.link}
-            >
-              Your Buttons
-            </Button>
-            <Button
-              component={Link}
-              to='/actions'
-              className={location.pathname === '/actions' ? classes.activeLink : classes.link}
-            >
-              Payment Actions
-            </Button>
-            <Button
-              component={Link}
-              to='/payments'
-              className={location.pathname === '/payments' ? classes.activeLink : classes.moneyLink}
-              startIcon={<AccountBalanceWallet />}
-            >
-              Payments
-            </Button>
+          <>
+            <div className={classes.navLinksWrapper}>
+              <div className={classes.navLinks}>
+                <Button
+                  component={Link}
+                  to='/'
+                  className={location.pathname === '/' ? classes.activeLink : classes.link}
+                >
+                  Home
+                </Button>
+                <Button
+                  component={Link}
+                  to='/create'
+                  className={location.pathname === '/create' ? classes.activeLink : classes.link}
+                >
+                  Create a Button
+                </Button>
+                <Button
+                  component={Link}
+                  to='/buttons'
+                  className={location.pathname === '/buttons' ? classes.activeLink : classes.link}
+                >
+                  Your Buttons
+                </Button>
+                <Button
+                  component={Link}
+                  to='/actions'
+                  className={location.pathname === '/actions' ? classes.activeLink : classes.link}
+                >
+                  Payment Actions
+                </Button>
+              </div>
+              <div className={classes.moneyLinkWrapper}>
+                <Button
+                  component={Link}
+                  to='/payments'
+                  className={location.pathname === '/payments' ? classes.activeLink : classes.moneyLink}
+                  startIcon={<AccountBalanceWallet />}
+                >
+                  Payments
+                </Button>
+              </div>
+            </div>
             {isAdmin && (
               <Button
                 component={Link}
@@ -110,7 +116,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
                 Admin Dashboard
               </Button>
             )}
-          </div>
+          </>
         )}
       </Toolbar>
     </AppBar>

@@ -14,6 +14,7 @@ import Payments from './pages/Payments'
 import Actions from './pages/Actions'
 import Money from './pages/Money'
 import Home from './pages/Home'
+import { Container, CssBaseline } from '@mui/material'
 
 const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
@@ -41,18 +42,21 @@ const App = () => {
 
   return (
     <Theme>
-      <ToastContainer position="top-center" containerId="alertToast" autoClose={5000} />
+      <ToastContainer position='top-center' containerId='alertToast' autoClose={5000} />
+      <CssBaseline />
+      {/* <Container maxWidth='xl' sx={{ padding: '0 !important' }}> */}
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/create" element={<Create />} />
-          <Route path="/buttons" element={<Buttons />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/actions" element={<Actions />} />
-          <Route path="/money" element={<Money />} />
+          <Route path='/' element={<Home />} />
+          <Route path='/create' element={<Create />} />
+          <Route path='/buttons' element={<Buttons />} />
+          <Route path='/payments' element={<Payments />} />
+          <Route path='/actions' element={<Actions />} />
+          <Route path='/money' element={<Money />} />
         </Routes>
       </Router>
+      {/* </Container> */}
     </Theme>
   )
 }
