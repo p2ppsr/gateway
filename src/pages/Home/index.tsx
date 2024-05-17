@@ -152,15 +152,6 @@ const HomePage: React.FC = () => {
                   }
                 />
               </ListItem>
-              <ListItem disablePadding>
-                <ListItemText
-                  primary={
-                    <Typography>
-                      <span style={{ fontWeight: 'bold' }}>Zapier</span> - Trigger events across thousands of services when buttons fire
-                    </Typography>
-                  }
-                />
-              </ListItem>
             </List>
             <Button
               variant="contained"
