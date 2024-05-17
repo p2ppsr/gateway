@@ -46,7 +46,7 @@ const Create: React.FC = () => {
     `.gateway-button-styles {
   border-radius: 2em;
   border: none;
-  padding: 0.7em 0;
+  padding: 0.7em 1em 0.7em 1em;
   min-width: 10em;
   background: linear-gradient(145deg, #8484FA, #5050F2);
   color: white;
