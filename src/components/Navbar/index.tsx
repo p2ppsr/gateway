@@ -7,6 +7,7 @@ import { useTheme } from '@mui/material/styles'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import style from './style'
 
+
 const useStyles = makeStyles(style, { name: 'Navbar' })
 
 const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
@@ -23,9 +24,6 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
   const drawer = (
     <List>
       <ListItem button component={Link} to='/' onClick={() => setDrawerOpen(false)}>
-        <ListItemText primary="Home" />
-      </ListItem>
-      <ListItem button component={Link} to='/create' onClick={() => setDrawerOpen(false)}>
         <ListItemText primary="Create a Button" />
       </ListItem>
       <ListItem button component={Link} to='/buttons' onClick={() => setDrawerOpen(false)}>
@@ -71,13 +69,6 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
                   component={Link}
                   to='/'
                   className={location.pathname === '/' ? classes.activeLink : classes.link}
-                >
-                  Home
-                </Button>
-                <Button
-                  component={Link}
-                  to='/create'
-                  className={location.pathname === '/create' ? classes.activeLink : classes.link}
                 >
                   Create a Button
                 </Button>

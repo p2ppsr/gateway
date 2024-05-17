@@ -5,19 +5,37 @@ import 'react-toastify/dist/ReactToastify.css'
 import Theme from './components/Theme'
 import Authrite from './utils/Authrite'
 import { getNetwork } from '@babbage/sdk-ts'
-
 import Navbar from './components/Navbar'
-
 import Create from './pages/Create'
 import Buttons from './pages/Buttons'
 import Payments from './pages/Payments'
 import Actions from './pages/Actions'
 import Money from './pages/Money'
-import Home from './pages/Home'
-import { Container, CssBaseline } from '@mui/material'
+import useAsyncEffect from 'use-async-effect'
+import { NoMncModal, checkForMetaNetClient } from 'metanet-react-prompt'
+import { CssBaseline } from '@mui/material'
 
 const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isMncMissing, setIsMncMissing] = useState(false)
+
+
+  // Run a 1s interval for checking if MNC is running
+  useAsyncEffect(async () => {
+    const intervalId = setInterval(async () => {
+      const hasMNC = await checkForMetaNetClient()
+      if (hasMNC === 0) {
+        setIsMncMissing(true)
+      } else {
+        setIsMncMissing(false)
+      }
+    }, 1000)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [])
+
 
   useEffect(() => {
     (async () => {
@@ -43,13 +61,13 @@ const App = () => {
   return (
     <Theme>
       <ToastContainer position='top-center' containerId='alertToast' autoClose={5000} />
+      <NoMncModal appName='Gateway' open={isMncMissing} onClose={() => setIsMncMissing(false)} />
       <CssBaseline />
       {/* <Container maxWidth='xl' sx={{ padding: '0 !important' }}> */}
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
-          <Route path='/' element={<Home />} />
-          <Route path='/create' element={<Create />} />
+          <Route path='/' element={<Create />} />
           <Route path='/buttons' element={<Buttons />} />
           <Route path='/payments' element={<Payments />} />
           <Route path='/actions' element={<Actions />} />
