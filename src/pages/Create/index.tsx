@@ -46,8 +46,20 @@ const Create: React.FC = () => {
     `.gateway-button-styles {
   border-radius: 2em;
   border: none;
-  padding: 0.7em;
+  padding: 0.7em 0;
   min-width: 10em;
+  background: linear-gradient(145deg, #8484FA, #5050F2);
+  color: white;
+  box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+  user-select: none;
+  transition: all 0.3s;
+  font-weight: bold;
+}
+
+.gateway-button-styles:hover {
+  cursor: pointer;
+  box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(145deg, #ABABFF, #5050F2);
 }`
   )
   const [amountInSats, setAmountInSats] = useState(1000)
