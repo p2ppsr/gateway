@@ -30,7 +30,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
         <ListItemText primary="Your Buttons" />
       </ListItem>
       <ListItem button component={Link} to='/actions' onClick={() => setDrawerOpen(false)}>
-        <ListItemText primary="Payment Actions" />
+        <ListItemText primary="Actions" />
       </ListItem>
       <ListItem button component={Link} to='/payments' onClick={() => setDrawerOpen(false)}>
         <ListItemText primary="Payments" />
@@ -84,7 +84,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
                   to='/actions'
                   className={location.pathname === '/actions' ? classes.activeLink : classes.link}
                 >
-                  Payment Actions
+                  Actions
                 </Button>
               </div>
               <div className={classes.moneyLinkWrapper}>

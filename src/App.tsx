@@ -19,7 +19,6 @@ const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isMncMissing, setIsMncMissing] = useState(false)
 
-
   // Run a 1s interval for checking if MNC is running
   useAsyncEffect(async () => {
     const intervalId = setInterval(async () => {
@@ -35,7 +34,6 @@ const App = () => {
       clearInterval(intervalId)
     }
   }, [])
-
 
   useEffect(() => {
     (async () => {
