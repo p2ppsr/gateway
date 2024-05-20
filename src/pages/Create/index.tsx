@@ -8,7 +8,10 @@ import {
   Paper,
   Box,
   InputAdornment,
+  Tooltip,
+  IconButton,
 } from '@mui/material'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import PayButton from '../../components/PayButton'
 import checkForMetaNetClient from '../../utils/checkForMetaNetClient'
 import { getPublicKey } from '@babbage/sdk-ts'
@@ -19,6 +22,8 @@ import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/pri
 import { useTheme } from '@mui/material/styles'
 import { AmountInputField } from 'amountinator-react'
 import { CurrencyConverter } from 'amountinator'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import { toast } from 'react-toastify'
 
 const CodeSnippet = ({ code, language }) => {
   const theme = useTheme()
@@ -42,6 +47,7 @@ const Create: React.FC = () => {
   const [buttonID, setButtonID] = useState('')
   const [showCode, setShowCode] = useState(false)
   const [hasMetaNet, setHasMetaNet] = useState(false)
+  const [copySuccess, setCopySuccess] = useState('')
   const [customCSS, setCustomCSS] = useState(
     `.gateway-button-styles {
   border-radius: 2em;
@@ -100,11 +106,9 @@ const Create: React.FC = () => {
 
   const handleAmountChange = useCallback(async (event: any) => {
     const input = event.target.value.replace(/[^0-9.]/g, '')
-    // setPaymentAmount(paymentAmount) // ??
     setPaymentAmount(input)
     setShowCode(false)
     console.log('entered', input)
-    // if (input !== paymentAmount) {
     try {
       const satoshis = await currencyConverter.convertCurrency(Number(input), currencyConverter.preferredCurrency, 'BSV')
       console.log('amount', satoshis)
@@ -112,8 +116,30 @@ const Create: React.FC = () => {
     } catch (error) {
       console.error('Error converting currency:', error)
     }
-    // }
   }, [])
+
+  const handleCopyCode = async () => {
+    const code = `${customCSS ? `<style>
+${customCSS}
+</style>` : ''}
+<div
+  class="gateway-paybutton"
+  data-merchant="${merchant}"
+  data-button="${buttonID}"
+  data-amount="${amountInSats}"
+  data-currency="BSV"
+  data-text="${buttonText}"
+  data-server="${location.protocol}//${location.host}"
+></div>`
+
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopySuccess('success')
+      setTimeout(() => setCopySuccess(''), 2000)
+    } catch (err) {
+      setCopySuccess('failed')
+    }
+  }
 
   useEffect(() => {
     const styleElement = document.createElement('style')
@@ -229,27 +255,24 @@ const Create: React.FC = () => {
                 overflow: 'hidden',
               }}
             >
-              <Paper elevation={3} className={classes.previewSection} style={{ borderRadius: '0.8em' }}>
-                <Typography variant="h4" gutterBottom>
+              <Paper elevation={3} className={classes.previewSection} style={{ borderRadius: '0.8em', position: 'relative' }}>
+                <Typography variant="h4" gutterBottom component="div" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   Button Preview
+                  {showCode && (
+                    <Tooltip title="Copy Code">
+                      <IconButton onClick={handleCopyCode}>
+                        {copySuccess === 'success' ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Typography>
-                <Box sx={{ marginBottom: 2 }}>
-                  <PayButton
-                    text={buttonText}
-                    amount={Number(paymentAmount)}
-                    merchant={merchant}
-                    button={buttonID}
-                    server={`${location.protocol}//${location.host}`}
-                  />
-                </Box>
-                <Typography variant="h5" gutterBottom>
-                  Code Snippet
-                </Typography>
-                {showCode ? (
-                  <Box className={classes.codePreview}>
-                    <CodeSnippet
-                      language="html"
-                      code={`${customCSS ? `<style>
+                {copySuccess === 'failed' && <Typography color="error">Failed to copy code!</Typography>}
+                <Box>
+                  {showCode ? (
+                    <Box className="codePreview">
+                      <CodeSnippet
+                        language="html"
+                        code={`${customCSS ? `<style>
 ${customCSS}
 </style>` : ''}
 <div
@@ -261,13 +284,14 @@ ${customCSS}
   data-text="${buttonText}"
   data-server="${location.protocol}//${location.host}"
 ></div>`}
-                    />
-                  </Box>
-                ) : (
-                  <Typography>
-                    Click "Generate Code" to get the HTML code for your website!
-                  </Typography>
-                )}
+                      />
+                    </Box>
+                  ) : (
+                    <Typography>
+                      Click "Generate Code" to get the HTML code for your website!
+                    </Typography>
+                  )}
+                </Box>
                 <Typography variant="h5" gutterBottom>
                   Script for Head Tag
                 </Typography>
