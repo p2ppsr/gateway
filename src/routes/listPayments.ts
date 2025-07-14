@@ -1,19 +1,33 @@
-const knex = require('knex')(require('../../knexfile.js'))
+import knex, { Knex } from 'knex'
+import knexConfig from '../../knexfile' // Assumes knexfile.js renamed to knexfile.ts
+import { Request, Response } from 'express'
 
-module.exports = {
-  type: 'get', // Use GET method for listing resources
+const db: Knex = knex(knexConfig)
+
+export default {
+  type: 'get',
   path: '/listPayments',
-  knex,
-  func: async (req, res) => {
+  knex: db,
+  func: async (req: Request, res: Response): Promise<void> => {
     // Extract merchant ID from authentication context
-    const merchantId = req.authrite.identityKey
+    const merchantId = (req as any).authrite.identityKey
 
     // Extract query parameters for optional filtering by button ID, pagination, and sorting
-    const { buttonId, limit = 25, offset = 0, sort = 'desc' } = req.query
+    const {
+      buttonId,
+      limit = 25,
+      offset = 0,
+      sort = 'desc'
+    } = req.query as {
+      buttonId?: string
+      limit?: number
+      offset?: number
+      sort?: 'asc' | 'desc'
+    }
 
     try {
       // Build the query with mandatory conditions
-      let query = knex('payments')
+      let query = db('payments')
         .where({ merchant_id: merchantId })
         .orderBy('created_at', sort)
         .limit(limit)

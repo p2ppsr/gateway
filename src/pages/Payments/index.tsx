@@ -1,3 +1,4 @@
+// frontend/src/pages/Payments/index.tsx
 import React, { useState, useEffect } from 'react'
 import {
   CircularProgress,
@@ -15,11 +16,18 @@ import {
   Box
 } from '@mui/material'
 import { ArrowBack, ArrowForward, Sort } from '@mui/icons-material'
-import authrite from '../../utils/Authrite'
-import { submitDirectTransaction } from '@babbage/sdk-ts'
-import { getPaymentAddress } from 'sendover'
-import { Transaction, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk'
-import { useTheme } from '@emotion/react'
+import {
+  Transaction,
+  P2PKH,
+  PrivateKey,
+  PublicKey,
+  WalletClient,
+  Hash,
+  Utils,
+  CreateActionArgs,
+  AuthFetch
+} from '@bsv/sdk'
+import { useTheme } from '@mui/material/styles'
 
 interface Payment {
   payment_id: string
@@ -31,6 +39,9 @@ interface Payment {
   transaction_info: string
   merchant_id: string
 }
+
+const wallet = new WalletClient('auto', 'localhost')
+const authFetch = new AuthFetch(wallet)
 
 const PaymentsList: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([])
@@ -45,10 +56,13 @@ const PaymentsList: React.FC = () => {
     setError('')
     try {
       const url = `${location.protocol}//${location.host}/api/listPayments?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
-      const response = await authrite.request(url, { method: 'GET' })
-      const data = JSON.parse(new TextDecoder().decode(response.body))
+      const response = await authFetch.fetch(url, { method: 'GET' })
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      const data = await response.json()
       if (data.status === 'error') {
-        throw new Error(response.message)
+        throw new Error(data.message)
       }
       setPayments(data.data)
     } catch (err: any) {
@@ -61,59 +75,90 @@ const PaymentsList: React.FC = () => {
   const acknowledgePayment = async (payment: Payment) => {
     try {
       const transaction = JSON.parse(payment.transaction_info)
-      const derivedPubKey = getPaymentAddress({
-        senderPrivateKey: '0000000000000000000000000000000000000000000000000000000000000001',
-        recipientPublicKey: payment.merchant_id,
-        invoiceNumber: `2-3241645161d8-${payment.payment_id} 1`,
-        returnType: 'publicKey'
-      })
+      const senderPrivKey = new PrivateKey(
+        '0000000000000000000000000000000000000000000000000000000000000001',
+        'hex'
+      )
+      const recipientPubKey = PublicKey.fromString(payment.merchant_id)
+      const invoiceNumber = `2-3241645161d8-${payment.payment_id} 1`
+      const combined = Utils.toArray(
+        `${senderPrivKey.toString()}${recipientPubKey.toString()}${invoiceNumber}`,
+        'utf8'
+      )
+      const derivedHash = Hash.sha256(Hash.sha256(combined))
+      const derivedPriv = new PrivateKey(Utils.toHex(derivedHash), 'hex')
+      const derivedPubKey = derivedPriv.toPublicKey()
       const expectedAmount = Math.round(payment.amount * 100000000)
-
       const pkh = new P2PKH()
-      const derivedScript = pkh.lock(PublicKey.fromString(derivedPubKey).toHash()).toHex()
+      const derivedScript = pkh.lock(derivedPubKey.toHash()).toHex()
       const bsvtx = Transaction.fromHex(transaction.rawTx)
+      const incomingTxid = bsvtx.id('hex')
       const index = bsvtx.outputs.findIndex(
-        x => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
+        x =>
+          x.lockingScript.toHex() === derivedScript &&
+          x.satoshis === expectedAmount
       )
       if (index === -1) {
         throw new Error('Could not discover our output of this transaction.')
       }
-      const anyonePub = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
-        .toPublicKey()
-        .toDER()
-      transaction.outputs = [
-        {
-          vout: index,
-          satoshis: expectedAmount,
-          derivationPrefix: payment.payment_id,
-          derivationSuffix: '1',
-          senderIdentityKey: anyonePub
-        }
-      ]
+      const anyonePriv = new PrivateKey(
+        '0000000000000000000000000000000000000000000000000000000000000001',
+        'hex'
+      )
+      const anyonePub = anyonePriv.toPublicKey()
 
-      const success = await submitDirectTransaction({
-        protocol: '3241645161d8',
-        senderIdentityKey: anyonePub,
-        derivationPrefix: payment.payment_id,
-        transaction,
-        note: 'Receive a payment',
-        amount: Math.round(payment.amount * 100000000)
-      })
-      if (!success.referenceNumber) {
+      const anyonePkh = new P2PKH()
+      const anyoneScript = anyonePkh.lock(anyonePub.toHash()).toHex()
+
+      const args: CreateActionArgs = {
+        description: 'Receive a payment',
+        inputs: [
+          {
+            outpoint: `${incomingTxid}_${index}`,
+            unlockingScriptLength: 73,
+            inputDescription: 'Acknowledge payment input'
+          }
+        ],
+        outputs: [
+          {
+            lockingScript: anyoneScript,
+            satoshis: expectedAmount,
+            outputDescription: 'Acknowledged payment'
+          }
+        ]
+      }
+      const { tx } = await wallet.createAction(args)
+      if (!tx) {
+        throw new Error('Unable to create transaction.')
+      }
+
+      const parsedTx = Transaction.fromAtomicBEEF(tx)
+      const successTxid = parsedTx.id('hex')
+      if (!successTxid) {
         throw new Error('Unable to submit incoming payment.')
       }
-      const response = await authrite.request(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ paymentId: payment.payment_id })
-      })
-      const data = JSON.parse(new TextDecoder().decode(response.body))
-      if (data.status === 'error') {
-        throw new Error(response.message)
+
+      const response = await authFetch.fetch(
+        `${location.protocol}//${location.host}/api/acknowledgePayment`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ paymentId: payment.payment_id })
+        }
+      )
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(
+          `HTTP error! status: ${response.status}, body: ${errorText}`
+        )
       }
-      await fetchPayments() // Refresh the list to show the updated status
+      const data = await response.json()
+      if (data.status === 'error') {
+        throw new Error(data.message)
+      }
+      await fetchPayments() // Refresh the list
     } catch (err: any) {
       setError(`Acknowledging payment failed: ${err.message}`)
     }
@@ -125,8 +170,8 @@ const PaymentsList: React.FC = () => {
 
   if (loading)
     return (
-      <div
-        style={{
+      <Box
+        sx={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
@@ -134,14 +179,14 @@ const PaymentsList: React.FC = () => {
         }}
       >
         <CircularProgress />
-      </div>
+      </Box>
     )
   if (error) return <Typography color="error">{error}</Typography>
 
   return (
     <Container>
       <Box
-        style={{
+        sx={{
           textAlign: 'center',
           marginBottom: theme.spacing(4),
           marginTop: theme.spacing(5),
@@ -185,9 +230,21 @@ const PaymentsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {payments.length === 0 && <Typography paddingTop="1em">No payments found.</Typography>}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
-        <IconButton onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+      {payments.length === 0 && (
+        <Typography sx={{ paddingTop: '1em' }}>No payments found.</Typography>
+      )}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mt: 2
+        }}
+      >
+        <IconButton
+          onClick={() => setPage(Math.max(1, page - 1))}
+          disabled={page === 1}
+        >
           <ArrowBack />
         </IconButton>
         <IconButton onClick={() => setPage(page + 1)}>

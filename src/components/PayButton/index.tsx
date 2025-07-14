@@ -1,9 +1,6 @@
 import React, { useState } from 'react'
-import checkForMetaNetClient from '../../utils/checkForMetaNetClient'
-import { Authrite } from 'authrite-js'
-import { createAction, getNetwork } from '@babbage/sdk-ts'
-
-const authrite = new Authrite()
+import { WalletClient, AuthFetch } from '@bsv/sdk'
+import constants from '../../utils/constants' // optional, or just inline the URL
 
 const PayButton = ({
   text = 'Pay Now',
@@ -28,47 +25,62 @@ const PayButton = ({
   const handleClick = async () => {
     try {
       setLoading(true)
-      const metaNetClient = await checkForMetaNetClient()
-      if (metaNetClient === 0) {
-        setLoading(false)
-        return alert('Please download MetaNet Client\n\nhttps://projectbabbage.com/metanet-client')
-      }
-      const statusResponse = await authrite.request(`${server}/api/getStatus`)
-      const status = JSON.parse(new TextDecoder().decode(statusResponse.body))
-      const metanetNetwork = await getNetwork()
-      if (status.network !== metanetNetwork) {
-        return alert(
-          `WARNING! This payment server uses ${status.network} but your MetaNet Client is on ${metanetNetwork}!\n\nPlease make sure you are using the correct network.`
-        )
-      }
-      const invoiceResponse = await authrite.request(`${server}/api/invoice`, {
+
+      // const metaNetClient = await checkForMetaNetClient()
+      // if (!metaNetClient) {
+      //   setLoading(false)
+      //   return alert(
+      //     'Please download MetaNet Client\n\nhttps://projectbabbage.com/metanet-client'
+      //   )
+      // }
+
+      const walletClient = new WalletClient('auto', 'localhost')
+      const authFetch = new AuthFetch(walletClient)
+
+      const statusResponse = await authFetch.fetch(`${server}/api/getStatus`)
+      const status = await statusResponse.json()
+
+      // const metanetNetwork = await getNetwork()
+      // if (status.network !== metanetNetwork) {
+      //   return alert(
+      //     `WARNING! This payment server uses ${status.network} but your MetaNet Client is on ${metanetNetwork}!\n\nPlease make sure you are using the correct network.`
+      //   )
+      // }
+
+      const invoiceResponse = await authFetch.fetch(`${server}/api/invoice`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           merchantId: merchant,
           paymentButtonId: button,
           currency,
-          amount: amount
+          amount
         })
       })
-      const invoice = JSON.parse(new TextDecoder().decode(invoiceResponse.body))
+
+      const invoice = await invoiceResponse.json()
       if (invoice.status !== 'success') {
         throw new Error(invoice.message || 'Error requesting invoice')
       }
-      const tx = await createAction({
+
+      const tx = await walletClient.createAction({
         description: button,
         outputs: invoice.outputs
       })
-      const payResponse = await authrite.request(`${server}/api/pay`, {
+
+      const payResponse = await authFetch.fetch(`${server}/api/pay`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           paymentId: invoice.paymentId,
           transaction: JSON.stringify(tx)
         })
       })
-      const pay = JSON.parse(new TextDecoder().decode(payResponse.body))
+
+      const pay = await payResponse.json()
       if (pay.status === 'success') {
         setPaid(true)
-        console.log('Successful Gateway payment', pay)
+        console.log('✅ Payment successful:', pay)
       } else {
         throw new Error(pay.message || 'Error submitting payment')
       }

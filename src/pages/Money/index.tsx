@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import authrite from '../../utils/Authrite'
 
 const MyMoney = () => {
   // const [loading, setLoading] = useState(true)

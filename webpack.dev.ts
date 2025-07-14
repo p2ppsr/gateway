@@ -23,4 +23,4 @@ const developmentConfig: Configuration = {
   devtool: 'inline-source-map'
 }
 
-module.exports = merge<Configuration>(common, developmentConfig)
+export default merge<WebpackConfiguration>(common, developmentConfig)

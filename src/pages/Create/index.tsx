@@ -1,3 +1,4 @@
+// frontend/src/pages/Create/index.tsx
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   Typography,
@@ -5,27 +6,42 @@ import {
   Button,
   Container,
   Grid,
-  Paper,
   Box,
   InputAdornment,
   Tooltip,
   IconButton
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import PayButton from '../../components/PayButton'
-import checkForMetaNetClient from '../../utils/checkForMetaNetClient'
-import { getPublicKey } from '@babbage/sdk-ts'
-import authrite from '../../utils/Authrite'
-import useStyles from './style'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
+import {
+  Root,
+  ContentWrap,
+  FormSection,
+  PreviewSection,
+  CodePreview,
+  CenteredHeader,
+  TextFieldStyled,
+  ButtonStyled
+} from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import {
+  atomDark,
+  oneLight
+} from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
-import { AmountInputField } from 'amountinator-react'
 import { CurrencyConverter } from 'amountinator'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { toast } from 'react-toastify'
 
-const CodeSnippet = ({ code, language }) => {
+const walletClient = new WalletClient('auto', 'localhost')
+const authFetch = new AuthFetch(walletClient)
+
+interface CodeSnippetProps {
+  code: string
+  language: string
+}
+
+const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   const theme = useTheme()
 
   return (
@@ -48,8 +64,7 @@ const Create: React.FC = () => {
   const [showCode, setShowCode] = useState(false)
   const [hasMetaNet, setHasMetaNet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
-  const [customCSS, setCustomCSS] = useState(
-    `.gateway-button-styles {
+  const [customCSS, setCustomCSS] = useState(`.gateway-button-styles {
   border-radius: 2em;
   border: none;
   padding: 0.7em 1em 0.7em 1em;
@@ -61,33 +76,32 @@ const Create: React.FC = () => {
   transition: all 0.3s;
   font-weight: bold;
 }
-
 .gateway-button-styles:hover {
   cursor: pointer;
   box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
   background: linear-gradient(145deg, #ABABFF, #5050F2);
-}`
-  )
+}`)
   const [amountInSats, setAmountInSats] = useState(1000)
   const [currencySymbol, setCurrencySymbol] = useState('$')
   const currencyConverter = new CurrencyConverter()
-  const classes = useStyles()
   const theme = useTheme()
 
   useEffect(() => {
     ;(async () => {
-      const metaNetClient = await checkForMetaNetClient()
-      if (metaNetClient === 0) {
-        setHasMetaNet(false)
-      } else {
-        const identity = await getPublicKey({ identityKey: true })
-        setMerchant(identity)
+      try {
+        const identity = await walletClient.getPublicKey({ identityKey: true })
+        setMerchant(identity.publicKey)
         setHasMetaNet(true)
+      } catch (error) {
+        console.error('Failed to fetch MetaNet identity:', error)
+        setHasMetaNet(false)
       }
     })()
   }, [])
 
-  const handleCustomCSSChange = event => {
+  const handleCustomCSSChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     setCustomCSS(event.target.value)
   }
 
@@ -106,34 +120,29 @@ const Create: React.FC = () => {
         console.error('Failed to fetch currency:', error)
       }
     })()
-  }, [])
+  }, [paymentAmount])
 
-  const handleAmountChange = useCallback(async (event: any) => {
-    const input = event.target.value.replace(/[^0-9.]/g, '')
-    setPaymentAmount(input)
-    setShowCode(false)
-    console.log('entered', input)
-    try {
-      const satoshis = await currencyConverter.convertCurrency(
-        Number(input),
-        currencyConverter.preferredCurrency,
-        'BSV'
-      )
-      console.log('amount', satoshis)
-      setAmountInSats(satoshis || 1000)
-    } catch (error) {
-      console.error('Error converting currency:', error)
-    }
-  }, [])
+  const handleAmountChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.target.value.replace(/[^0-9.]/g, '')
+      setPaymentAmount(input)
+      setShowCode(false)
+      try {
+        const satoshis = await currencyConverter.convertCurrency(
+          Number(input),
+          currencyConverter.preferredCurrency,
+          'BSV'
+        )
+        setAmountInSats(satoshis || 1000)
+      } catch (error) {
+        console.error('Error converting currency:', error)
+      }
+    },
+    []
+  )
 
   const handleCopyCode = async () => {
-    const code = `${
-      customCSS
-        ? `<style>
-${customCSS}
-</style>`
-        : ''
-    }
+    const code = `${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
 <div
   class="gateway-paybutton"
   data-merchant="${merchant}"
@@ -148,8 +157,10 @@ ${customCSS}
       await navigator.clipboard.writeText(code)
       setCopySuccess('success')
       setTimeout(() => setCopySuccess(''), 2000)
+      toast.success('Code copied to clipboard')
     } catch (err) {
       setCopySuccess('failed')
+      toast.error('Failed to copy code')
     }
   }
 
@@ -166,47 +177,57 @@ ${customCSS}
 
   const handleSubmit = async () => {
     if (!hasMetaNet) {
-      return alert('Download MetaNet Client!\n\nhttps://projectbabbage.com/metanet-client')
+      toast.error('Metanet client required! Download at https://metanet.bsvb.tech')
+      return
     }
-    const createResponse = await authrite.request(`${location.protocol}//${location.host}/api/createButton`, {
-      method: 'POST',
-      body: JSON.stringify({
-        amount: Number(paymentAmount),
-        currency: 'BSV',
-        multiUse: true,
-        variableAmount: true,
-        accepts: 'BSV'
-      })
-    })
-    const create = JSON.parse(new TextDecoder().decode(createResponse.body))
-    setButtonID(create.buttonId)
-    setShowCode(true)
+
+    try {
+      const response = await authFetch.fetch(
+        `${location.protocol}//${location.host}/api/createButton`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: Number(paymentAmount),
+            currency: 'BSV',
+            multiUse: true,
+            variableAmount: true,
+            accepts: 'BSV'
+          }),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+      const data = await response.json()
+      if (data.buttonId) {
+        setButtonID(data.buttonId)
+        setShowCode(true)
+        toast.success('Button created successfully')
+      } else {
+        toast.error('Failed to create button')
+      }
+    } catch (error) {
+      console.error('Error creating button:', error)
+      toast.error('Error creating button')
+    }
   }
 
   return (
-    <Box className={classes.root}>
+    <Root>
       <Container maxWidth="lg">
-        <Box className={classes.contentWrap}>
-          <Box className={classes.centeredHeader}>
+        <ContentWrap>
+          <CenteredHeader>
             <Typography variant="h2">Create Your Tipping Button</Typography>
             <Typography variant="subtitle1">Instantly generate code to embed tipping buttons on your site.</Typography>
           </Box>
 
           <Grid container spacing={4}>
-            <Grid
-              item
-              xs={12}
-              md={4}
-              style={{
-                borderRadius: '0.8em',
-                overflow: 'hidden'
-              }}
-            >
-              <Paper elevation={3} className={classes.formSection} style={{ borderRadius: '0.8em' }}>
+            <Grid item xs={12} md={4}>
+              <FormSection elevation={3}>
                 <Typography variant="h4" gutterBottom>
                   Configure Your Button
                 </Typography>
-                <TextField
+                <TextFieldStyled
                   label="Button Text"
                   value={buttonText}
                   onChange={e => {
@@ -215,78 +236,78 @@ ${customCSS}
                   }}
                   fullWidth
                   margin="normal"
-                  className={classes.textField}
                 />
-                <TextField
+                <TextFieldStyled
                   label="Tip Amount"
                   value={paymentAmount}
                   onChange={handleAmountChange}
                   type="number"
                   fullWidth
                   margin="normal"
-                  className={classes.textField}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        {currencySymbol}
+                      </InputAdornment>
+                    )
                   }}
                 />
-
-                <TextField
+                <TextFieldStyled
                   label="Custom CSS"
                   value={customCSS}
                   onChange={handleCustomCSSChange}
                   fullWidth
                   margin="normal"
-                  className={classes.textField}
                   multiline
                 />
-                <Button variant="contained" color="primary" fullWidth sx={{ marginTop: 2 }} onClick={handleSubmit}>
+                <ButtonStyled
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  sx={{ marginTop: 2 }}
+                  onClick={handleSubmit}
+                >
                   Generate Code
-                </Button>
-              </Paper>
+                </ButtonStyled>
+              </FormSection>
             </Grid>
 
-            <Grid
-              item
-              xs={12}
-              md={8}
-              style={{
-                borderRadius: '0.8em',
-                overflow: 'hidden'
-              }}
-            >
-              <Paper
-                elevation={3}
-                className={classes.previewSection}
-                style={{ borderRadius: '0.8em', position: 'relative' }}
-              >
+            <Grid item xs={12} md={8}>
+              <PreviewSection elevation={3} sx={{ position: 'relative' }}>
                 <Typography
                   variant="h4"
                   gutterBottom
                   component="div"
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
                 >
                   Button Preview
                   {showCode && (
                     <Tooltip title="Copy Code">
                       <IconButton onClick={handleCopyCode}>
-                        {copySuccess === 'success' ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                        {copySuccess === 'success' ? (
+                          <CheckCircleIcon color="success" />
+                        ) : (
+                          <ContentCopyIcon />
+                        )}
                       </IconButton>
                     </Tooltip>
                   )}
                 </Typography>
-                {copySuccess === 'failed' && <Typography color="error">Failed to copy code!</Typography>}
+
+                {copySuccess === 'failed' && (
+                  <Typography color="error">Failed to copy code!</Typography>
+                )}
+
                 <Box>
                   {showCode ? (
-                    <Box className="codePreview">
+                    <CodePreview>
                       <CodeSnippet
                         language="html"
-                        code={`${
-                          customCSS
-                            ? `<style>
-${customCSS}
-</style>`
-                            : ''
-                        }
+                        code={`${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
 <div
   class="gateway-paybutton"
   data-merchant="${merchant}"
@@ -297,26 +318,27 @@ ${customCSS}
   data-server="${location.protocol}//${location.host}"
 ></div>`}
                       />
-                    </Box>
+                    </CodePreview>
                   ) : (
                     <Typography>Click "Generate Code" to get the HTML code for your website!</Typography>
                   )}
                 </Box>
+
                 <Typography variant="h5" gutterBottom>
                   Script for Head Tag
                 </Typography>
-                <Box className={classes.codePreview}>
+                <CodePreview>
                   <CodeSnippet
                     language="javascript"
                     code={`<script src="${location.protocol}//${location.host}/pay.js"></script>`}
                   />
-                </Box>
-              </Paper>
+                </CodePreview>
+              </PreviewSection>
             </Grid>
           </Grid>
-        </Box>
+        </ContentWrap>
       </Container>
-    </Box>
+    </Root>
   )
 }
 

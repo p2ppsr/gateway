@@ -18,8 +18,9 @@ import {
   useTheme,
   Box
 } from '@mui/material'
-import authrite from '../../utils/Authrite'
 import { makeStyles } from '@mui/styles'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { Theme } from '@mui/material/styles'
 
 interface PaymentButton {
   button_id: string
@@ -32,7 +33,7 @@ interface PaymentButton {
   total_paid: number
 }
 
-const useStyles = makeStyles(theme => ({
+const useStyles = makeStyles((theme: Theme) => ({
   centeredHeader: {
     textAlign: 'center',
     marginBottom: theme.spacing(3),
@@ -51,7 +52,14 @@ const PaymentButtonsList: React.FC = () => {
   const theme = useTheme()
   const classes = useStyles({ theme })
 
-  const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
+  const wallet = new WalletClient('auto', 'localhost')
+  const authFetch = new AuthFetch(wallet)
+
+  const fetchButtons = async (
+    page: number,
+    sortOrder: 'asc' | 'desc',
+    usedFilter: 'all' | 'used' | 'unused'
+  ) => {
     setError('')
     try {
       setLoading(true)
@@ -59,12 +67,14 @@ const PaymentButtonsList: React.FC = () => {
       if (usedFilter !== 'all') {
         url += `&usage=${usedFilter}`
       }
-      const response = await authrite.request(url, {
+
+      const response = await authFetch.fetch(url, {
         method: 'GET'
       })
-      const data = JSON.parse(new TextDecoder().decode(response.body))
+
+      const data = await response.json()
       if (data.status === 'error') {
-        throw new Error(response.message)
+        throw new Error(data.message)
       }
       setButtons(data.data)
     } catch (err: any) {
@@ -108,7 +118,12 @@ const PaymentButtonsList: React.FC = () => {
     )
 
   return (
-    <Container style={{ backgroundColor: theme.palette.background.default, padding: theme.spacing(4) }}>
+    <Container
+      style={{
+        backgroundColor: theme.palette.background.default,
+        padding: theme.spacing(4)
+      }}
+    >
       <Box className={classes.centeredHeader}>
         <Typography variant="h2">Payment Buttons</Typography>
         <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
@@ -117,7 +132,9 @@ const PaymentButtonsList: React.FC = () => {
         <InputLabel>Filter by usage</InputLabel>
         <Select
           value={usedFilter}
-          onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
+          onChange={e =>
+            setUsedFilter(e.target.value as 'all' | 'used' | 'unused')
+          }
           label="Filter by usage"
         >
           <MenuItem value="all">All</MenuItem>
@@ -155,7 +172,9 @@ const PaymentButtonsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
+      {buttons.length === 0 && (
+        <Typography>No payment buttons found.</Typography>
+      )}
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
         <Button variant="contained" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           Previous

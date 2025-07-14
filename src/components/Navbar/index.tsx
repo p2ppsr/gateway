@@ -1,13 +1,37 @@
 import React, { useState } from 'react'
 import { makeStyles } from '@mui/styles'
-import { Typography, AppBar, Toolbar, Button, IconButton, Drawer, List, ListItem, ListItemText } from '@mui/material'
+import {
+  Typography,
+  AppBar,
+  Toolbar,
+  Button,
+  IconButton,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText
+} from '@mui/material'
 import { Menu as MenuIcon, AccountBalanceWallet } from '@mui/icons-material'
-import { Link, useLocation } from 'react-router-dom'
+import { Link as RouterLink, useLocation } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
+import { ClassNameMap } from '@mui/styles'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import style from './style'
-
+// 👇 Helper to resolve TS conflict when using ListItem + RouterLink + button
+const ListItemLink = (props: {
+  to: string
+  primary: string
+  onClick: () => void
+}) => {
+  const { to, primary, onClick } = props
+  return (
+    <ListItem button component={RouterLink as any} to={to} onClick={onClick}>
+      <ListItemText primary={primary} />
+    </ListItem>
+  )
+}
 const useStyles = makeStyles(style, { name: 'Navbar' })
+
 
 const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
   const classes = useStyles()
@@ -22,22 +46,32 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
 
   const drawer = (
     <List>
-      <ListItem button component={Link} to="/" onClick={() => setDrawerOpen(false)}>
-        <ListItemText primary="Create a Button" />
-      </ListItem>
-      <ListItem button component={Link} to="/buttons" onClick={() => setDrawerOpen(false)}>
-        <ListItemText primary="Your Buttons" />
-      </ListItem>
-      <ListItem button component={Link} to="/actions" onClick={() => setDrawerOpen(false)}>
-        <ListItemText primary="Actions" />
-      </ListItem>
-      <ListItem button component={Link} to="/payments" onClick={() => setDrawerOpen(false)}>
-        <ListItemText primary="Payments" />
-      </ListItem>
+      <ListItemLink
+        to="/"
+        primary="Create a Button"
+        onClick={() => setDrawerOpen(false)}
+      />
+      <ListItemLink
+        to="/buttons"
+        primary="Your Buttons"
+        onClick={() => setDrawerOpen(false)}
+      />
+      <ListItemLink
+        to="/actions"
+        primary="Actions"
+        onClick={() => setDrawerOpen(false)}
+      />
+      <ListItemLink
+        to="/payments"
+        primary="Payments"
+        onClick={() => setDrawerOpen(false)}
+      />
       {isAdmin && (
-        <ListItem button component={Link} to="/admin" onClick={() => setDrawerOpen(false)}>
-          <ListItemText primary="Admin Dashboard" />
-        </ListItem>
+        <ListItemLink
+          to="/admin"
+          primary="Admin Dashboard"
+          onClick={() => setDrawerOpen(false)}
+        />
       )}
     </List>
   )
@@ -53,10 +87,19 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
         </div>
         {isMobile ? (
           <>
-            <IconButton edge="start" color="inherit" aria-label="menu" onClick={handleDrawerToggle}>
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="menu"
+              onClick={handleDrawerToggle}
+            >
               <MenuIcon />
             </IconButton>
-            <Drawer anchor="left" open={drawerOpen} onClose={handleDrawerToggle}>
+            <Drawer
+              anchor="left"
+              open={drawerOpen}
+              onClose={handleDrawerToggle}
+            >
               {drawer}
             </Drawer>
           </>
@@ -65,32 +108,48 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
             <div className={classes.navLinksWrapper}>
               <div className={classes.navLinks}>
                 <Button
-                  component={Link}
+                  component={RouterLink}
                   to="/"
-                  className={location.pathname === '/' ? classes.activeLink : classes.link}
+                  className={
+                    location.pathname === '/'
+                      ? classes.activeLink
+                      : classes.link
+                  }
                 >
                   Create a Button
                 </Button>
                 <Button
-                  component={Link}
+                  component={RouterLink}
                   to="/buttons"
-                  className={location.pathname === '/buttons' ? classes.activeLink : classes.link}
+                  className={
+                    location.pathname === '/buttons'
+                      ? classes.activeLink
+                      : classes.link
+                  }
                 >
                   Your Buttons
                 </Button>
                 <Button
-                  component={Link}
+                  component={RouterLink}
                   to="/actions"
-                  className={location.pathname === '/actions' ? classes.activeLink : classes.link}
+                  className={
+                    location.pathname === '/actions'
+                      ? classes.activeLink
+                      : classes.link
+                  }
                 >
                   Actions
                 </Button>
               </div>
               <div className={classes.moneyLinkWrapper}>
                 <Button
-                  component={Link}
+                  component={RouterLink}
                   to="/payments"
-                  className={location.pathname === '/payments' ? classes.activeLink : classes.moneyLink}
+                  className={
+                    location.pathname === '/payments'
+                      ? classes.activeLink
+                      : classes.moneyLink
+                  }
                   startIcon={<AccountBalanceWallet />}
                 >
                   Payments
@@ -99,9 +158,13 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
             </div>
             {isAdmin && (
               <Button
-                component={Link}
+                component={RouterLink}
                 to="/admin"
-                className={location.pathname === '/admin' ? classes.activeLink : classes.link}
+                className={
+                  location.pathname === '/admin'
+                    ? classes.activeLink
+                    : classes.link
+                }
               >
                 Admin Dashboard
               </Button>
