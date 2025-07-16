@@ -1,11 +1,5 @@
 import React from 'react'
-import {
-  CircularProgress,
-  Container,
-  Typography,
-  Paper,
-  Box
-} from '@mui/material'
+import { CircularProgress, Container, Typography, Paper, Box } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 
 const PaymentActionsList: React.FC = () => {

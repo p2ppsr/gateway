@@ -1,37 +1,11 @@
-module.exports = [
-  {
-    type: 'get',
-    path: '/getStatus',
-    func: require('./getStatus')
-  },
-  {
-    type: 'post',
-    path: '/createButton',
-    func: require('./createButton')
-  },
-  {
-    type: 'post',
-    path: '/invoice',
-    func: require('./invoice')
-  },
-  {
-    type: 'post',
-    path: '/pay',
-    func: require('./pay')
-  },
-  {
-    type: 'get',
-    path: '/listPayments',
-    func: require('./listPayments')
-  },
-  {
-    type: 'get',
-    path: '/listButtons',
-    func: require('./listButtons')
-  },
-  {
-    type: 'post',
-    path: '/acknowledgePayment',
-    func: require('./acknowledgePayment')
-  }
+const get = (m: any) => (m && m.default ? m.default : m)
+
+export default [
+  get(require('./getStatus')),
+  get(require('./createButton')),
+  get(require('./invoice')),
+  get(require('./pay')),
+  get(require('./listPayments')),
+  get(require('./listButtons')),
+  get(require('./acknowledgePayment'))
 ]

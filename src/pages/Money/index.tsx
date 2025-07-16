@@ -13,7 +13,7 @@ const MyMoney = () => {
   //         if (usedFilter !== 'all') {
   //             url += `&usage=${usedFilter}`
   //         }
-  //         const response = await Authrite.request(url, {
+  //         const response = await AuthFetch.request(url, {
   //             method: 'GET',
   //             // Include headers as necessary, e.g., for authentication
   //         })

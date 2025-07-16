@@ -40,7 +40,9 @@ interface Payment {
   merchant_id: string
 }
 
-const wallet = new WalletClient('auto', 'localhost')
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const wallet = new WalletClient('auto', WALLET_ORIGIN)
+//const wallet = new WalletClient('auto', 'localhost')
 const authFetch = new AuthFetch(wallet)
 
 const PaymentsList: React.FC = () => {
@@ -81,10 +83,7 @@ const PaymentsList: React.FC = () => {
       )
       const recipientPubKey = PublicKey.fromString(payment.merchant_id)
       const invoiceNumber = `2-3241645161d8-${payment.payment_id} 1`
-      const combined = Utils.toArray(
-        `${senderPrivKey.toString()}${recipientPubKey.toString()}${invoiceNumber}`,
-        'utf8'
-      )
+      const combined = Utils.toArray(`${senderPrivKey.toString()}${recipientPubKey.toString()}${invoiceNumber}`, 'utf8')
       const derivedHash = Hash.sha256(Hash.sha256(combined))
       const derivedPriv = new PrivateKey(Utils.toHex(derivedHash), 'hex')
       const derivedPubKey = derivedPriv.toPublicKey()
@@ -94,17 +93,12 @@ const PaymentsList: React.FC = () => {
       const bsvtx = Transaction.fromHex(transaction.rawTx)
       const incomingTxid = bsvtx.id('hex')
       const index = bsvtx.outputs.findIndex(
-        x =>
-          x.lockingScript.toHex() === derivedScript &&
-          x.satoshis === expectedAmount
+        x => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
       )
       if (index === -1) {
         throw new Error('Could not discover our output of this transaction.')
       }
-      const anyonePriv = new PrivateKey(
-        '0000000000000000000000000000000000000000000000000000000000000001',
-        'hex'
-      )
+      const anyonePriv = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
       const anyonePub = anyonePriv.toPublicKey()
 
       const anyonePkh = new P2PKH()
@@ -138,21 +132,16 @@ const PaymentsList: React.FC = () => {
         throw new Error('Unable to submit incoming payment.')
       }
 
-      const response = await authFetch.fetch(
-        `${location.protocol}//${location.host}/api/acknowledgePayment`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ paymentId: payment.payment_id })
-        }
-      )
+      const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ paymentId: payment.payment_id })
+      })
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(
-          `HTTP error! status: ${response.status}, body: ${errorText}`
-        )
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
       }
       const data = await response.json()
       if (data.status === 'error') {
@@ -230,9 +219,7 @@ const PaymentsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {payments.length === 0 && (
-        <Typography sx={{ paddingTop: '1em' }}>No payments found.</Typography>
-      )}
+      {payments.length === 0 && <Typography sx={{ paddingTop: '1em' }}>No payments found.</Typography>}
       <Box
         sx={{
           display: 'flex',
@@ -241,10 +228,7 @@ const PaymentsList: React.FC = () => {
           mt: 2
         }}
       >
-        <IconButton
-          onClick={() => setPage(Math.max(1, page - 1))}
-          disabled={page === 1}
-        >
+        <IconButton onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           <ArrowBack />
         </IconButton>
         <IconButton onClick={() => setPage(page + 1)}>

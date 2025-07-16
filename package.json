@@ -13,6 +13,8 @@
     "setup:db": "node scripts/mkenv.sh && knex migrate:latest && knex seed:run"
   },
   "dependencies": {
+    "@bsv/auth-express-middleware": "^1.2.0",
+    "@bsv/payment-express-middleware": "^1.2.1",
     "@bsv/sdk": "^1.6.12",
     "@bsv/wallet-toolbox": "^1.5.9",
     "@emotion/react": "^11.11.3",
@@ -22,7 +24,6 @@
     "@mui/styles": "^5.15.14",
     "amountinator": "^0.2.9",
     "amountinator-react": "^0.1.36",
-    "authrite-express": "^0.4.12",
     "body-parser": "^1.20.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
@@ -44,6 +45,7 @@
     "@babel/preset-react": "^7.23.3",
     "@babel/preset-typescript": "^7.23.3",
     "@types/node": "^22.16.3",
+    "@types/prettyjson": "^0.0.33",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@types/react-syntax-highlighter": "^15.5.13",
@@ -53,6 +55,7 @@
     "concurrently": "^8.2.2",
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^6.10.0",
+    "dotenv-webpack": "^8.1.1",
     "file-loader": "^6.2.0",
     "html-webpack-plugin": "^5.5.0",
     "jest": "^29.7.0",

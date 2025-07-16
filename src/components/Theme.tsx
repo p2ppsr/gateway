@@ -103,10 +103,7 @@ const extendedTheme = (baseTheme: Theme) => ({
 
 const ThemeWrapper = ({ children }: { children: ReactNode }) => {
   const [mode, setMode] = useState<'light' | 'dark'>('dark')
-  const theme = useMemo(
-    () => extendedTheme(mode === 'light' ? lightTheme : darkTheme),
-    [mode]
-  )
+  const theme = useMemo(() => extendedTheme(mode === 'light' ? lightTheme : darkTheme), [mode])
 
   return (
     <ThemeProvider theme={theme}>

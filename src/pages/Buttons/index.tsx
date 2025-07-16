@@ -22,6 +22,14 @@ import { makeStyles } from '@mui/styles'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import { Theme } from '@mui/material/styles'
 
+/* ──────────────────────────────────────────────────────────────
+   One wallet + AuthFetch shared by this module
+   ────────────────────────────────────────────────────────────── */
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const wallet = new WalletClient('auto', WALLET_ORIGIN)
+//const wallet = new WalletClient('auto', 'localhost')
+const authFetch = new AuthFetch(wallet)
+
 interface PaymentButton {
   button_id: string
   amount: number
@@ -52,30 +60,16 @@ const PaymentButtonsList: React.FC = () => {
   const theme = useTheme()
   const classes = useStyles({ theme })
 
-  const wallet = new WalletClient('auto', 'localhost')
-  const authFetch = new AuthFetch(wallet)
-
-  const fetchButtons = async (
-    page: number,
-    sortOrder: 'asc' | 'desc',
-    usedFilter: 'all' | 'used' | 'unused'
-  ) => {
+  const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
     setError('')
     try {
       setLoading(true)
       let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
-      if (usedFilter !== 'all') {
-        url += `&usage=${usedFilter}`
-      }
+      if (usedFilter !== 'all') url += `&usage=${usedFilter}`
 
-      const response = await authFetch.fetch(url, {
-        method: 'GET'
-      })
-
+      const response = await authFetch.fetch(url, { method: 'GET' })
       const data = await response.json()
-      if (data.status === 'error') {
-        throw new Error(data.message)
-      }
+      if (data.status === 'error') throw new Error(data.message)
       setButtons(data.data)
     } catch (err: any) {
       setError(err.message)
@@ -85,9 +79,7 @@ const PaymentButtonsList: React.FC = () => {
   }
 
   useEffect(() => {
-    ;(async () => {
-      await fetchButtons(page, sortOrder, usedFilter)
-    })()
+    fetchButtons(page, sortOrder, usedFilter)
   }, [page, sortOrder, usedFilter])
 
   if (loading)
@@ -132,9 +124,7 @@ const PaymentButtonsList: React.FC = () => {
         <InputLabel>Filter by usage</InputLabel>
         <Select
           value={usedFilter}
-          onChange={e =>
-            setUsedFilter(e.target.value as 'all' | 'used' | 'unused')
-          }
+          onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
           label="Filter by usage"
         >
           <MenuItem value="all">All</MenuItem>
@@ -172,9 +162,7 @@ const PaymentButtonsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {buttons.length === 0 && (
-        <Typography>No payment buttons found.</Typography>
-      )}
+      {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
         <Button variant="contained" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           Previous

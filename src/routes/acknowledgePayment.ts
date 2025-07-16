@@ -1,3 +1,4 @@
+// src/routes/acknowledgePayment.ts
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
 import { Request, Response } from 'express'
@@ -7,10 +8,10 @@ const db: Knex = knex(knexConfig)
 export default {
   type: 'post',
   path: '/acknowledgePayment',
-  knex: db,
+
   func: async (req: Request, res: Response): Promise<void> => {
-    // Extract the merchant's ID from the authentication context (assume middleware sets req.authrite)
-    const merchantId = (req as any).authrite.identityKey // Type assertion if authrite is custom
+    // Extract the merchant's ID from the authentication context (assume middleware sets req.auth)
+    const merchantId = (req as any).auth.identityKey
     // Extract the payment ID from the request body
     const { paymentId } = req.body as { paymentId: string }
 
@@ -35,16 +36,13 @@ export default {
       if (!payment) {
         res.status(404).json({
           status: 'error',
-          message:
-            'Payment not found, already acknowledged, or does not belong to the merchant'
+          message: 'Payment not found, already acknowledged, or does not belong to the merchant'
         })
         return
       }
 
       // Update the payment's is_new status to false
-      await db('payments')
-        .where({ payment_id: paymentId })
-        .update({ is_new: false })
+      await db('payments').where({ payment_id: paymentId }).update({ is_new: false })
 
       // Respond with success
       res.status(200).json({

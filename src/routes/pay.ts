@@ -1,3 +1,4 @@
+// src/routes/pay.ts
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile' // Assumes knexfile.js renamed to knexfile.ts
 import * as SDK from '@bsv/sdk'
@@ -9,7 +10,7 @@ const db: Knex = knex(knexConfig)
 export default {
   type: 'post',
   path: '/pay',
-  knex: db,
+
   func: async (req: Request, res: Response): Promise<void> => {
     // Extract the necessary information from the request body
     const { paymentId, transaction } = req.body as {
@@ -34,7 +35,7 @@ export default {
         return
       }
 
-      if (payment.from !== (req as any).authrite.identityKey) {
+      if (payment.from !== (req as any).auth.identityKey) {
         res.status(401).json({
           status: 'error',
           message: 'Payment not originated by the same user'
@@ -79,16 +80,12 @@ export default {
       const expectedAmount = Math.round(payment.amount * 100000000)
 
       const pkh = new SDK.P2PKH()
-      const derivedScript = pkh
-        .lock(SDK.PublicKey.fromString(derivedPublicKey).toHash())
-        .toHex()
+      const derivedScript = pkh.lock(SDK.PublicKey.fromString(derivedPublicKey).toHash()).toHex()
       const parsedTXEnvelope = JSON.parse(transaction)
       const bsvtx = SDK.Transaction.fromHex(parsedTXEnvelope.rawTx)
       if (
         !bsvtx.outputs.some(
-          (x: SDK.TransactionOutput) =>
-            x.lockingScript.toHex() === derivedScript &&
-            x.satoshis === expectedAmount
+          (x: SDK.TransactionOutput) => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
         )
       ) {
         res.status(400).json({

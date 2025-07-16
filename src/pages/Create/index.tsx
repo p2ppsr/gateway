@@ -1,16 +1,6 @@
 // frontend/src/pages/Create/index.tsx
 import React, { useState, useEffect, useCallback } from 'react'
-import {
-  Typography,
-  TextField,
-  Button,
-  Container,
-  Grid,
-  Box,
-  InputAdornment,
-  Tooltip,
-  IconButton
-} from '@mui/material'
+import { Typography, TextField, Button, Container, Grid, Box, InputAdornment, Tooltip, IconButton } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import {
@@ -24,17 +14,19 @@ import {
   ButtonStyled
 } from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import {
-  atomDark,
-  oneLight
-} from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
 import { CurrencyConverter } from 'amountinator'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { toast } from 'react-toastify'
 
-const walletClient = new WalletClient('auto', 'localhost')
-const authFetch = new AuthFetch(walletClient)
+/* -------------------------------------------------------------------------- */
+/*  One wallet + AuthFetch shared by this module                              */
+/* -------------------------------------------------------------------------- */
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const wallet = new WalletClient('auto', WALLET_ORIGIN)
+//const walletClient = new WalletClient('auto', 'localhost')
+const authFetch = new AuthFetch(wallet)
 
 interface CodeSnippetProps {
   code: string
@@ -89,7 +81,7 @@ const Create: React.FC = () => {
   useEffect(() => {
     ;(async () => {
       try {
-        const identity = await walletClient.getPublicKey({ identityKey: true })
+        const identity = await wallet.getPublicKey({ identityKey: true })
         setMerchant(identity.publicKey)
         setHasMetaNet(true)
       } catch (error) {
@@ -99,9 +91,7 @@ const Create: React.FC = () => {
     })()
   }, [])
 
-  const handleCustomCSSChange = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setCustomCSS(event.target.value)
   }
 
@@ -122,24 +112,21 @@ const Create: React.FC = () => {
     })()
   }, [paymentAmount])
 
-  const handleAmountChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const input = event.target.value.replace(/[^0-9.]/g, '')
-      setPaymentAmount(input)
-      setShowCode(false)
-      try {
-        const satoshis = await currencyConverter.convertCurrency(
-          Number(input),
-          currencyConverter.preferredCurrency,
-          'BSV'
-        )
-        setAmountInSats(satoshis || 1000)
-      } catch (error) {
-        console.error('Error converting currency:', error)
-      }
-    },
-    []
-  )
+  const handleAmountChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target.value.replace(/[^0-9.]/g, '')
+    setPaymentAmount(input)
+    setShowCode(false)
+    try {
+      const satoshis = await currencyConverter.convertCurrency(
+        Number(input),
+        currencyConverter.preferredCurrency,
+        'BSV'
+      )
+      setAmountInSats(satoshis || 1000)
+    } catch (error) {
+      console.error('Error converting currency:', error)
+    }
+  }, [])
 
   const handleCopyCode = async () => {
     const code = `${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
@@ -182,22 +169,20 @@ const Create: React.FC = () => {
     }
 
     try {
-      const response = await authFetch.fetch(
-        `${location.protocol}//${location.host}/api/createButton`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            amount: Number(paymentAmount),
-            currency: 'BSV',
-            multiUse: true,
-            variableAmount: true,
-            accepts: 'BSV'
-          }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
+      const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/createButton`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: Number(paymentAmount),
+          currency: 'BSV',
+          multiUse: true,
+          variableAmount: true,
+          accepts: 'BSV'
+        }),
+        headers: {
+          'Content-Type': 'application/json'
         }
-      )
+      })
+
       const data = await response.json()
       if (data.buttonId) {
         setButtonID(data.buttonId)
@@ -245,11 +230,7 @@ const Create: React.FC = () => {
                   fullWidth
                   margin="normal"
                   InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        {currencySymbol}
-                      </InputAdornment>
-                    )
+                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>
                   }}
                 />
                 <TextFieldStyled
@@ -288,19 +269,13 @@ const Create: React.FC = () => {
                   {showCode && (
                     <Tooltip title="Copy Code">
                       <IconButton onClick={handleCopyCode}>
-                        {copySuccess === 'success' ? (
-                          <CheckCircleIcon color="success" />
-                        ) : (
-                          <ContentCopyIcon />
-                        )}
+                        {copySuccess === 'success' ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
                       </IconButton>
                     </Tooltip>
                   )}
                 </Typography>
 
-                {copySuccess === 'failed' && (
-                  <Typography color="error">Failed to copy code!</Typography>
-                )}
+                {copySuccess === 'failed' && <Typography color="error">Failed to copy code!</Typography>}
 
                 <Box>
                   {showCode ? (

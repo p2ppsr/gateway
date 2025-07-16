@@ -1,7 +1,18 @@
+// src/components/PayButton/index.tsx
 import React, { useState } from 'react'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
-import constants from '../../utils/constants' // optional, or just inline the URL
 
+/**
+ * Reusable payment component.
+ *
+ * @param text         Button label (default "Pay Now")
+ * @param amount       Amount in chosen currency (number)
+ * @param merchant     Merchant identity key (string)
+ * @param button       Payment‑button ID (string)
+ * @param currency     "BSV" | "USD" | …
+ * @param server       Gateway back‑end URL (e.g. "http://localhost:3001")
+ * @param loadingtext  Text while awaiting invoice / payment
+ */
 const PayButton = ({
   text = 'Pay Now',
   amount,
@@ -9,7 +20,7 @@ const PayButton = ({
   button,
   currency = 'BSV',
   server,
-  loadingtext = 'Loading, please wait...'
+  loadingtext = 'Loading, please wait…'
 }: {
   text?: string
   amount: number
@@ -22,32 +33,26 @@ const PayButton = ({
   const [loading, setLoading] = useState(false)
   const [paid, setPaid] = useState(false)
 
+  /* ---------------------------------------------------------------------- */
+  /*  One AuthFetch + one WalletClient per click keeps scope tidy           */
+  /* ---------------------------------------------------------------------- */
   const handleClick = async () => {
+    setLoading(true)
     try {
-      setLoading(true)
+      const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+      const wallet = new WalletClient('auto', WALLET_ORIGIN)
+      //const wallet = new WalletClient('auto', 'localhost')
+      const authFetch = new AuthFetch(wallet)
 
-      // const metaNetClient = await checkForMetaNetClient()
-      // if (!metaNetClient) {
-      //   setLoading(false)
-      //   return alert(
-      //     'Please download MetaNet Client\n\nhttps://projectbabbage.com/metanet-client'
-      //   )
-      // }
+      /* --------------------------- /api/getStatus ------------------------ */
+      const resStatus = await authFetch.fetch(`${server}/api/getStatus`, {
+        method: 'GET'
+      })
+      const status = await resStatus.json()
+      if (status.status !== 'success') throw new Error('Cannot reach server')
 
-      const walletClient = new WalletClient('auto', 'localhost')
-      const authFetch = new AuthFetch(walletClient)
-
-      const statusResponse = await authFetch.fetch(`${server}/api/getStatus`)
-      const status = await statusResponse.json()
-
-      // const metanetNetwork = await getNetwork()
-      // if (status.network !== metanetNetwork) {
-      //   return alert(
-      //     `WARNING! This payment server uses ${status.network} but your MetaNet Client is on ${metanetNetwork}!\n\nPlease make sure you are using the correct network.`
-      //   )
-      // }
-
-      const invoiceResponse = await authFetch.fetch(`${server}/api/invoice`, {
+      /* ----------------------------- /api/invoice ------------------------ */
+      const resInv = await authFetch.fetch(`${server}/api/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -57,18 +62,16 @@ const PayButton = ({
           amount
         })
       })
+      const invoice = await resInv.json()
+      if (invoice.status !== 'success') throw new Error(invoice.message)
 
-      const invoice = await invoiceResponse.json()
-      if (invoice.status !== 'success') {
-        throw new Error(invoice.message || 'Error requesting invoice')
-      }
-
-      const tx = await walletClient.createAction({
+      /* --------------------------- sign & pay ---------------------------- */
+      const tx = await wallet.createAction({
         description: button,
         outputs: invoice.outputs
       })
 
-      const payResponse = await authFetch.fetch(`${server}/api/pay`, {
+      const resPay = await authFetch.fetch(`${server}/api/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,31 +79,31 @@ const PayButton = ({
           transaction: JSON.stringify(tx)
         })
       })
+      const pay = await resPay.json()
+      if (pay.status !== 'success') throw new Error(pay.message)
 
-      const pay = await payResponse.json()
-      if (pay.status === 'success') {
-        setPaid(true)
-        console.log('✅ Payment successful:', pay)
-      } else {
-        throw new Error(pay.message || 'Error submitting payment')
-      }
-    } catch (e: any) {
-      console.error(e)
-      alert(e.message)
+      setPaid(true)
+      console.log('✅ Payment successful:', pay)
+    } catch (err: any) {
+      console.error('Payment flow error:', err)
+      alert(err.message || 'Unexpected error')
     } finally {
       setLoading(false)
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  /*  Render                                                               */
+  /* ---------------------------------------------------------------------- */
   if (!paid) {
     return (
       <button className="gateway-button-styles" onClick={handleClick} disabled={loading}>
         {loading ? loadingtext : text}
       </button>
     )
-  } else {
-    return <div>Payment Submitted</div>
   }
+
+  return <div>Payment Submitted</div>
 }
 
 export default PayButton

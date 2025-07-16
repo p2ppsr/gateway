@@ -1,13 +1,15 @@
 import 'dotenv/config'
 import type { Knex } from 'knex'
 
-const port = process.env.SQL_DATABASE_PORT
-  ? Number(process.env.SQL_DATABASE_PORT)
-  : undefined
+const port = process.env.SQL_DATABASE_PORT ? Number(process.env.SQL_DATABASE_PORT) : 3306 // fallback
+
+if (!process.env.SQL_DATABASE_HOST || !process.env.SQL_DATABASE_USER || !process.env.SQL_DATABASE_DB_NAME) {
+  throw new Error('Missing required database environment variables')
+}
 
 const config: Knex.Config = {
   client: 'mysql2',
-  migrations: { directory: './migrations' }, // <- fix here
+  migrations: { directory: './migrations' },
   connection: {
     host: process.env.SQL_DATABASE_HOST,
     port,

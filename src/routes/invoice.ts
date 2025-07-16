@@ -1,3 +1,4 @@
+// src/routes/invoice.ts
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile' // Assumes knexfile.js renamed to knexfile.ts
 import * as SDK from '@bsv/sdk'
@@ -60,7 +61,7 @@ export default {
         payment_id: paymentID,
         merchant_id: merchantId,
         completed: false,
-        from: (req as any).authrite.identityKey,
+        from: (req as any).auth.identityKey,
         transaction_info: '',
         amount,
         currency,
@@ -84,9 +85,7 @@ export default {
       const derivedPublicKey = derivedPriv.toPublicKey().toString()
 
       const pkh = new SDK.P2PKH()
-      const derivedScript = pkh
-        .lock(SDK.PublicKey.fromString(derivedPublicKey).toHash())
-        .toHex()
+      const derivedScript = pkh.lock(SDK.PublicKey.fromString(derivedPublicKey).toHash()).toHex()
 
       // Respond with the payment ID
       res.status(200).json({

@@ -1,22 +1,24 @@
+import { Configuration as WebpackConfiguration } from 'webpack'
 import { merge } from 'webpack-merge'
-import common from './webpack.common.ts'
-import { Configuration } from 'webpack'
-import 'webpack-dev-server'
+import common from './webpack.common'
+import 'dotenv/config'
 
-const developmentConfig: Configuration = {
+const API_HOST = process.env.API_HOST ?? 'localhost'
+const API_PORT = process.env.API_PORT ?? process.env.HTTP_PORT ?? '3001'
+
+const developmentConfig: WebpackConfiguration = {
   mode: 'development',
   devServer: {
     open: true,
-    port: 3000, // you can change the port
+    port: 3000,
     client: {
-      overlay: true // Show application errors
+      overlay: true
     },
     historyApiFallback: {
       index: 'index.html'
     },
     proxy: {
-      '/api': 'http://localhost:3001',
-      '/authrite': 'http://localhost:3001'
+      '/api': `http://${API_HOST}:${API_PORT}`
     },
     static: './public'
   },
@@ -24,3 +26,4 @@ const developmentConfig: Configuration = {
 }
 
 export default merge<WebpackConfiguration>(common, developmentConfig)
+

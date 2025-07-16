@@ -19,40 +19,25 @@ export const ContentWrap = styled(Box)(({ theme }) => ({
 export const FormSection = styled(Paper)(({ theme }) => ({
   // Changed from Box to Paper
   padding: theme.spacing(4),
-  backgroundColor:
-    theme.palette.mode === 'dark'
-      ? 'rgba(255, 255, 255, 0.1)'
-      : 'rgba(0, 0, 0, 0.1)',
+  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
   backdropFilter: 'blur(10px)',
   borderRadius: theme.shape.borderRadius,
-  boxShadow:
-    theme.palette.mode === 'dark'
-      ? '0 4px 30px rgba(0, 0, 0, 0.1)'
-      : '0 4px 30px rgba(255, 255, 255, 0.1)',
+  boxShadow: theme.palette.mode === 'dark' ? '0 4px 30px rgba(0, 0, 0, 0.1)' : '0 4px 30px rgba(255, 255, 255, 0.1)',
   color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
 }))
 
 export const PreviewSection = styled(Paper)(({ theme }) => ({
   // Changed from Box to Paper
   padding: theme.spacing(4),
-  backgroundColor:
-    theme.palette.mode === 'dark'
-      ? 'rgba(255, 255, 255, 0.1)'
-      : 'rgba(0, 0, 0, 0.1)',
+  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
   backdropFilter: 'blur(10px)',
   borderRadius: theme.shape.borderRadius,
-  boxShadow:
-    theme.palette.mode === 'dark'
-      ? '0 4px 30px rgba(0, 0, 0, 0.1)'
-      : '0 4px 30px rgba(255, 255, 255, 0.1)',
+  boxShadow: theme.palette.mode === 'dark' ? '0 4px 30px rgba(0, 0, 0, 0.1)' : '0 4px 30px rgba(255, 255, 255, 0.1)',
   color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
 }))
 
 export const CodePreview = styled(Box)(({ theme }) => ({
-  backgroundColor:
-    theme.palette.mode === 'dark'
-      ? 'rgba(0, 0, 0, 0.8)'
-      : 'rgba(255, 255, 255, 0.8)',
+  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)',
   color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
   padding: theme.spacing(2),
   borderRadius: theme.shape.borderRadius,
@@ -98,9 +83,6 @@ export const ButtonStyled = styled(Button)(({ theme }) => ({
   borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
   '&:hover': {
     borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-    backgroundColor:
-      theme.palette.mode === 'dark'
-        ? 'rgba(255, 255, 255, 0.2)'
-        : 'rgba(0, 0, 0, 0.2)'
+    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'
   }
 }))

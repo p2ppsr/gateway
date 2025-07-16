@@ -1,3 +1,4 @@
+// src/routes/listPayments.ts
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile' // Assumes knexfile.js renamed to knexfile.ts
 import { Request, Response } from 'express'
@@ -7,10 +8,10 @@ const db: Knex = knex(knexConfig)
 export default {
   type: 'get',
   path: '/listPayments',
-  knex: db,
+
   func: async (req: Request, res: Response): Promise<void> => {
     // Extract merchant ID from authentication context
-    const merchantId = (req as any).authrite.identityKey
+    const merchantId = (req as any).auth.identityKey
 
     // Extract query parameters for optional filtering by button ID, pagination, and sorting
     const {
