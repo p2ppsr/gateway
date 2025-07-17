@@ -6,43 +6,36 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Typography,
   Button,
   Paper,
-  TableContainer,
   IconButton,
   Box
 } from '@mui/material'
-import { ArrowBack, ArrowForward, Sort } from '@mui/icons-material'
-import {
-  Transaction,
-  P2PKH,
-  PrivateKey,
-  PublicKey,
-  WalletClient,
-  Hash,
-  Utils,
-  CreateActionArgs,
-  AuthFetch
-} from '@bsv/sdk'
+import { ArrowBack, ArrowForward } from '@mui/icons-material'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
+
+const formatBSV = (value: number | string): string => {
+  return parseFloat(value.toString()).toFixed(8);
+};
 
 interface Payment {
   payment_id: string
-  button_id: string
-  amount: number
+  payment_button_id: string
+  amount: number | string
   currency: string
   completed: boolean
   is_new: boolean
-  transaction_info: string
-  merchant_id: string
+  transaction_info?: string
+  merchant_id?: string
 }
 
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
-//const wallet = new WalletClient('auto', 'localhost')
 const authFetch = new AuthFetch(wallet)
 
 const PaymentsList: React.FC = () => {
@@ -50,7 +43,8 @@ const PaymentsList: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [page, setPage] = useState(1)
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const sortOrder = 'desc'
+
   const theme = useTheme()
 
   const fetchPayments = async () => {
@@ -74,8 +68,9 @@ const PaymentsList: React.FC = () => {
     }
   }
 
-  const acknowledgePayment = async (payment: Payment) => {
+  const acknowledgePayment = async (paymentId: string) => {
     try {
+<<<<<<< HEAD
       const transaction = JSON.parse(payment.transaction_info)
       const senderPrivKey = new PrivateKey(
         '0000000000000000000000000000000000000000000000000000000000000001',
@@ -132,12 +127,14 @@ const PaymentsList: React.FC = () => {
         throw new Error('Unable to submit incoming payment.')
       }
 
+=======
+>>>>>>> 7f1bf5b (Updates for hard coded 5 sats tip and storing atomicBeef replacing tx envelope)
       const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ paymentId: payment.payment_id })
+        body: JSON.stringify({ paymentId })
       })
       if (!response.ok) {
         const errorText = await response.text()
@@ -155,7 +152,7 @@ const PaymentsList: React.FC = () => {
 
   useEffect(() => {
     fetchPayments()
-  }, [page, sortOrder])
+  }, [page])
 
   if (loading)
     return (
@@ -202,14 +199,14 @@ const PaymentsList: React.FC = () => {
             {payments.map(payment => (
               <TableRow key={payment.payment_id}>
                 <TableCell>{payment.payment_id}</TableCell>
-                <TableCell>{payment.button_id}</TableCell>
-                <TableCell>{payment.amount}</TableCell>
+                <TableCell>{payment.payment_button_id}</TableCell>
+                <TableCell>{formatBSV(payment.amount)}</TableCell>
                 <TableCell>{payment.currency}</TableCell>
                 <TableCell>{payment.completed ? 'Yes' : 'No'}</TableCell>
                 <TableCell>{payment.is_new ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   {payment.is_new && (
-                    <Button variant="contained" color="primary" onClick={() => acknowledgePayment(payment)}>
+                    <Button variant="contained" color="primary" onClick={() => acknowledgePayment(payment.payment_id)}>
                       Acknowledge
                     </Button>
                   )}
@@ -234,13 +231,6 @@ const PaymentsList: React.FC = () => {
         <IconButton onClick={() => setPage(page + 1)}>
           <ArrowForward />
         </IconButton>
-        <Button
-          variant="outlined"
-          startIcon={<Sort />}
-          onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-        >
-          Sort Order: {sortOrder.toUpperCase()}
-        </Button>
       </Box>
     </Container>
   )

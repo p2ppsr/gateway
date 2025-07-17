@@ -94,8 +94,9 @@ export default {
         paymentId: paymentID,
         outputs: [
           {
-            script: derivedScript,
-            satoshis: Math.round(amount * 100000000)
+            lockingScript: derivedScript,
+            satoshis: 5,
+            outputDescription: 'Tip paid to merchant'
           }
         ]
       })
