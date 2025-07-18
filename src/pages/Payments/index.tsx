@@ -20,8 +20,8 @@ import { WalletClient, AuthFetch } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
 
 const formatBSV = (value: number | string): string => {
-  return parseFloat(value.toString()).toFixed(8);
-};
+  return parseFloat(value.toString()).toFixed(8)
+}
 
 interface Payment {
   payment_id: string

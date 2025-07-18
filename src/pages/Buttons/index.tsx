@@ -1,185 +1,184 @@
 // src/pages/Buttons/index.tsx
-  import React, { useState, useEffect } from 'react'
-  import {
-    Container,
-    Typography,
-    Select,
-    MenuItem,
-    FormControl,
-    InputLabel,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    CircularProgress,
-    Button,
-    useTheme,
-    Box
-  } from '@mui/material'
-  import { makeStyles } from '@mui/styles'
-  import { WalletClient, AuthFetch } from '@bsv/sdk'
+import React, { useState, useEffect } from 'react'
+import {
+  Container,
+  Typography,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  CircularProgress,
+  Button,
+  useTheme,
+  Box
+} from '@mui/material'
+import { makeStyles } from '@mui/styles'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
 
-  /* ──────────────────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────
      One wallet + AuthFetch shared by this module
      ────────────────────────────────────────────────────────────── */
-  const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
-  const wallet = new WalletClient('auto', WALLET_ORIGIN)
-  const authFetch = new AuthFetch(wallet)
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const wallet = new WalletClient('auto', WALLET_ORIGIN)
+const authFetch = new AuthFetch(wallet)
 
-  const formatBSV = (value: number | string): string => {
-    return parseFloat(value.toString()).toFixed(8);
-  };
+const formatBSV = (value: number | string): string => {
+  return parseFloat(value.toString()).toFixed(8)
+}
 
-  interface PaymentButton {
-    button_id: string
-    amount: number | string
-    currency: string
-    variable_amount: boolean
-    multi_use: boolean
-    used: boolean
-    accepts: string
-    total_paid: number | string
+interface PaymentButton {
+  button_id: string
+  amount: number | string
+  currency: string
+  variable_amount: boolean
+  multi_use: boolean
+  used: boolean
+  accepts: string
+  total_paid: number | string
+}
+
+const useStyles = makeStyles((theme: any) => ({
+  centeredHeader: {
+    textAlign: 'center',
+    marginBottom: theme.spacing(3),
+    color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+  }
+}))
+
+const PaymentButtonsList: React.FC = () => {
+  const [buttons, setButtons] = useState<PaymentButton[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
+
+  const theme = useTheme()
+  const classes = useStyles({ theme })
+
+  const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
+    setError('')
+    try {
+      setLoading(true)
+      let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
+      if (usedFilter !== 'all') url += `&usage=${usedFilter}`
+
+      const response = await authFetch.fetch(url, { method: 'GET' })
+      const data = await response.json()
+      if (data.status === 'error') throw new Error(data.message)
+      setButtons(data.data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const useStyles = makeStyles((theme: any) => ({
-    centeredHeader: {
-      textAlign: 'center',
-      marginBottom: theme.spacing(3),
-      color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
-    }
-  }))
+  useEffect(() => {
+    fetchButtons(page, sortOrder, usedFilter)
+  }, [page, sortOrder, usedFilter])
 
-  const PaymentButtonsList: React.FC = () => {
-    const [buttons, setButtons] = useState<PaymentButton[]>([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
-    const [page, setPage] = useState(1)
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-    const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
-
-    const theme = useTheme()
-    const classes = useStyles({ theme })
-
-    const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
-      setError('')
-      try {
-        setLoading(true)
-        let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
-        if (usedFilter !== 'all') url += `&usage=${usedFilter}`
-
-        const response = await authFetch.fetch(url, { method: 'GET' })
-        const data = await response.json()
-        if (data.status === 'error') throw new Error(data.message)
-        setButtons(data.data)
-      } catch (err: any) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    useEffect(() => {
-      fetchButtons(page, sortOrder, usedFilter)
-    }, [page, sortOrder, usedFilter])
-
-    if (loading)
-      return (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100vh'
-          }}
-        >
-          <CircularProgress />
-        </div>
-      )
-    if (error)
-      return (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '90vh'
-          }}
-        >
-          <Typography color="error">Error: {error}</Typography>
-        </div>
-      )
-
+  if (loading)
     return (
-      <Container
+      <div
         style={{
-          backgroundColor: theme.palette.background.default,
-          padding: theme.spacing(4)
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh'
         }}
       >
-        <Box className={classes.centeredHeader}>
-          <Typography variant="h2">Payment Buttons</Typography>
-          <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
-        </Box>
-        <FormControl variant="outlined" fullWidth margin="normal">
-          <InputLabel>Filter by usage</InputLabel>
-          <Select
-            value={usedFilter}
-            onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
-            label="Filter by usage"
-          >
-            <MenuItem value="all">All</MenuItem>
-            <MenuItem value="used">Used</MenuItem>
-            <MenuItem value="unused">Unused</MenuItem>
-          </Select>
-        </FormControl>
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell>Currency</TableCell>
-                <TableCell>Variable Amount</TableCell>
-                <TableCell>Multi-use</TableCell>
-                <TableCell>Used</TableCell>
-                <TableCell>Accepts</TableCell>
-                <TableCell>Total Paid</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {buttons.map(button => (
-                <TableRow key={button.button_id}>
-                  <TableCell>{button.button_id}</TableCell>
-                  <TableCell>{formatBSV(button.amount)}</TableCell>
-                  <TableCell>{button.currency}</TableCell>
-                  <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
-                  <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
-                  <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
-                  <TableCell>{button.accepts}</TableCell>
-                  <TableCell>{formatBSV(button.total_paid)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
-          <Button variant="contained" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-            Previous
-          </Button>
-          <Button variant="contained" onClick={() => setPage(page + 1)}>
-            Next
-          </Button>
-          <Button variant="contained" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
-            Sort Order: {sortOrder.toUpperCase()}
-          </Button>
-        </Box>
-      </Container>
+        <CircularProgress />
+      </div>
     )
-  }
+  if (error)
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '90vh'
+        }}
+      >
+        <Typography color="error">Error: {error}</Typography>
+      </div>
+    )
 
-  export default PaymentButtonsList
-  
+  return (
+    <Container
+      style={{
+        backgroundColor: theme.palette.background.default,
+        padding: theme.spacing(4)
+      }}
+    >
+      <Box className={classes.centeredHeader}>
+        <Typography variant="h2">Payment Buttons</Typography>
+        <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
+      </Box>
+      <FormControl variant="outlined" fullWidth margin="normal">
+        <InputLabel>Filter by usage</InputLabel>
+        <Select
+          value={usedFilter}
+          onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
+          label="Filter by usage"
+        >
+          <MenuItem value="all">All</MenuItem>
+          <MenuItem value="used">Used</MenuItem>
+          <MenuItem value="unused">Unused</MenuItem>
+        </Select>
+      </FormControl>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>ID</TableCell>
+              <TableCell>Amount</TableCell>
+              <TableCell>Currency</TableCell>
+              <TableCell>Variable Amount</TableCell>
+              <TableCell>Multi-use</TableCell>
+              <TableCell>Used</TableCell>
+              <TableCell>Accepts</TableCell>
+              <TableCell>Total Paid</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {buttons.map(button => (
+              <TableRow key={button.button_id}>
+                <TableCell>{button.button_id}</TableCell>
+                <TableCell>{formatBSV(button.amount)}</TableCell>
+                <TableCell>{button.currency}</TableCell>
+                <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{button.accepts}</TableCell>
+                <TableCell>{formatBSV(button.total_paid)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
+        <Button variant="contained" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+          Previous
+        </Button>
+        <Button variant="contained" onClick={() => setPage(page + 1)}>
+          Next
+        </Button>
+        <Button variant="contained" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
+          Sort Order: {sortOrder.toUpperCase()}
+        </Button>
+      </Box>
+    </Container>
+  )
+}
+
+export default PaymentButtonsList
