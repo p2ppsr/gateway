@@ -36,19 +36,21 @@ const App = () => {
   }, [])
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       try {
         const statusResponse = await Authrite.request(
-          `${window.location.protocol}//${window.location.host}/api/getStatus`, {
-          method: 'GET'
-        })
-        const status = JSON.parse(
-          new TextDecoder().decode(statusResponse.body)
+          `${window.location.protocol}//${window.location.host}/api/getStatus`,
+          {
+            method: 'GET'
+          }
         )
+        const status = JSON.parse(new TextDecoder().decode(statusResponse.body))
         setIsAdmin(status.isAdmin)
         const metanetNetwork = await getNetwork()
         if (status.network !== metanetNetwork) {
-          window.alert(`WARNING! Your MetaNet Client is using ${metanetNetwork} but the payment server is using ${status.network}!\n\nPlease be aware of which network you are using.`)
+          window.alert(
+            `WARNING! Your MetaNet Client is using ${metanetNetwork} but the payment server is using ${status.network}!\n\nPlease be aware of which network you are using.`
+          )
         }
       } catch (e) {
         console.error(e)
@@ -58,18 +60,18 @@ const App = () => {
 
   return (
     <Theme>
-      <ToastContainer position='top-center' containerId='alertToast' autoClose={5000} />
-      <NoMncModal appName='Gateway' open={isMncMissing} onClose={() => setIsMncMissing(false)} />
+      <ToastContainer position="top-center" containerId="alertToast" autoClose={5000} />
+      <NoMncModal appName="Gateway" open={isMncMissing} onClose={() => setIsMncMissing(false)} />
       <CssBaseline />
       {/* <Container maxWidth='xl' sx={{ padding: '0 !important' }}> */}
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
-          <Route path='/' element={<Create />} />
-          <Route path='/buttons' element={<Buttons />} />
-          <Route path='/payments' element={<Payments />} />
-          <Route path='/actions' element={<Actions />} />
-          <Route path='/money' element={<Money />} />
+          <Route path="/" element={<Create />} />
+          <Route path="/buttons" element={<Buttons />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/actions" element={<Actions />} />
+          <Route path="/money" element={<Money />} />
         </Routes>
       </Router>
       {/* </Container> */}

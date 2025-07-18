@@ -9,7 +9,7 @@ import {
   Box,
   InputAdornment,
   Tooltip,
-  IconButton,
+  IconButton
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import PayButton from '../../components/PayButton'
@@ -75,7 +75,7 @@ const Create: React.FC = () => {
   const theme = useTheme()
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       const metaNetClient = await checkForMetaNetClient()
       if (metaNetClient === 0) {
         setHasMetaNet(false)
@@ -87,16 +87,20 @@ const Create: React.FC = () => {
     })()
   }, [])
 
-  const handleCustomCSSChange = (event) => {
+  const handleCustomCSSChange = event => {
     setCustomCSS(event.target.value)
   }
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       try {
         await currencyConverter.initialize()
         setCurrencySymbol(currencyConverter.getCurrencySymbol())
-        const satoshis = await currencyConverter.convertCurrency(Number(paymentAmount), currencyConverter.preferredCurrency, 'BSV')
+        const satoshis = await currencyConverter.convertCurrency(
+          Number(paymentAmount),
+          currencyConverter.preferredCurrency,
+          'BSV'
+        )
         setAmountInSats(satoshis || 1000)
       } catch (error) {
         console.error('Failed to fetch currency:', error)
@@ -110,7 +114,11 @@ const Create: React.FC = () => {
     setShowCode(false)
     console.log('entered', input)
     try {
-      const satoshis = await currencyConverter.convertCurrency(Number(input), currencyConverter.preferredCurrency, 'BSV')
+      const satoshis = await currencyConverter.convertCurrency(
+        Number(input),
+        currencyConverter.preferredCurrency,
+        'BSV'
+      )
       console.log('amount', satoshis)
       setAmountInSats(satoshis || 1000)
     } catch (error) {
@@ -119,9 +127,13 @@ const Create: React.FC = () => {
   }, [])
 
   const handleCopyCode = async () => {
-    const code = `${customCSS ? `<style>
+    const code = `${
+      customCSS
+        ? `<style>
 ${customCSS}
-</style>` : ''}
+</style>`
+        : ''
+    }
 <div
   class="gateway-paybutton"
   data-merchant="${merchant}"
@@ -154,23 +166,18 @@ ${customCSS}
 
   const handleSubmit = async () => {
     if (!hasMetaNet) {
-      return alert(
-        'Download MetaNet Client!\n\nhttps://projectbabbage.com/metanet-client'
-      )
+      return alert('Download MetaNet Client!\n\nhttps://projectbabbage.com/metanet-client')
     }
-    const createResponse = await authrite.request(
-      `${location.protocol}//${location.host}/api/createButton`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          amount: Number(paymentAmount),
-          currency: 'BSV',
-          multiUse: true,
-          variableAmount: true,
-          accepts: 'BSV',
-        }),
-      }
-    )
+    const createResponse = await authrite.request(`${location.protocol}//${location.host}/api/createButton`, {
+      method: 'POST',
+      body: JSON.stringify({
+        amount: Number(paymentAmount),
+        currency: 'BSV',
+        multiUse: true,
+        variableAmount: true,
+        accepts: 'BSV'
+      })
+    })
     const create = JSON.parse(new TextDecoder().decode(createResponse.body))
     setButtonID(create.buttonId)
     setShowCode(true)
@@ -182,9 +189,7 @@ ${customCSS}
         <Box className={classes.contentWrap}>
           <Box className={classes.centeredHeader}>
             <Typography variant="h2">Create Your Tipping Button</Typography>
-            <Typography variant="subtitle1">
-              Instantly generate code to embed tipping buttons on your site.
-            </Typography>
+            <Typography variant="subtitle1">Instantly generate code to embed tipping buttons on your site.</Typography>
           </Box>
 
           <Grid container spacing={4}>
@@ -194,7 +199,7 @@ ${customCSS}
               md={4}
               style={{
                 borderRadius: '0.8em',
-                overflow: 'hidden',
+                overflow: 'hidden'
               }}
             >
               <Paper elevation={3} className={classes.formSection} style={{ borderRadius: '0.8em' }}>
@@ -204,7 +209,7 @@ ${customCSS}
                 <TextField
                   label="Button Text"
                   value={buttonText}
-                  onChange={(e) => {
+                  onChange={e => {
                     setButtonText(e.target.value)
                     setShowCode(false)
                   }}
@@ -234,13 +239,7 @@ ${customCSS}
                   className={classes.textField}
                   multiline
                 />
-                <Button
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  sx={{ marginTop: 2 }}
-                  onClick={handleSubmit}
-                >
+                <Button variant="contained" color="primary" fullWidth sx={{ marginTop: 2 }} onClick={handleSubmit}>
                   Generate Code
                 </Button>
               </Paper>
@@ -252,11 +251,20 @@ ${customCSS}
               md={8}
               style={{
                 borderRadius: '0.8em',
-                overflow: 'hidden',
+                overflow: 'hidden'
               }}
             >
-              <Paper elevation={3} className={classes.previewSection} style={{ borderRadius: '0.8em', position: 'relative' }}>
-                <Typography variant="h4" gutterBottom component="div" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Paper
+                elevation={3}
+                className={classes.previewSection}
+                style={{ borderRadius: '0.8em', position: 'relative' }}
+              >
+                <Typography
+                  variant="h4"
+                  gutterBottom
+                  component="div"
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
                   Button Preview
                   {showCode && (
                     <Tooltip title="Copy Code">
@@ -272,9 +280,13 @@ ${customCSS}
                     <Box className="codePreview">
                       <CodeSnippet
                         language="html"
-                        code={`${customCSS ? `<style>
+                        code={`${
+                          customCSS
+                            ? `<style>
 ${customCSS}
-</style>` : ''}
+</style>`
+                            : ''
+                        }
 <div
   class="gateway-paybutton"
   data-merchant="${merchant}"
@@ -287,9 +299,7 @@ ${customCSS}
                       />
                     </Box>
                   ) : (
-                    <Typography>
-                      Click "Generate Code" to get the HTML code for your website!
-                    </Typography>
+                    <Typography>Click "Generate Code" to get the HTML code for your website!</Typography>
                   )}
                 </Box>
                 <Typography variant="h5" gutterBottom>
@@ -304,7 +314,6 @@ ${customCSS}
               </Paper>
             </Grid>
           </Grid>
-
         </Box>
       </Container>
     </Box>

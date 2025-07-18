@@ -1,4 +1,4 @@
-import { getNetwork } from "@babbage/sdk-ts"
+import { getNetwork } from '@babbage/sdk-ts'
 
 export default async function checkForMetaNetClient() {
   try {

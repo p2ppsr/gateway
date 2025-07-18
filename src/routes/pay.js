@@ -16,7 +16,8 @@ module.exports = {
         .where({
           payment_id: paymentId,
           completed: false
-        }).first()
+        })
+        .first()
 
       if (!payment) {
         return res.status(404).json({
@@ -36,7 +37,8 @@ module.exports = {
       const button = await knex('payment_buttons')
         .where({
           button_id: payment.payment_button_id
-        }).first()
+        })
+        .first()
 
       if (!button.multi_use && button.used) {
         return res.status(400).json({
@@ -71,13 +73,11 @@ module.exports = {
       // If checks pass, update the payment as completed and the button as used
       await knex.transaction(async trx => {
         // Set the payment as completed
-        await trx('payments')
-          .where({ payment_id: paymentId })
-          .update({
-            completed: true,
-            transaction_info: transaction,
-            is_new: true
-          })
+        await trx('payments').where({ payment_id: paymentId }).update({
+          completed: true,
+          transaction_info: transaction,
+          is_new: true
+        })
 
         // Mark the button as used and increment the total amount paid to this button
         await trx('payment_buttons')

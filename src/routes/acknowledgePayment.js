@@ -17,7 +17,8 @@ module.exports = {
           payment_id: paymentId,
           merchant_id: merchantId,
           is_new: true
-        }).first()
+        })
+        .first()
 
       if (!payment) {
         return res.status(404).json({
@@ -27,9 +28,7 @@ module.exports = {
       }
 
       // Update the payment's is_new status to false
-      await knex('payments')
-        .where({ payment_id: paymentId })
-        .update({ is_new: false })
+      await knex('payments').where({ payment_id: paymentId }).update({ is_new: false })
 
       // Respond with success
       res.status(200).json({

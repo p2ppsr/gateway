@@ -10,7 +10,13 @@ module.exports = {
 
     // Validate the input parameters (basic example)
     const { amount, currency, variableAmount, multiUse, accepts } = req.body
-    if (typeof amount !== 'number' || typeof currency !== 'string' || typeof variableAmount !== 'boolean' || typeof multiUse !== 'boolean' || !['BSV', 'fiat', 'both'].includes(accepts)) {
+    if (
+      typeof amount !== 'number' ||
+      typeof currency !== 'string' ||
+      typeof variableAmount !== 'boolean' ||
+      typeof multiUse !== 'boolean' ||
+      !['BSV', 'fiat', 'both'].includes(accepts)
+    ) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid parameters'

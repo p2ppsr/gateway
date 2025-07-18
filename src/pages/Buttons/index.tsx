@@ -32,12 +32,12 @@ interface PaymentButton {
   total_paid: number
 }
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles(theme => ({
   centeredHeader: {
     textAlign: 'center',
     marginBottom: theme.spacing(3),
-    color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-  },
+    color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+  }
 }))
 
 const PaymentButtonsList: React.FC = () => {
@@ -49,7 +49,7 @@ const PaymentButtonsList: React.FC = () => {
   const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
 
   const theme = useTheme()
-  const classes = useStyles({ theme });
+  const classes = useStyles({ theme })
 
   const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
     setError('')
@@ -60,7 +60,7 @@ const PaymentButtonsList: React.FC = () => {
         url += `&usage=${usedFilter}`
       }
       const response = await authrite.request(url, {
-        method: 'GET',
+        method: 'GET'
       })
       const data = JSON.parse(new TextDecoder().decode(response.body))
       if (data.status === 'error') {
@@ -75,45 +75,49 @@ const PaymentButtonsList: React.FC = () => {
   }
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       await fetchButtons(page, sortOrder, usedFilter)
     })()
   }, [page, sortOrder, usedFilter])
 
-  if (loading) return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh'
-    }}>
-      <CircularProgress />
-    </div>
-  )
-  if (error) return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '90vh'
-    }}>
-      <Typography color="error">Error: {error}</Typography>
-    </div>
-  )
+  if (loading)
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh'
+        }}
+      >
+        <CircularProgress />
+      </div>
+    )
+  if (error)
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '90vh'
+        }}
+      >
+        <Typography color="error">Error: {error}</Typography>
+      </div>
+    )
 
   return (
     <Container style={{ backgroundColor: theme.palette.background.default, padding: theme.spacing(4) }}>
       <Box className={classes.centeredHeader}>
         <Typography variant="h2">Payment Buttons</Typography>
-        <Typography variant="subtitle1">
-          View all the payment buttons you have created
-        </Typography>
+        <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
       </Box>
       <FormControl variant="outlined" fullWidth margin="normal">
         <InputLabel>Filter by usage</InputLabel>
         <Select
           value={usedFilter}
-          onChange={(e) => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
+          onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
           label="Filter by usage"
         >
           <MenuItem value="all">All</MenuItem>
@@ -136,7 +140,7 @@ const PaymentButtonsList: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {buttons.map((button) => (
+            {buttons.map(button => (
               <TableRow key={button.button_id}>
                 <TableCell>{button.button_id}</TableCell>
                 <TableCell>{button.amount}</TableCell>
@@ -153,23 +157,13 @@ const PaymentButtonsList: React.FC = () => {
       </TableContainer>
       {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
-        <Button
-          variant="contained"
-          onClick={() => setPage(Math.max(1, page - 1))}
-          disabled={page === 1}
-        >
+        <Button variant="contained" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           Previous
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => setPage(page + 1)}
-        >
+        <Button variant="contained" onClick={() => setPage(page + 1)}>
           Next
         </Button>
-        <Button
-          variant="contained"
-          onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-        >
+        <Button variant="contained" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
           Sort Order: {sortOrder.toUpperCase()}
         </Button>
       </Box>

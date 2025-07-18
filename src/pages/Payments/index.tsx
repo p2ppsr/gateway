@@ -12,7 +12,7 @@ import {
   Paper,
   TableContainer,
   IconButton,
-  Box,
+  Box
 } from '@mui/material'
 import { ArrowBack, ArrowForward, Sort } from '@mui/icons-material'
 import authrite from '../../utils/Authrite'
@@ -65,7 +65,7 @@ const PaymentsList: React.FC = () => {
         senderPrivateKey: '0000000000000000000000000000000000000000000000000000000000000001',
         recipientPublicKey: payment.merchant_id,
         invoiceNumber: `2-3241645161d8-${payment.payment_id} 1`,
-        returnType: 'publicKey',
+        returnType: 'publicKey'
       })
       const expectedAmount = Math.round(payment.amount * 100000000)
 
@@ -73,7 +73,7 @@ const PaymentsList: React.FC = () => {
       const derivedScript = pkh.lock(PublicKey.fromString(derivedPubKey).toHash()).toHex()
       const bsvtx = Transaction.fromHex(transaction.rawTx)
       const index = bsvtx.outputs.findIndex(
-        (x) => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
+        x => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
       )
       if (index === -1) {
         throw new Error('Could not discover our output of this transaction.')
@@ -87,8 +87,8 @@ const PaymentsList: React.FC = () => {
           satoshis: expectedAmount,
           derivationPrefix: payment.payment_id,
           derivationSuffix: '1',
-          senderIdentityKey: anyonePub,
-        },
+          senderIdentityKey: anyonePub
+        }
       ]
 
       const success = await submitDirectTransaction({
@@ -97,7 +97,7 @@ const PaymentsList: React.FC = () => {
         derivationPrefix: payment.payment_id,
         transaction,
         note: 'Receive a payment',
-        amount: Math.round(payment.amount * 100000000),
+        amount: Math.round(payment.amount * 100000000)
       })
       if (!success.referenceNumber) {
         throw new Error('Unable to submit incoming payment.')
@@ -105,9 +105,9 @@ const PaymentsList: React.FC = () => {
       const response = await authrite.request(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ paymentId: payment.payment_id }),
+        body: JSON.stringify({ paymentId: payment.payment_id })
       })
       const data = JSON.parse(new TextDecoder().decode(response.body))
       if (data.status === 'error') {
@@ -123,30 +123,33 @@ const PaymentsList: React.FC = () => {
     fetchPayments()
   }, [page, sortOrder])
 
-  if (loading) return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh'
-    }}>
-      <CircularProgress />
-    </div>
-  )
+  if (loading)
+    return (
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh'
+        }}
+      >
+        <CircularProgress />
+      </div>
+    )
   if (error) return <Typography color="error">{error}</Typography>
 
   return (
     <Container>
-      <Box style={{
-        textAlign: 'center',
-        marginBottom: theme.spacing(4),
-        marginTop: theme.spacing(5),
-        color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-      }}>
+      <Box
+        style={{
+          textAlign: 'center',
+          marginBottom: theme.spacing(4),
+          marginTop: theme.spacing(5),
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+        }}
+      >
         <Typography variant="h2">Payments</Typography>
-        <Typography variant="subtitle1">
-          Acknowledge your incoming payments
-        </Typography>
+        <Typography variant="subtitle1">Acknowledge your incoming payments</Typography>
       </Box>
       <TableContainer component={Paper}>
         <Table>
@@ -162,7 +165,7 @@ const PaymentsList: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {payments.map((payment) => (
+            {payments.map(payment => (
               <TableRow key={payment.payment_id}>
                 <TableCell>{payment.payment_id}</TableCell>
                 <TableCell>{payment.button_id}</TableCell>
@@ -172,11 +175,7 @@ const PaymentsList: React.FC = () => {
                 <TableCell>{payment.is_new ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   {payment.is_new && (
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => acknowledgePayment(payment)}
-                    >
+                    <Button variant="contained" color="primary" onClick={() => acknowledgePayment(payment)}>
                       Acknowledge
                     </Button>
                   )}
@@ -186,7 +185,7 @@ const PaymentsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {payments.length === 0 && <Typography paddingTop='1em'>No payments found.</Typography>}
+      {payments.length === 0 && <Typography paddingTop="1em">No payments found.</Typography>}
       <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
         <IconButton onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           <ArrowBack />

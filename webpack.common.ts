@@ -1,32 +1,32 @@
-import path from "path"
-import HtmlWebpackPlugin from "html-webpack-plugin"
-import NodePolyfillPlugin from "node-polyfill-webpack-plugin"
-import CopyWebpackPlugin from "copy-webpack-plugin"
-import { Configuration } from "webpack"
+import path from 'path'
+import HtmlWebpackPlugin from 'html-webpack-plugin'
+import NodePolyfillPlugin from 'node-polyfill-webpack-plugin'
+import CopyWebpackPlugin from 'copy-webpack-plugin'
+import { Configuration } from 'webpack'
 
 const common: Configuration = {
   output: {
-    path: path.join(__dirname, "/build"),
-    filename: "bundle.js",
-    publicPath: "/",
+    path: path.join(__dirname, '/build'),
+    filename: 'bundle.js',
+    publicPath: '/'
   },
 
   plugins: [
     new HtmlWebpackPlugin({
-      template: "public/index.html",
-      inject: false,
+      template: 'public/index.html',
+      inject: false
     }),
     new NodePolyfillPlugin(),
     new CopyWebpackPlugin({
       patterns: [
         {
-          from: "public",
+          from: 'public',
           globOptions: {
-            ignore: ["**/index.html"],
-          },
-        },
-      ],
-    }),
+            ignore: ['**/index.html']
+          }
+        }
+      ]
+    })
   ],
 
   module: {
@@ -35,18 +35,18 @@ const common: Configuration = {
         test: /\.(ts|tsx|js|jsx)$/,
         exclude: /node_modules/,
         use: {
-          loader: "babel-loader",
-        },
+          loader: 'babel-loader'
+        }
       },
 
       {
         test: /\.css$/,
-        use: ["style-loader", "css-loader"],
+        use: ['style-loader', 'css-loader']
       },
 
       {
         test: /\.scss$/,
-        use: ["style-loader", "css-loader", "sass-loader"],
+        use: ['style-loader', 'css-loader', 'sass-loader']
       },
 
       // Image file loaders
@@ -54,42 +54,42 @@ const common: Configuration = {
         test: /\.(png|jpe?g|gif|svg|webp)$/,
         use: [
           {
-            loader: "url-loader",
-            options: { limit: false },
-          },
-        ],
+            loader: 'url-loader',
+            options: { limit: false }
+          }
+        ]
       },
 
       // Font file loaders
       {
         test: /\.(woff|woff2|eot|ttf)$/,
         use: {
-          loader: "file-loader",
+          loader: 'file-loader',
           options: {
-            name: "assets/Fonts/[name].[ext]",
-          },
-        },
+            name: 'assets/Fonts/[name].[ext]'
+          }
+        }
       },
 
       // Audio file loaders
       {
         test: /\.(mp3|wav|m4v|flac|aiff)$/,
         use: {
-          loader: "file-loader",
+          loader: 'file-loader',
           options: {
-            name: "assets/Music/[name].[ext]",
-          },
-        },
-      },
-    ],
+            name: 'assets/Music/[name].[ext]'
+          }
+        }
+      }
+    ]
   },
 
   resolve: {
-    extensions: ["", ".js", ".jsx", ".ts", ".tsx"],
+    extensions: ['', '.js', '.jsx', '.ts', '.tsx'],
     alias: {
-      fs: false,
-    },
-  },
+      fs: false
+    }
+  }
 }
 
 export default common

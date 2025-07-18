@@ -1,8 +1,6 @@
 const knex = require('knex')(require('../../knexfile.js'))
 
-const {
-  BSV_NETWORK
-} = process.env
+const { BSV_NETWORK } = process.env
 
 module.exports = {
   type: 'get',
@@ -10,9 +8,11 @@ module.exports = {
   knex,
   func: async (req, res) => {
     try {
-      const admin = await knex('admins').where({
-        admin_id: req.authrite.identityKey
-      }).first()
+      const admin = await knex('admins')
+        .where({
+          admin_id: req.authrite.identityKey
+        })
+        .first()
       res.status(200).json({
         status: 'success',
         network: BSV_NETWORK,

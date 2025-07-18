@@ -6,37 +6,37 @@ export default (theme: Theme) =>
       boxShadow: theme.shadows[3],
       marginBottom: theme.spacing(1),
       maxWidth: '1920px',
-      margin: '0 auto',
+      margin: '0 auto'
     },
     toolbar: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      position: 'relative',
+      position: 'relative'
     },
     logo: {
       fontWeight: 'bold',
-      cursor: 'pointer',
+      cursor: 'pointer'
     },
     navLinksWrapper: {
       display: 'flex',
       flex: 1,
       justifyContent: 'center',
-      position: 'relative',
+      position: 'relative'
     },
     navLinks: {
       display: 'flex',
-      gap: theme.spacing(4),
+      gap: theme.spacing(4)
     },
     link: {
       color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
       '&:hover': {
-        color: theme.palette.secondary.main,
-      },
+        color: theme.palette.secondary.main
+      }
     },
     activeLink: {
       color: theme.palette.secondary.main,
-      fontWeight: 'bold',
+      fontWeight: 'bold'
     },
     moneyLink: {
       color: theme.palette.secondary.contrastText,
@@ -44,11 +44,11 @@ export default (theme: Theme) =>
       padding: theme.spacing(0.5, 1),
       borderRadius: theme.shape.borderRadius,
       '&:hover': {
-        backgroundColor: theme.palette.secondary.light,
-      },
+        backgroundColor: theme.palette.secondary.light
+      }
     },
     moneyLinkWrapper: {
       position: 'absolute',
-      right: 0,
-    },
+      right: 0
+    }
   })

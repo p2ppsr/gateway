@@ -4,7 +4,7 @@ import { makeStyles, createStyles } from '@mui/styles'
 
 const commonTypography = {
   fontFamily: 'Satoshi',
-  color: '#424242',
+  color: '#424242'
 }
 
 const lightTheme = createTheme({
@@ -16,15 +16,15 @@ const lightTheme = createTheme({
     h3: { fontWeight: 'normal', fontSize: '2em' },
     h4: { fontSize: '1.75em' },
     h5: { fontSize: '1.5em' },
-    h6: { fontSize: '1.25em' },
+    h6: { fontSize: '1.25em' }
   },
   palette: {
     mode: 'light',
     primary: { main: '#424242' },
     secondary: { main: '#FC433F' },
-    background: { default: '#ffffff' },
+    background: { default: '#ffffff' }
   },
-  maxContentWidth: '1440px',
+  maxContentWidth: '1440px'
 })
 
 const darkTheme = createTheme({
@@ -36,15 +36,15 @@ const darkTheme = createTheme({
     h3: { fontWeight: 'normal', fontSize: '2em', color: '#ffffff' },
     h4: { fontSize: '1.75em', color: '#ffffff' },
     h5: { fontSize: '1.5em', color: '#ffffff' },
-    h6: { fontSize: '1.25em', color: '#ffffff' },
+    h6: { fontSize: '1.25em', color: '#ffffff' }
   },
   palette: {
     mode: 'dark',
     primary: { main: '#ffffff' },
     secondary: { main: '#5E59F9' },
-    background: { default: '#323537' },
+    background: { default: '#323537' }
   },
-  maxContentWidth: '1440px',
+  maxContentWidth: '1440px'
 })
 
 const extendedTheme = (theme: Theme) => ({
@@ -53,12 +53,12 @@ const extendedTheme = (theme: Theme) => ({
     ...theme.typography,
     h1: {
       ...theme.typography.h1,
-      [theme.breakpoints.down('md')]: { fontSize: '1.8em' },
+      [theme.breakpoints.down('md')]: { fontSize: '1.8em' }
     },
     h2: {
       ...theme.typography.h2,
-      [theme.breakpoints.down('md')]: { fontSize: '1.6em' },
-    },
+      [theme.breakpoints.down('md')]: { fontSize: '1.6em' }
+    }
   },
   templates: {
     page_wrap: {
@@ -68,7 +68,7 @@ const extendedTheme = (theme: Theme) => ({
       padding: theme.spacing(7),
       [theme.breakpoints.down('lg')]: { padding: theme.spacing(5) },
       [theme.breakpoints.down('md')]: { padding: theme.spacing(3) },
-      [theme.breakpoints.down('sm')]: { padding: theme.spacing(1) },
+      [theme.breakpoints.down('sm')]: { padding: theme.spacing(1) }
     },
     subheading: {
       fontWeight: 'bold',
@@ -78,7 +78,7 @@ const extendedTheme = (theme: Theme) => ({
       color: theme.palette.mode === 'dark' ? '#FFF' : '#424242',
       textAlign: 'center',
       margin: 'auto',
-      [theme.breakpoints.up('lg')]: { fontSize: '32px' },
+      [theme.breakpoints.up('lg')]: { fontSize: '32px' }
     },
     subheading_f: {
       fontWeight: 'bold',
@@ -87,14 +87,14 @@ const extendedTheme = (theme: Theme) => ({
       color: theme.palette.mode === 'dark' ? '#FFF' : '#424242',
       maxWidth: '600px',
       textAlign: 'left',
-      [theme.breakpoints.up('lg')]: { fontSize: '32px' },
+      [theme.breakpoints.up('lg')]: { fontSize: '32px' }
     },
     centeredHeader: {
       textAlign: 'center',
       marginBottom: theme.spacing(7),
-      color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+      color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
     }
-  },
+  }
 })
 
 const useStyles = makeStyles((theme: Theme) =>
@@ -108,8 +108,8 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     '@global a': {
       textDecoration: 'none',
-      color: '#FC433F',
-    },
+      color: '#FC433F'
+    }
   })
 )
 

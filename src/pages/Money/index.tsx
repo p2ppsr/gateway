@@ -44,7 +44,8 @@ const MyMoney = () => {
       <h2>My Money</h2>
       <div>
         <p>
-          Here, you'll be able to withdraw any fiat payments into your bank account, and manage other aspects of your profile, such as identity certificate registration.
+          Here, you'll be able to withdraw any fiat payments into your bank account, and manage other aspects of your
+          profile, such as identity certificate registration.
         </p>
       </div>
     </div>

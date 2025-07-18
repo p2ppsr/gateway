@@ -12,15 +12,15 @@ const PayButton = ({
   button,
   currency = 'BSV',
   server,
-  loadingtext = 'Loading, please wait...',
+  loadingtext = 'Loading, please wait...'
 }: {
-  text?: string,
-  amount: number,
-  merchant: string,
-  button: string,
-  currency?: string,
-  server: string,
-  loadingtext?: string,
+  text?: string
+  amount: number
+  merchant: string
+  button: string
+  currency?: string
+  server: string
+  loadingtext?: string
 }) => {
   const [loading, setLoading] = useState(false)
   const [paid, setPaid] = useState(false)
@@ -37,7 +37,9 @@ const PayButton = ({
       const status = JSON.parse(new TextDecoder().decode(statusResponse.body))
       const metanetNetwork = await getNetwork()
       if (status.network !== metanetNetwork) {
-        return alert(`WARNING! This payment server uses ${status.network} but your MetaNet Client is on ${metanetNetwork}!\n\nPlease make sure you are using the correct network.`)
+        return alert(
+          `WARNING! This payment server uses ${status.network} but your MetaNet Client is on ${metanetNetwork}!\n\nPlease make sure you are using the correct network.`
+        )
       }
       const invoiceResponse = await authrite.request(`${server}/api/invoice`, {
         method: 'POST',
@@ -80,11 +82,7 @@ const PayButton = ({
 
   if (!paid) {
     return (
-      <button
-        className="gateway-button-styles"
-        onClick={handleClick}
-        disabled={loading}
-      >
+      <button className="gateway-button-styles" onClick={handleClick} disabled={loading}>
         {loading ? loadingtext : text}
       </button>
     )

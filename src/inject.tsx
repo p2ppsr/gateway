@@ -10,21 +10,14 @@ if (typeof window !== 'object') {
 }
 
 // create a local .render() function accessible from the window object
-(window as any).PayButton = {};
+;(window as any).PayButton = {}
 
-(window as any).PayButton.render = (elementID: string, props: any) => {
+;(window as any).PayButton.render = (elementID: string, props: any) => {
   // first, we clear anything that might be in the element
-  ReactDOM.render(
-    <div />,
-    document.getElementById(elementID),
-    () => {
-      // then, we render the actual PayButton
-      ReactDOM.render(
-        <PayButton {...props} />,
-        document.getElementById(elementID)
-      )
-    }
-  )
+  ReactDOM.render(<div />, document.getElementById(elementID), () => {
+    // then, we render the actual PayButton
+    ReactDOM.render(<PayButton {...props} />, document.getElementById(elementID))
+  })
 }
 
 // this function uses the above renderer to load all buttons where
@@ -32,12 +25,7 @@ if (typeof window !== 'object') {
 let bootstrapPayButtons = () => {
   // query the DOM and console-log however many buttons we found
   let buttons = document.getElementsByClassName('gateway-paybutton')
-  console.log(
-    'Gateway: Found',
-    buttons.length,
-    buttons.length === 1 ? 'PayButton' : 'PayButtons',
-    'on this page.'
-  )
+  console.log('Gateway: Found', buttons.length, buttons.length === 1 ? 'PayButton' : 'PayButtons', 'on this page.')
 
   // for each of those buttons, use the renderer to display the button
   for (let i = 0; i < buttons.length; i++) {
@@ -63,9 +51,9 @@ let bootstrapPayButtons = () => {
       }
     }
 
-    console.log(props);
+    console.log(props)
     // render the button
-    (window as any).PayButton.render(buttonID, props)
+    ;(window as any).PayButton.render(buttonID, props)
   }
 }
 

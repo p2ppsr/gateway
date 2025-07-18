@@ -16,7 +16,8 @@ module.exports = {
         .where({
           button_id: paymentButtonId,
           merchant_id: merchantId
-        }).first()
+        })
+        .first()
 
       if (!button) {
         return res.status(404).json({
@@ -34,10 +35,7 @@ module.exports = {
       }
 
       // Verify the amount matches or the button is variable
-      if (
-        !button.variable_amount &&
-        (amount !== button.amount || currency !== button.currency)
-      ) {
+      if (!button.variable_amount && (amount !== button.amount || currency !== button.currency)) {
         return res.status(400).json({
           status: 'error',
           message: 'Amount and/or currency mismatch for fixed-amount button.'
@@ -73,12 +71,13 @@ module.exports = {
         status: 'success',
         message: 'Invoice created successfully',
         paymentId: paymentID,
-        outputs: [{
-          script: derivedScript,
-          satoshis: Math.round(amount * 100000000)
-        }]
+        outputs: [
+          {
+            script: derivedScript,
+            satoshis: Math.round(amount * 100000000)
+          }
+        ]
       })
-
     } catch (error) {
       console.error('Error creating invoice:', error)
       res.status(500).json({
