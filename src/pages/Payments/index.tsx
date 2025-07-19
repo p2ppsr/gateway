@@ -70,65 +70,6 @@ const PaymentsList: React.FC = () => {
 
   const acknowledgePayment = async (paymentId: string) => {
     try {
-<<<<<<< HEAD
-      const transaction = JSON.parse(payment.transaction_info)
-      const senderPrivKey = new PrivateKey(
-        '0000000000000000000000000000000000000000000000000000000000000001',
-        'hex'
-      )
-      const recipientPubKey = PublicKey.fromString(payment.merchant_id)
-      const invoiceNumber = `2-3241645161d8-${payment.payment_id} 1`
-      const combined = Utils.toArray(`${senderPrivKey.toString()}${recipientPubKey.toString()}${invoiceNumber}`, 'utf8')
-      const derivedHash = Hash.sha256(Hash.sha256(combined))
-      const derivedPriv = new PrivateKey(Utils.toHex(derivedHash), 'hex')
-      const derivedPubKey = derivedPriv.toPublicKey()
-      const expectedAmount = Math.round(payment.amount * 100000000)
-      const pkh = new P2PKH()
-      const derivedScript = pkh.lock(derivedPubKey.toHash()).toHex()
-      const bsvtx = Transaction.fromHex(transaction.rawTx)
-      const incomingTxid = bsvtx.id('hex')
-      const index = bsvtx.outputs.findIndex(
-        x => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
-      )
-      if (index === -1) {
-        throw new Error('Could not discover our output of this transaction.')
-      }
-      const anyonePriv = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
-      const anyonePub = anyonePriv.toPublicKey()
-
-      const anyonePkh = new P2PKH()
-      const anyoneScript = anyonePkh.lock(anyonePub.toHash()).toHex()
-
-      const args: CreateActionArgs = {
-        description: 'Receive a payment',
-        inputs: [
-          {
-            outpoint: `${incomingTxid}_${index}`,
-            unlockingScriptLength: 73,
-            inputDescription: 'Acknowledge payment input'
-          }
-        ],
-        outputs: [
-          {
-            lockingScript: anyoneScript,
-            satoshis: expectedAmount,
-            outputDescription: 'Acknowledged payment'
-          }
-        ]
-      }
-      const { tx } = await wallet.createAction(args)
-      if (!tx) {
-        throw new Error('Unable to create transaction.')
-      }
-
-      const parsedTx = Transaction.fromAtomicBEEF(tx)
-      const successTxid = parsedTx.id('hex')
-      if (!successTxid) {
-        throw new Error('Unable to submit incoming payment.')
-      }
-
-=======
->>>>>>> 7f1bf5b (Updates for hard coded 5 sats tip and storing atomicBeef replacing tx envelope)
       const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
         method: 'POST',
         headers: {

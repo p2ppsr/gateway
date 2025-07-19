@@ -18,7 +18,6 @@ const ListItemLink = (props: { to: string; primary: string; onClick: () => void 
 }
 const useStyles = makeStyles(style, { name: 'Navbar' })
 
-
 const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
   const classes = useStyles()
   const location = useLocation()

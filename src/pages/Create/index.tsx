@@ -1,16 +1,6 @@
 // src/pages/Create/index.tsx
 import React, { useState, useEffect, useCallback } from 'react'
-import {
-  Typography,
-  TextField,
-  Button,
-  Container,
-  Grid,
-  Box,
-  InputAdornment,
-  Tooltip,
-  IconButton
-} from '@mui/material'
+import { Typography, TextField, Button, Container, Grid, Box, InputAdornment, Tooltip, IconButton } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import {
@@ -212,9 +202,7 @@ const Create: React.FC = () => {
         <ContentWrap>
           <CenteredHeader>
             <Typography variant="h2">Create Your Tipping Button</Typography>
-            <Typography variant="subtitle1">
-              Instantly generate code to embed tipping buttons on your site.
-            </Typography>
+            <Typography variant="subtitle1">Instantly generate code to embed tipping buttons on your site.</Typography>
           </CenteredHeader>
 
           <Grid container spacing={4}>

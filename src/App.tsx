@@ -12,6 +12,8 @@ import Actions from './pages/Actions'
 import Money from './pages/Money'
 import { CssBaseline } from '@mui/material'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { checkForMetaNetClient, NoMncModal } from 'metanet-react-prompt'
+import useAsyncEffect from 'use-async-effect'
 
 /* -------------------------------------------------------------------------- */
 /*  AuthFetch – constructed once per session                                  */
@@ -28,6 +30,23 @@ const API_BASE =
 
 const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isMncMissing, setIsMncMissing] = useState(false)
+
+  // Run a 1s interval for checking if MNC is running
+  useAsyncEffect(async () => {
+    const intervalId = setInterval(async () => {
+      const hasMNC = await checkForMetaNetClient()
+      if (hasMNC === 0) {
+        setIsMncMissing(true)
+      } else {
+        setIsMncMissing(false)
+      }
+    }, 1000)
+
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -47,7 +66,9 @@ const App = () => {
   return (
     <Theme>
       <ToastContainer position="top-center" containerId="alertToast" autoClose={5000} />
+      <NoMncModal appName="Gateway" open={isMncMissing} onClose={() => setIsMncMissing(false)} />
       <CssBaseline />
+      {/* <Container maxWidth='xl' sx={{ padding: '0 !important' }}> */}
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
