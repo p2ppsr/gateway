@@ -49,7 +49,6 @@ const common: Configuration = {
         use: ['style-loader', 'css-loader', 'sass-loader']
       },
 
-      // Image file loaders
       {
         test: /\.(png|jpe?g|gif|svg|webp)$/,
         use: [
@@ -60,7 +59,6 @@ const common: Configuration = {
         ]
       },
 
-      // Font file loaders
       {
         test: /\.(woff|woff2|eot|ttf)$/,
         use: {
@@ -71,7 +69,6 @@ const common: Configuration = {
         }
       },
 
-      // Audio file loaders
       {
         test: /\.(mp3|wav|m4v|flac|aiff)$/,
         use: {
@@ -85,8 +82,9 @@ const common: Configuration = {
   },
 
   resolve: {
-    extensions: ['', '.js', '.jsx', '.ts', '.tsx'],
+    extensions: ['.web.tsx', '.web.ts', '.ts', '.tsx', '.js', '.jsx', '.json'],
     alias: {
+      'react-native$': 'react-native-web',
       fs: false
     }
   }

@@ -1,8 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 import Theme from './components/Theme'
 import Navbar from './components/Navbar'
 import Create from './pages/Create'
@@ -10,19 +8,19 @@ import Buttons from './pages/Buttons'
 import Payments from './pages/Payments'
 import Actions from './pages/Actions'
 import Money from './pages/Money'
+import checkForMetaNetclient from './utils/checkForMetanetclient'
 import { CssBaseline } from '@mui/material'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
-import { checkForMetaNetClient, NoMncModal } from 'metanet-react-prompt'
 import useAsyncEffect from 'use-async-effect'
+import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 
 /* -------------------------------------------------------------------------- */
 /*  AuthFetch – constructed once per session                                  */
 /* -------------------------------------------------------------------------- */
 
-const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3301'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
-// const wallet = new WalletClient('auto', 'localhost')
-const authFetch = new AuthFetch(wallet) // handshake handled automatically
+const authFetch = new AuthFetch(wallet)
 
 const API_BASE =
   process.env.API_BASE ??
@@ -32,20 +30,14 @@ const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isMncMissing, setIsMncMissing] = useState(false)
 
-  // Run a 1s interval for checking if MNC is running
+  // Run a 10s interval for checking if MNC is running
   useAsyncEffect(async () => {
     const intervalId = setInterval(async () => {
-      const hasMNC = await checkForMetaNetClient()
-      if (hasMNC === 0) {
-        setIsMncMissing(true)
-      } else {
-        setIsMncMissing(false)
-      }
-    }, 1000)
+      const hasMNC = await checkForMetaNetclient(WALLET_ORIGIN)
+      setIsMncMissing(hasMNC === 0)
+    }, 2000)
 
-    return () => {
-      clearInterval(intervalId)
-    }
+    return () => clearInterval(intervalId)
   }, [])
 
   useEffect(() => {
@@ -65,10 +57,8 @@ const App = () => {
 
   return (
     <Theme>
-      <ToastContainer position="top-center" containerId="alertToast" autoClose={5000} />
-      <NoMncModal appName="Gateway" open={isMncMissing} onClose={() => setIsMncMissing(false)} />
       <CssBaseline />
-      {/* <Container maxWidth='xl' sx={{ padding: '0 !important' }}> */}
+      <MetanetclientMissingModal open={isMncMissing} />
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
