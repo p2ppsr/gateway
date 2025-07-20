@@ -1,11 +1,48 @@
 /**
- * API Environment Setup Script
+ * @file setup.js
+ * @description
+ * Gateway API Environment Setup Script.
+ *
+ * This interactive script helps developers or operators configure a `.env` file
+ * for the Gateway API server by collecting MySQL credentials, web server details,
+ * and environment settings. It also verifies the MySQL connection, writes to `.env`,
+ * runs database migrations, and optionally seeds the database.
+ *
+ * Steps performed:
+ * 1. Prompt user for SQL and web server information.
+ * 2. Test MySQL connection using provided credentials.
+ * 3. Save configuration to `.env` file.
+ * 4. Run Knex.js migrations.
+ * 5. Optionally seed the database for development use.
+ *
+ * Requirements:
+ * - Node.js
+ * - MySQL Server running and reachable
+ * - knexfile.js present and configured properly
+ *
+ * Environment variables written:
+ * - HTTP_PORT
+ * - BSV_NETWORK
+ * - SERVER_PRIVATE_KEY
+ * - HOSTING_DOMAIN
+ * - SQL_DATABASE_HOST
+ * - SQL_DATABASE_PORT
+ * - SQL_DATABASE_USER
+ * - SQL_DATABASE_PASSWORD
+ * - SQL_DATABASE_DB_NAME
+ * - SPAWN_NGINX
  */
+
 const readline = require('readline')
 const fs = require('fs')
 const mysql = require('mysql2')
 const promisify = require('util').promisify
 
+/**
+ * Collects user input from the terminal for server/database configuration.
+ * Prompts for SQL host, port, user, password, database name, HTTP port, etc.
+ * Once input is collected, calls `testDatabaseConnection`.
+ */
 const collectInformation = async () => {
   // create a new readline query stream
   const rl = readline.createInterface({
@@ -68,6 +105,21 @@ const collectInformation = async () => {
   testDatabaseConnection(dbHostname, dbPort, dbUser, dbPass, db, httpPort, domain, spawnNginx, bsvNet)
 }
 
+/**
+ * Tests the MySQL database connection with the provided credentials.
+ * If successful, writes environment config to `.env` and calls `setupDatabase`.
+ * If unsuccessful, re-prompts via `collectInformation`.
+ *
+ * @param {string} host - MySQL hostname
+ * @param {string} port - MySQL port
+ * @param {string} user - MySQL username
+ * @param {string} pass - MySQL password
+ * @param {string} db - MySQL database name
+ * @param {string} listen - HTTP port for the Gateway server
+ * @param {string} domain - Public domain of the Gateway server
+ * @param {string} spawnNginx - Whether to start NGINX automatically
+ * @param {string} bsvNet - BSV network name ("mainnet" or "testnet")
+ */
 const testDatabaseConnection = async (host, port, user, pass, db, listen, domain, spawnNginx, bsvNet) => {
   console.log('\nTesting MySQL credentials...')
   const conn = mysql.createConnection({
@@ -137,6 +189,10 @@ const testDatabaseConnection = async (host, port, user, pass, db, listen, domain
   })
 }
 
+/**
+ * Runs Knex migrations and optionally seeds the database based on user input.
+ * Warns the user that seeding will erase existing data.
+ */
 const setupDatabase = async () => {
   const rl = readline.createInterface({
     input: process.stdin,
@@ -186,7 +242,7 @@ database you want to keep, answer NO.
   process.exit(0)
 }
 
-// print some informational text
+// Show introductory setup guidance
 console.log(
   `The Gateway API server uses a MySQL database to store and manage user
 buttons, payments and other data. To set up the API server (required for both

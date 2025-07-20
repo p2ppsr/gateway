@@ -41,8 +41,8 @@ const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
 
     return {
       macos: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_aarch64.dmg`,
-      windows: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_x64.exe`,
-      linux: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_x64.AppImage`,
+      windows: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_x64-setup.exe`,
+      linux: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_amd64.AppImage`,
       ios: 'https://apps.apple.com/app/metanet/id0000000000', // TODO: update with actual link
       android: 'https://play.google.com/store/apps/details?id=com.metanet.browser' // TODO: update with actual link
     }
