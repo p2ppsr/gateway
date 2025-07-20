@@ -126,7 +126,7 @@ export default {
         ]
       })
     } catch (error) {
-      console.error('Error creating invoice:', error)
+      console.error('❌ Error creating invoice:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

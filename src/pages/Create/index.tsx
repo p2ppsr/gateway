@@ -92,7 +92,7 @@ const Create: React.FC = () => {
         setMerchant(identity.publicKey)
         setHasMetanet(true)
       } catch (error) {
-        console.error('Failed to fetch Metanet identity:', error)
+        console.error('❌ Failed to fetch Metanet identity:', error)
         setHasMetanet(false)
       }
     })()
@@ -114,7 +114,7 @@ const Create: React.FC = () => {
         )
         setAmountInSats(satoshis || 1000)
       } catch (error) {
-        console.error('Failed to fetch currency:', error)
+        console.error('❌ Failed to fetch currency:', error)
       }
     })()
   }, [paymentAmount])
@@ -131,7 +131,7 @@ const Create: React.FC = () => {
       )
       setAmountInSats(satoshis || 1000)
     } catch (error) {
-      console.error('Error converting currency:', error)
+      console.error('❌ Error converting currency:', error)
     }
   }, [])
 
@@ -200,7 +200,7 @@ const Create: React.FC = () => {
         toast.error('Failed to create button')
       }
     } catch (error) {
-      console.error('Error creating button:', error)
+      console.error('❌ Error creating button:', error)
       toast.error('Error creating button')
     }
   }

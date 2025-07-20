@@ -79,7 +79,7 @@ export default {
         message: 'Payments fetched successfully'
       })
     } catch (error) {
-      console.error('Error listing payments:', error)
+      console.error('❌ Error listing payments:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

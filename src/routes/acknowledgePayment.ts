@@ -74,7 +74,7 @@ export default {
         message: 'Payment acknowledged successfully'
       })
     } catch (error) {
-      console.error('Error acknowledging payment:', error)
+      console.error('❌ Error acknowledging payment:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

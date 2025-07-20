@@ -93,7 +93,7 @@ export default {
         const txArray = Utils.toArray(atomicBeefTx, 'hex')
         bsvtx = Transaction.fromAtomicBEEF(txArray)
       } catch (e) {
-        console.error('🔍 Transaction parsing failed:', e)
+        console.error('❌ Transaction parsing failed:', e)
         throw new Error('Invalid transaction format: unable to parse atomicBeefTx')
       }
 
@@ -163,7 +163,7 @@ export default {
         txid
       })
     } catch (error) {
-      console.error('🔍 Pay error:', error)
+      console.error('❌ Pay error:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

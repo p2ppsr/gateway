@@ -87,7 +87,7 @@ export default {
         message: 'Payment buttons fetched successfully'
       })
     } catch (error) {
-      console.error('Error listing payment buttons:', error)
+      console.error('❌ Error listing payment buttons:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

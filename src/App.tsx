@@ -65,7 +65,7 @@ const App = () => {
         const { isAdmin } = await res.json()
         setIsAdmin(isAdmin)
       } catch (err) {
-        console.error('getStatus failed:', err)
+        console.error('❌ getStatus failed:', err)
       }
     })()
   }, [])

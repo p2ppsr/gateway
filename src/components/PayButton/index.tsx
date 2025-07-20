@@ -99,9 +99,9 @@ const PayButton = ({
       let transaction, atomicBeefTx, txid
       try {
         transaction = Transaction.fromAtomicBEEF(tx.tx)
-        console.log('txid:', txid)
+        console.log('🔍 txid:', txid)
         atomicBeefTx = Utils.toHex(tx.tx!)
-        console.log('1 atomicBeefTx:', atomicBeefTx)
+        console.log('🔍 atomicBeefTx:', atomicBeefTx)
       } catch (e) {
         console.error('❌ Transaction serialization failed:', e)
         throw new Error('❌ Failed to serialize transaction')

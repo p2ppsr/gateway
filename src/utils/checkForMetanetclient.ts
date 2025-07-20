@@ -19,7 +19,6 @@ import { WalletClient } from '@bsv/sdk'
 export default async (walletOrigin: string): Promise<number> => {
   try {
     const { network } = await new WalletClient('auto', walletOrigin).getNetwork()
-    console.log('network=', network)
     if (network === 'mainnet') {
       return 1
     } else {

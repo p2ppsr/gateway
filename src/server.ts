@@ -53,13 +53,13 @@ app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
 
 // Response JSON logger (disabled by default, can be enabled for debugging)
 app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
-  // console.log(`[${req.method}] <- ${req.path}`)
-  // console.log(prettyjson.render(req.body ?? {}, { keysColor: 'blue' }))
+  // console.log(`🔍 [${req.method}] <- ${req.path}`)
+  // console.log(`🔍 prettyjson.render(req.body ?? {}, { keysColor: 'blue' })`)
   const originalJson = res.json.bind(res)
   res.json = (data: any) => {
     originalJson(data)
-    // console.log(`[${req.method}] -> ${req.path}`)
-    // console.log(prettyjson.render(data, { keysColor: 'green' }))
+    // console.log(`🔍 [${req.method}] -> ${req.path}`)
+    // console.log(`🔍 prettyjson.render(data, { keysColor: 'green' })`)
     return res
   }
   next()
@@ -116,7 +116,7 @@ app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
 
   // Start the server
   app.listen(HTTP_PORT, async () => {
-    console.log('🚀 Gateway Payment Server listening on', HTTP_PORT)
+    console.log('Gateway Payment Server listening on', HTTP_PORT)
     if (SPAWN_NGINX === 'yes') {
       require('child_process').spawn('nginx', [], { stdio: 'inherit' })
       await knex(require('../knexfile.js')).migrate.latest()
