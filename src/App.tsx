@@ -1,4 +1,10 @@
-// src/App.tsx
+/**
+ * @file src/App.tsx
+ *
+ * The main entry point for the React application.
+ * It sets up global theme, routes, and continuously checks for the presence of the Metanet client.
+ */
+
 import React, { useState, useEffect } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Theme from './components/Theme'
@@ -14,10 +20,7 @@ import { WalletClient, AuthFetch } from '@bsv/sdk'
 import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 
-/* -------------------------------------------------------------------------- */
-/*  AuthFetch – constructed once per session                                  */
-/* -------------------------------------------------------------------------- */
-
+// AuthFetch – constructed once per session
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
@@ -26,11 +29,23 @@ const API_BASE =
   process.env.API_BASE ??
   `${window.location.protocol}//${window.location.hostname}:${process.env.API_PORT ?? process.env.HTTP_PORT ?? 3001}`
 
+/**
+ * The main React component for the application.
+ *
+ * - Applies global MUI theming.
+ * - Loads admin status using `/api/getStatus`.
+ * - Checks every 2 seconds whether the Metanet client is running and sets `isMncMissing` accordingly.
+ * - Displays a modal if Metanet client is not detected.
+ * - Defines all app routes using React Router.
+ *
+ * @component
+ * @returns {JSX.Element} The rendered application component.
+ */
 const App = () => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isMncMissing, setIsMncMissing] = useState(false)
 
-  // Run a 10s interval for checking if MNC is running
+  // Run a periodic check for Metanet client
   useAsyncEffect(async () => {
     const intervalId = setInterval(async () => {
       const hasMNC = await checkForMetanetclient(WALLET_ORIGIN)

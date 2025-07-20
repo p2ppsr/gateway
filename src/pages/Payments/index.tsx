@@ -1,4 +1,16 @@
-// frontend/src/pages/Payments/index.tsx
+/**
+ * @file src/pages/Payments/index.tsx
+ *
+ * Displays a paginated table of received payments tied to user payment buttons.
+ * Each row represents a payment, showing ID, amount, currency, completion status, and more.
+ *
+ * - Fetches payments from the backend using `authFetch` and the Metanet client.
+ * - Highlights and allows acknowledging of "new" payments.
+ * - Includes pagination controls and responsive styling via MUI.
+ *
+ * Used by the Gateway UI to manage incoming payment activity.
+ */
+
 import React, { useState, useEffect } from 'react'
 import {
   CircularProgress,
@@ -23,6 +35,18 @@ const formatBSV = (value: number | string): string => {
   return parseFloat(value.toString()).toFixed(8)
 }
 
+/**
+ * Represents a payment received through a payment button.
+ *
+ * @property {string} payment_id - Unique identifier for the payment.
+ * @property {string} payment_button_id - ID of the button that received this payment.
+ * @property {number | string} amount - Amount paid (can be a number or numeric string).
+ * @property {string} currency - Currency type used for the payment (e.g., "BSV").
+ * @property {boolean} completed - Whether the payment has been fully processed.
+ * @property {boolean} is_new - Whether the payment has not yet been acknowledged.
+ * @property {string} [transaction_info] - Optional string containing extra transaction metadata.
+ * @property {string} [merchant_id] - Optional identifier for the merchant receiving the payment.
+ */
 interface Payment {
   payment_id: string
   payment_button_id: string

@@ -1,4 +1,18 @@
-// src/pages/Buttons/index.tsx
+/**
+ * @file src/pages/Buttons/index.tsx
+ *
+ * Displays a paginated, filterable table of payment buttons created by the user.
+ * This component queries the backend via `authFetch` using the Metanet client
+ * (WalletClient + AuthFetch) to retrieve a list of buttons and their metadata.
+ *
+ * - Filters by usage status (used, unused, all)
+ * - Supports ascending/descending sort order
+ * - Fetches 25 buttons per page with client-side pagination
+ * - Renders details including ID, amount, currency, usage flags, and total paid
+ *
+ * Used in the Gateway UI to allow users to view and inspect their configured payment buttons.
+ */
+
 import React, { useState, useEffect } from 'react'
 import {
   Container,

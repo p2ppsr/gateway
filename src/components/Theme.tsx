@@ -1,4 +1,19 @@
-// frontend/src/components/Theme.tsx
+/**
+ * @file src/components/Theme.tsx
+ *
+ * Provides a reusable `ThemeWrapper` component that applies a customized MUI theme
+ * (light or dark) across the app. This file defines the base light and dark themes,
+ * extends them with responsive typography and reusable layout templates, and wraps
+ * the app with a `ThemeProvider` and global `CssBaseline` reset.
+ *
+ * - Font: Satoshi
+ * - Color modes: light and dark
+ * - Responsive scaling of headers (h1, h2)
+ * - Custom template styles: `page_wrap`, `subheading`, `centeredHeader`, etc.
+ *
+ * Used as the top-level theme wrapper in the application root.
+ */
+
 import React, { ReactNode, useMemo, useState } from 'react'
 import { createTheme, ThemeProvider, CssBaseline } from '@mui/material'
 import { Theme } from '@mui/material/styles'

@@ -1,4 +1,17 @@
-// frontend/src/pages/Create/style.ts
+/**
+ * @file src/pages/Create/style.ts
+ *
+ * Provides styled MUI components used in the "Create Payment Button" page.
+ * These components apply consistent spacing, typography, and theme-aware coloring
+ * to support both light and dark modes across layout sections and form inputs.
+ *
+ * - Components include: `Root`, `ContentWrap`, `FormSection`, `PreviewSection`, `CodePreview`,
+ *   `CenteredHeader`, `TextFieldStyled`, and `ButtonStyled`.
+ * - All styles are responsive to `theme.palette.mode` and use MUI’s `styled` API.
+ *
+ * Used by `src/pages/Create/index.tsx` to style the UI consistently with the app theme.
+ */
+
 import { styled } from '@mui/material/styles'
 import { Box, Paper, TextField, Button } from '@mui/material'
 
@@ -55,7 +68,9 @@ export const TextFieldStyled = styled(TextField)(({ theme }) => ({
   '& label.Mui-focused': {
     color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
   },
-  '& label': { color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000' },
+  '& label': {
+    color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+  },
   '& .MuiInput-underline:after': {
     borderBottomColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
   },
@@ -83,6 +98,7 @@ export const ButtonStyled = styled(Button)(({ theme }) => ({
   borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
   '&:hover': {
     borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'
+    backgroundColor:
+      theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'
   }
 }))

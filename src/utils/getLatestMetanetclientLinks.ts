@@ -1,5 +1,20 @@
-// src/utils/getLatestMetanetclientLinks.ts
+/**
+ * @file src/utils/getLatestMetanetclientLinks.ts
+ *
+ * Provides a function to fetch download links for the latest Metanet Desktop release
+ * from the official GitHub repository, including placeholders for mobile app links.
+ */
 
+/**
+ * Represents the download URLs for the Metanet client across supported platforms.
+ *
+ * @typedef {Object} MetanetclientLinks
+ * @property {string | null} macos - Direct download URL for macOS (.dmg file) or `null` if unavailable.
+ * @property {string | null} windows - Direct download URL for Windows (.exe file) or `null` if unavailable.
+ * @property {string | null} linux - Direct download URL for Linux (.AppImage file) or `null` if unavailable.
+ * @property {string | null} ios - App Store link for iOS or `null` if not available.
+ * @property {string | null} android - Play Store link for Android or `null` if not available.
+ */
 export type MetanetclientLinks = {
   macos: string | null
   windows: string | null
@@ -9,8 +24,10 @@ export type MetanetclientLinks = {
 }
 
 /**
- * Fetches the latest release tag from GitHub for metanet-desktop
- * and constructs download URLs for supported platforms.
+ * Fetches the latest Metanet Desktop release from GitHub and constructs
+ * download links for all major platforms using the release tag.
+ *
+ * @returns {Promise<MetanetclientLinks>} An object containing download URLs or `null` if the fetch fails.
  */
 const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
   try {

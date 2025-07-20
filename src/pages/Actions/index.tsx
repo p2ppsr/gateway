@@ -1,7 +1,19 @@
+/**
+ * @file src/pages/Actions/index.tsx
+ *
+ * Displays the "Payment Actions" informational page in the app. This component introduces
+ * the idea of user-defined payment actions that can be triggered upon receiving payments.
+ *
+ * - Uses MUI theming to apply dynamic styles for light and dark mode.
+ * - Presents a heading, subtitle, and a brief explanatory paragraph.
+ * - Currently static and non-interactive; serves as a placeholder for future action management UI.
+ *
+ * Intended as a future home for managing payment-triggered workflows.
+ */
+
 import React from 'react'
 import { Container, Typography, Paper, Box } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-
 
 /**
  * `PaymentActionsList` is a React functional component that displays an overview section

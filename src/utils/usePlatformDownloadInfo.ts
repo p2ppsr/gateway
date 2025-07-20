@@ -1,17 +1,45 @@
-// src/utils/usePlatformDownloadInfo.ts
+/**
+ * @file src/utils/usePlatformDownloadInfo.ts
+ *
+ * A React hook that determines the current platform (iOS, Android, or Web) and provides
+ * the appropriate download URL for the Metanet client, using the latest GitHub release info.
+ */
+
 import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
 import getLatestMetanetclientLinks, { MetanetclientLinks } from './getLatestMetanetclientLinks'
 
+/**
+ * Represents platform-specific download information for the Metanet client.
+ *
+ * @typedef {Object} DownloadInfo
+ * @property {string} platformLabel - A human-readable label for the detected platform (e.g., "Android", "macOS").
+ * @property {string} downloadURL - A direct URL to download the Metanet client for the detected platform.
+ */
 export type DownloadInfo = {
   platformLabel: string
   downloadURL: string
 } | null
 
+/**
+ * A React hook that detects the current platform (mobile or web) and fetches the appropriate
+ * download link for the Metanet client from the latest GitHub release.
+ *
+ * For mobile (iOS/Android), returns the corresponding App Store / Play Store link.
+ * For web, inspects the user agent to determine macOS, Windows, or Linux platform.
+ *
+ * @returns {DownloadInfo} An object with `platformLabel` and `downloadURL`, or `null` while loading.
+ */
 const usePlatformDownloadInfo = (): DownloadInfo => {
   const [info, setInfo] = useState<DownloadInfo>(null)
 
   useEffect(() => {
+
+    /**
+     * Detects the desktop platform using the browser's user agent string.
+     *
+     * @returns {'macos' | 'windows' | 'linux'} The inferred desktop OS key.
+     */
     const detectWebPlatform = (): keyof MetanetclientLinks => {
       const ua = navigator.userAgent || navigator.platform || 'unknown'
 
@@ -21,6 +49,9 @@ const usePlatformDownloadInfo = (): DownloadInfo => {
       return 'macos' // fallback
     }
 
+    /**
+     * Fetches the latest Metanet client links and sets the appropriate platform info.
+     */
     const fetchDownloadURL = async () => {
       const links: MetanetclientLinks = await getLatestMetanetclientLinks()
 

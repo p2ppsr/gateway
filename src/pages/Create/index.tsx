@@ -1,5 +1,6 @@
-// src/pages/Create/index.tsx
 /**
+ * @file src/pages/Create/index.tsx
+ * 
  * Create Page — Allows users to configure and generate tipping button code.
  *
  * Users can customize the button text, payment amount, and CSS styles. Once configured,

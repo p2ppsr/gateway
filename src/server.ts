@@ -1,9 +1,29 @@
+/**
+ * @file server.ts
+ *
+ * Entry point for the Gateway Payment Server.
+ * 
+ * This file configures and launches an Express.js server that:
+ * - Enables CORS and logs JSON requests/responses
+ * - Adds authentication and payment middleware using Wallet Toolbox
+ * - Serves static frontend files (SPA) from `build/`
+ * - Registers API routes from `src/routes/`
+ * - Optionally spawns NGINX and runs database migrations
+ *
+ * Environment variables:
+ * - `HTTP_PORT`: Port the server listens on (default: 3001)
+ * - `ROUTING_PREFIX`: Prefix for API routes (default: /api)
+ * - `WALLET_STORAGE_URL`: Wallet storage endpoint (required)
+ * - `SERVER_PRIVATE_KEY`: Private key for signing wallet requests (required)
+ * - `SPAWN_NGINX`: If set to 'yes', starts NGINX and runs DB migrations
+ */
+
 import dotenv from 'dotenv'
 dotenv.config()
 
 import express, { Request as ExpressRequest, Response, NextFunction, Router } from 'express'
 import bodyParser from 'body-parser'
-import prettyjson from 'prettyjson'
+//import prettyjson from 'prettyjson'
 import path from 'path'
 import knex from 'knex'
 import { Setup } from '@bsv/wallet-toolbox'
@@ -20,9 +40,7 @@ const app = express()
 
 app.use(bodyParser.json({ limit: '1gb' }))
 
-/* -------------------------------------------------------------------------- */
-/*  CORS + Logging                                                            */
-/* -------------------------------------------------------------------------- */
+// CORS headers and preflight response
 app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Origin', '*')
   res.header('Access-Control-Allow-Headers', '*')
@@ -33,28 +51,29 @@ app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
   next()
 })
 
+// Response JSON logger (disabled by default, can be enabled for debugging)
 app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
-  console.log(`[${req.method}] <- ${req.path}`)
-  console.log(prettyjson.render(req.body ?? {}, { keysColor: 'blue' }))
+  // console.log(`[${req.method}] <- ${req.path}`)
+  // console.log(prettyjson.render(req.body ?? {}, { keysColor: 'blue' }))
   const originalJson = res.json.bind(res)
   res.json = (data: any) => {
     originalJson(data)
-    console.log(`[${req.method}] -> ${req.path}`)
-    console.log(prettyjson.render(data, { keysColor: 'green' }))
+    // console.log(`[${req.method}] -> ${req.path}`)
+    // console.log(prettyjson.render(data, { keysColor: 'green' }))
     return res
   }
   next()
 })
 ;(async () => {
-  /* -------------------------------------------------------------------------- */
-  /*  Auth & Payment Middleware                                                 */
-  /* -------------------------------------------------------------------------- */
+
+  // Initialize WalletClient
   const wallet = await Setup.createWalletClientNoEnv({
     rootKeyHex: process.env.SERVER_PRIVATE_KEY || '',
     storageUrl: WALLET_STORAGE_URL,
     chain: 'main'
   })
 
+  // Attach authentication middleware (allows unauthenticated requests by default)
   app.use(
     createAuthMiddleware({
       wallet,
@@ -62,6 +81,7 @@ app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
     })
   )
 
+  // Attach payment middleware with optional custom pricing
   app.use(
     createPaymentMiddleware({
       wallet,
@@ -75,18 +95,14 @@ app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
     } as unknown as import('@bsv/payment-express-middleware').PaymentMiddlewareOptions)
   )
 
-  /* -------------------------------------------------------------------------- */
-  /*  Static + SPA fall-through                                                 */
-  /* -------------------------------------------------------------------------- */
+  // Serve static files and route SPA paths to index.html
   app.use(express.static('build'))
   const spaPaths = ['/', '/buttons', '/payments', '/actions', '/money', '/admin']
   spaPaths.forEach(p => {
     app.get(p, (_, res) => res.sendFile(path.join(__dirname, '../build', 'index.html')))
   })
 
-  /* -------------------------------------------------------------------------- */
-  /*  API Routes                                                                */
-  /* -------------------------------------------------------------------------- */
+  // Register API routes
   const apiRouter: Router = express.Router()
   routes.forEach(route => {
     const method = String(route.type || 'get').toLowerCase() as 'get' | 'post' | 'put' | 'delete' | 'patch'
@@ -97,9 +113,8 @@ app.use((req: ExpressRequest, res: Response, next: NextFunction) => {
   })
   app.use(ROUTING_PREFIX, apiRouter)
 
-  /* -------------------------------------------------------------------------- */
-  /*  Server Start                                                              */
-  /* -------------------------------------------------------------------------- */
+
+  // Start the server
   app.listen(HTTP_PORT, async () => {
     console.log('🚀 Gateway Payment Server listening on', HTTP_PORT)
     if (SPAWN_NGINX === 'yes') {

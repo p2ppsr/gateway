@@ -1,6 +1,18 @@
-// src/routes/invoice.ts
+/**
+ * @file src/routes/invoice.ts
+ *
+ * POST route to create a new payment invoice for a given payment button.
+ * Validates the payment button, verifies merchant ownership, enforces multi-use and variable-amount rules,
+ * and generates a new payment record in the database.
+ *
+ * Also generates a derived payment address using a deterministic key derivation scheme
+ * from the merchant ID and sender's identity key.
+ *
+ * Used by the Gateway UI to initiate a payment flow after clicking a tipping button.
+ */
+
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile' // Assumes knexfile.js renamed to knexfile.ts
+import knexConfig from '../../knexfile'
 import { Hash, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk'
 import { Request, Response } from 'express'
 import { Utils } from '@bsv/sdk'
@@ -11,7 +23,24 @@ export default {
   type: 'post',
   path: '/invoice',
   knex: db,
+
+    /**
+   * Express route handler to create a new invoice/payment entry.
+   *
+   * Validates that the payment button exists, belongs to the merchant, and is eligible for use.
+   * Creates a new `payments` record with `completed = false`, and responds with the derived
+   * P2PKH locking script where the payment should be sent.
+   *
+   * The locking script is deterministically generated using a hash of the sender's identity,
+   * merchant's public key, and an invoice number.
+   *
+   * @param req - Express request with `paymentButtonId`, `merchantId`, `currency`, and `amount` in body.
+   *              Auth middleware must populate `req.auth.identityKey`.
+   * @param res - Express response object for sending success or error responses.
+   * @returns {Promise<void>} Sends a 200 success response with `paymentId` and derived outputs.
+   */
   func: async (req: Request, res: Response): Promise<void> => {
+
     // Extract the necessary information from the request body
     const { paymentButtonId, merchantId, currency, amount } = req.body as {
       paymentButtonId: string
@@ -69,7 +98,6 @@ export default {
         payment_button_id: paymentButtonId
       })
 
-      // Replace sendover with @bsv/sdk equivalent
       const senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
       const recipientPublicKey = PublicKey.fromString(button.merchant_id)
       const invoiceNumber = `2-3241645161d8-${paymentID} 1`
