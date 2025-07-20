@@ -1,7 +1,7 @@
 import { WalletClient } from '@bsv/sdk'
 
 /*
-  Check if the MetaNet Client is running, and, if so, if it's on mainnet or testnet
+  Check if the Metanet Client is running, and, if so, if it's on mainnet or testnet
 
   @returns 1 for mainnet, -1 for testnet, 0 for an error (i.e. indicating MNC isn't running)
 */

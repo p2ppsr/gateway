@@ -1,6 +1,16 @@
 // src/pages/Create/index.tsx
+/**
+ * Create Page — Allows users to configure and generate tipping button code.
+ *
+ * Users can customize the button text, payment amount, and CSS styles. Once configured,
+ * a button is created using the Metanet identity, and corresponding embeddable HTML and script
+ * code is displayed, which can be copied for integration into websites.
+ *
+ * The page also checks for Metanet client presence and provides user feedback via toast notifications.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react'
-import { Typography, TextField, Button, Container, Grid, Box, InputAdornment, Tooltip, IconButton } from '@mui/material'
+import { Typography, Container, Grid, Box, InputAdornment, Tooltip, IconButton } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import {
@@ -20,9 +30,7 @@ import { CurrencyConverter } from 'amountinator'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { toast } from 'react-toastify'
 
-/* -------------------------------------------------------------------------- */
-/*  One wallet + AuthFetch shared by this module                              */
-/* -------------------------------------------------------------------------- */
+// One wallet + AuthFetch shared by this module
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
@@ -52,7 +60,7 @@ const Create: React.FC = () => {
   const [merchant, setMerchant] = useState('')
   const [buttonID, setButtonID] = useState('')
   const [showCode, setShowCode] = useState(false)
-  const [hasMetaNet, setHasMetaNet] = useState(false)
+  const [hasMetanet, setHasMetanet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
   const [customCSS, setCustomCSS] = useState(`.gateway-button-styles {
     border-radius: 2em;
@@ -81,10 +89,10 @@ const Create: React.FC = () => {
       try {
         const identity = await wallet.getPublicKey({ identityKey: true })
         setMerchant(identity.publicKey)
-        setHasMetaNet(true)
+        setHasMetanet(true)
       } catch (error) {
-        console.error('Failed to fetch MetaNet identity:', error)
-        setHasMetaNet(false)
+        console.error('Failed to fetch Metanet identity:', error)
+        setHasMetanet(false)
       }
     })()
   }, [])
@@ -161,7 +169,7 @@ const Create: React.FC = () => {
   }, [customCSS])
 
   const handleSubmit = async () => {
-    if (!hasMetaNet) {
+    if (!hasMetanet) {
       toast.error('Metanet client required! Download at https://metanet.bsvb.tech')
       return
     }

@@ -1,7 +1,18 @@
 import React from 'react'
-import { CircularProgress, Container, Typography, Paper, Box } from '@mui/material'
+import { Container, Typography, Paper, Box } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 
+
+/**
+ * `PaymentActionsList` is a React functional component that displays an overview section
+ * describing the purpose and future functionality of user-defined payment actions.
+ *
+ * It uses the current MUI theme to apply dynamic styles based on light or dark mode.
+ *
+ * This component is purely presentational and does not currently render any actionable items.
+ *
+ * @returns A styled informational panel with a heading and description of payment actions.
+ */
 const PaymentActionsList: React.FC = () => {
   const theme = useTheme()
 

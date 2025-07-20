@@ -1,0 +1,27 @@
+assets by path [1m[32m*.html[39m[22m 4.34 KiB
+  asset [1m[32mbutton.html[39m[22m 2.61 KiB [1m[33m[compared for emit][39m[22m [from: public/button.html] [1m[32m[copied][39m[22m
+  asset [1m[32mpaybutton-tests.html[39m[22m 1.14 KiB [1m[33m[compared for emit][39m[22m [from: public/paybutton-tests.html] [1m[32m[copied][39m[22m
+  asset [1m[32mindex.html[39m[22m 601 bytes [1m[33m[compared for emit][39m[22m
+asset [1m[32mpay.bck[39m[22m 2.71 MiB [1m[33m[compared for emit][39m[22m [from: public/pay.bck] [1m[32m[copied][39m[22m
+asset [1m[32mpay.js[39m[22m 2.69 MiB [1m[32m[emitted][39m[22m (name: main)
+asset [1m[32mgatewaycash.svg[39m[22m 16.5 KiB [1m[33m[compared for emit][39m[22m [from: public/gatewaycash.svg] [1m[32m[copied][39m[22m
+asset [1m[32mfavicon.ico[39m[22m 4.19 KiB [1m[33m[compared for emit][39m[22m [from: public/favicon.ico] [1m[32m[copied][39m[22m
+asset [1m[32mpay.js.LICENSE.txt[39m[22m 3.35 KiB [1m[33m[compared for emit][39m[22m [from: public/pay.js.LICENSE.txt] [1m[32m[copied][39m[22m
+asset [1m[32mmanifest.json[39m[22m 593 bytes [1m[33m[compared for emit][39m[22m [from: public/manifest.json] [1m[32m[copied][39m[22m
+216 modules
+webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 639 ms
+assets by status 5.43 MiB [1m[32m[cached][39m[22m 9 assets
+cached modules 2.35 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 216 modules
+webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 20 ms
+assets by status 2.72 MiB [1m[32m[cached][39m[22m 8 assets
+cached modules 2.35 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 216 modules
+webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 25 ms
+assets by status 29 KiB [1m[32m[cached][39m[22m 7 assets
+asset [1m[32mpay.js[39m[22m 2.69 MiB [1m[32m[emitted][39m[22m (name: main)
+cached modules 2.33 MiB [1m[32m[cached][39m[22m 209 modules
+runtime modules 1.25 KiB 6 modules
+[1m./src/components/PayButton/index.tsx[39m[22m 13.4 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
+webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 78 ms
+assets by status 2.72 MiB [1m[32m[cached][39m[22m 8 assets
+cached modules 2.35 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 216 modules
+webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 17 ms

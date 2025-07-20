@@ -22,9 +22,8 @@ import {
 import { makeStyles } from '@mui/styles'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 
-/* ──────────────────────────────────────────────────────────────
-     One wallet + AuthFetch shared by this module
-     ────────────────────────────────────────────────────────────── */
+
+// One wallet + AuthFetch shared by this module
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
@@ -33,6 +32,18 @@ const formatBSV = (value: number | string): string => {
   return parseFloat(value.toString()).toFixed(8)
 }
 
+/**
+ * Structure of a payment button object.
+ *
+ * @property {string} button_id - Unique identifier for the payment button.
+ * @property {number | string} amount - Amount configured for the button (may be fixed or variable).
+ * @property {string} currency - Currency type (e.g., "BSV").
+ * @property {boolean} variable_amount - Whether the user can specify the amount.
+ * @property {boolean} multi_use - Whether the button can be used multiple times.
+ * @property {boolean} used - Indicates whether the button has already been used.
+ * @property {string} accepts - Comma-separated list of accepted token types or protocols.
+ * @property {number | string} total_paid - Total amount received through this button.
+ */
 interface PaymentButton {
   button_id: string
   amount: number | string
@@ -52,6 +63,13 @@ const useStyles = makeStyles((theme: any) => ({
   }
 }))
 
+/**
+ * Renders a paginated and filterable list of payment buttons.
+ * Buttons are fetched from the server using `authFetch` and displayed in a table.
+ * Users can filter by usage status and change the sort order.
+ *
+ * @returns A component that lists all created payment buttons with pagination and filters.
+ */
 const PaymentButtonsList: React.FC = () => {
   const [buttons, setButtons] = useState<PaymentButton[]>([])
   const [loading, setLoading] = useState(false)
@@ -63,6 +81,13 @@ const PaymentButtonsList: React.FC = () => {
   const theme = useTheme()
   const classes = useStyles({ theme })
 
+  /**
+   * Fetches the list of payment buttons from the server with pagination, sorting, and filtering.
+   *
+   * @param page - Current page number (1-indexed).
+   * @param sortOrder - Sort order, either 'asc' or 'desc'.
+   * @param usedFilter - Filter by usage: 'all', 'used', or 'unused'.
+   */
   const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
     setError('')
     try {

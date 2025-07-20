@@ -3,16 +3,22 @@ import React, { ReactNode, useMemo, useState } from 'react'
 import { createTheme, ThemeProvider, CssBaseline } from '@mui/material'
 import { Theme } from '@mui/material/styles'
 
+/**
+ * Common typography settings applied to both light and dark themes.
+ */
 const commonTypography = {
   fontFamily: 'Satoshi'
-  // Removed top-level 'color' here; apply per-variant below
+  // Removed top-level 'color' here; apply per-variant below, correct way to structure theme
 }
 
+/**
+ * Base light mode MUI theme configuration.
+ */
 const lightTheme = createTheme({
   spacing: 8,
   typography: {
     ...commonTypography,
-    h1: { fontWeight: 'bold', fontSize: '3em', color: '#424242' }, // Added color per variant
+    h1: { fontWeight: 'bold', fontSize: '3em', color: '#424242' },
     h2: { fontWeight: 'bold', fontSize: '2.5em', color: '#424242' },
     h3: { fontWeight: 'normal', fontSize: '2em', color: '#424242' },
     h4: { fontSize: '1.75em', color: '#424242' },
@@ -30,6 +36,9 @@ const lightTheme = createTheme({
   maxContentWidth: '1440px'
 })
 
+/**
+ * Base dark mode MUI theme configuration.
+ */
 const darkTheme = createTheme({
   spacing: 8,
   typography: {
@@ -51,6 +60,12 @@ const darkTheme = createTheme({
   maxContentWidth: '1440px'
 })
 
+/**
+ * Extends the base theme with custom responsive typography and template styles.
+ *
+ * @param baseTheme The base MUI theme (light or dark).
+ * @returns Extended theme object with custom typography and templates.
+ */
 const extendedTheme = (baseTheme: Theme) => ({
   ...baseTheme,
   typography: {
@@ -101,6 +116,17 @@ const extendedTheme = (baseTheme: Theme) => ({
   }
 })
 
+/**
+ * `ThemeWrapper` is a React component that wraps children in an MUI `ThemeProvider`
+ * with custom light and dark theme support, defaulting to dark mode.
+ *
+ * - Provides global `CssBaseline` reset.
+ * - Applies responsive typography and layout templates.
+ * - Switchable via internal `mode` state (currently fixed to "dark").
+ *
+ * @param children - React children to wrap in the themed layout.
+ * @returns Themed UI container with children rendered inside.
+ */
 const ThemeWrapper = ({ children }: { children: ReactNode }) => {
   const [mode, setMode] = useState<'light' | 'dark'>('dark')
   const theme = useMemo(() => extendedTheme(mode === 'light' ? lightTheme : darkTheme), [mode])

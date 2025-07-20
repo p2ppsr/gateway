@@ -8,7 +8,7 @@ import Buttons from './pages/Buttons'
 import Payments from './pages/Payments'
 import Actions from './pages/Actions'
 import Money from './pages/Money'
-import checkForMetaNetclient from './utils/checkForMetanetclient'
+import checkForMetanetclient from './utils/checkForMetanetclient'
 import { CssBaseline } from '@mui/material'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import useAsyncEffect from 'use-async-effect'
@@ -18,7 +18,7 @@ import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 /*  AuthFetch – constructed once per session                                  */
 /* -------------------------------------------------------------------------- */
 
-const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3301'
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
 
@@ -33,7 +33,7 @@ const App = () => {
   // Run a 10s interval for checking if MNC is running
   useAsyncEffect(async () => {
     const intervalId = setInterval(async () => {
-      const hasMNC = await checkForMetaNetclient(WALLET_ORIGIN)
+      const hasMNC = await checkForMetanetclient(WALLET_ORIGIN)
       setIsMncMissing(hasMNC === 0)
     }, 2000)
 

@@ -1,3 +1,29 @@
+/**
+ * @file seeds/seed.js
+ *
+ * Seeds the development database with initial data across all major tables.
+ * This includes merchants, payment buttons, payments, admins, and server settings.
+ *
+ * Tables seeded (in order):
+ *  - server_settings (cleared first for dependency safety)
+ *  - admins
+ *  - payments
+ *  - payment_buttons
+ *  - merchants
+ *
+ * Seed Data Summary:
+ *  - 3 merchants with varied fee configurations
+ *  - 3 payment buttons with different currencies and usage conditions
+ *  - 2 payments associated with existing buttons and merchants
+ *  - 2 admin users
+ *  - 1 server settings config
+ *
+ * This file is meant to be used in local/dev environments only.
+ *
+ * @function
+ * @param {import('knex')} knex - The Knex.js instance used for database access.
+ * @returns {Promise<void>} A promise that resolves after all seed operations complete.
+ */
 exports.seed = function (knex) {
   // Deletes ALL existing entries
   return knex('server_settings')

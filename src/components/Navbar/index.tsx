@@ -1,13 +1,31 @@
+/**
+ * @file src/components/Navbar/index.tsx
+ *
+ * Renders the main navigation bar for the Gateway application.
+ *
+ * This component provides responsive navigation links including "Create a Button", 
+ * "Your Buttons", "Actions", "Payments", and optionally "Admin Dashboard" if the user is an admin.
+ * On smaller screens, it collapses into a hamburger menu using MUI's Drawer component.
+ * The active route is highlighted, and visual styling adapts to light/dark themes.
+ */
+
 import React, { useState } from 'react'
-import { makeStyles } from '@mui/styles'
-import { Typography, AppBar, Toolbar, Button, IconButton, Drawer, List, ListItem, ListItemText } from '@mui/material'
+import {
+  Typography,
+  AppBar,
+  Toolbar,
+  Button,
+  IconButton,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  useTheme,
+  useMediaQuery
+} from '@mui/material'
 import { Menu as MenuIcon, AccountBalanceWallet } from '@mui/icons-material'
 import { Link as RouterLink, useLocation } from 'react-router-dom'
-import { useTheme } from '@mui/material/styles'
-import { ClassNameMap } from '@mui/styles'
-import useMediaQuery from '@mui/material/useMediaQuery'
-import style from './style'
-// 👇 Helper to resolve TS conflict when using ListItem + RouterLink + button
+
 const ListItemLink = (props: { to: string; primary: string; onClick: () => void }) => {
   const { to, primary, onClick } = props
   return (
@@ -16,12 +34,20 @@ const ListItemLink = (props: { to: string; primary: string; onClick: () => void 
     </ListItem>
   )
 }
-const useStyles = makeStyles(style, { name: 'Navbar' })
 
+/**
+ * Navigation bar component for the Gateway frontend.
+ *
+ * Displays the site logo and routes for creating buttons, viewing buttons, actions,
+ * payments, and admin dashboard. Adjusts layout based on mobile viewport using a drawer menu.
+ *
+ * @component
+ * @param {boolean} isAdmin - Whether the user is an admin. Admins see the "Admin Dashboard" link.
+ * @returns {JSX.Element} The rendered Navbar component.
+ */
 const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
-  const classes = useStyles()
-  const location = useLocation()
   const theme = useTheme()
+  const location = useLocation()
   const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -29,65 +55,104 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
     setDrawerOpen(!drawerOpen)
   }
 
-  const drawer = (
-    <List>
-      <ListItemLink to="/" primary="Create a Button" onClick={() => setDrawerOpen(false)} />
-      <ListItemLink to="/buttons" primary="Your Buttons" onClick={() => setDrawerOpen(false)} />
-      <ListItemLink to="/actions" primary="Actions" onClick={() => setDrawerOpen(false)} />
-      <ListItemLink to="/payments" primary="Payments" onClick={() => setDrawerOpen(false)} />
-      {isAdmin && <ListItemLink to="/admin" primary="Admin Dashboard" onClick={() => setDrawerOpen(false)} />}
-    </List>
-  )
+  const getLinkStyle = (path: string) =>
+    location.pathname === path
+      ? {
+          color: theme.palette.secondary.main,
+          fontWeight: 'bold'
+        }
+      : {
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+          '&:hover': { color: theme.palette.secondary.main }
+        }
 
   return (
-    <AppBar position="sticky" color="primary" className={classes.navbar}>
-      <Toolbar className={classes.toolbar}>
+    <AppBar
+      position="sticky"
+      color="primary"
+      sx={{
+        boxShadow: 3,
+        mb: 1,
+        maxWidth: '1920px',
+        mx: 'auto'
+      }}
+    >
+      <Toolbar
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'relative'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <img src="/gatewaycash.svg" height="50px" style={{ paddingRight: '0.5em' }} />
-          <Typography variant="h5" className={classes.logo}>
+          <Typography variant="h5" sx={{ fontWeight: 'bold', cursor: 'pointer' }}>
             Gateway
           </Typography>
         </div>
+
         {isMobile ? (
           <>
             <IconButton edge="start" color="inherit" aria-label="menu" onClick={handleDrawerToggle}>
               <MenuIcon />
             </IconButton>
             <Drawer anchor="left" open={drawerOpen} onClose={handleDrawerToggle}>
-              {drawer}
+              <List>
+                <ListItemLink to="/" primary="Create a Button" onClick={() => setDrawerOpen(false)} />
+                <ListItemLink to="/buttons" primary="Your Buttons" onClick={() => setDrawerOpen(false)} />
+                <ListItemLink to="/actions" primary="Actions" onClick={() => setDrawerOpen(false)} />
+                <ListItemLink to="/payments" primary="Payments" onClick={() => setDrawerOpen(false)} />
+                {isAdmin && <ListItemLink to="/admin" primary="Admin Dashboard" onClick={() => setDrawerOpen(false)} />}
+              </List>
             </Drawer>
           </>
         ) : (
           <>
-            <div className={classes.navLinksWrapper}>
-              <div className={classes.navLinks}>
-                <Button
-                  component={RouterLink}
-                  to="/"
-                  className={location.pathname === '/' ? classes.activeLink : classes.link}
-                >
+            <div
+              style={{
+                display: 'flex',
+                flex: 1,
+                justifyContent: 'center',
+                position: 'relative'
+              }}
+            >
+              <div style={{ display: 'flex', gap: theme.spacing(4) }}>
+                <Button component={RouterLink} to="/" sx={getLinkStyle('/')}>
                   Create a Button
                 </Button>
-                <Button
-                  component={RouterLink}
-                  to="/buttons"
-                  className={location.pathname === '/buttons' ? classes.activeLink : classes.link}
-                >
+                <Button component={RouterLink} to="/buttons" sx={getLinkStyle('/buttons')}>
                   Your Buttons
                 </Button>
-                <Button
-                  component={RouterLink}
-                  to="/actions"
-                  className={location.pathname === '/actions' ? classes.activeLink : classes.link}
-                >
+                <Button component={RouterLink} to="/actions" sx={getLinkStyle('/actions')}>
                   Actions
                 </Button>
               </div>
-              <div className={classes.moneyLinkWrapper}>
+              <div style={{ position: 'absolute', right: 0 }}>
                 <Button
                   component={RouterLink}
                   to="/payments"
-                  className={location.pathname === '/payments' ? classes.activeLink : classes.moneyLink}
+                  sx={
+                    location.pathname === '/payments'
+                      ? {
+                          color: theme.palette.secondary.contrastText,
+                          backgroundColor: theme.palette.secondary.main,
+                          padding: theme.spacing(0.5, 1),
+                          borderRadius: theme.shape.borderRadius,
+                          '&:hover': {
+                            backgroundColor: theme.palette.secondary.light
+                          }
+                        }
+                      : {
+                          color: theme.palette.secondary.contrastText,
+                          backgroundColor: theme.palette.secondary.main,
+                          padding: theme.spacing(0.5, 1),
+                          borderRadius: theme.shape.borderRadius,
+                          '&:hover': {
+                            backgroundColor: theme.palette.secondary.light
+                          }
+                        }
+                  }
                   startIcon={<AccountBalanceWallet />}
                 >
                   Payments
@@ -95,11 +160,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }) => {
               </div>
             </div>
             {isAdmin && (
-              <Button
-                component={RouterLink}
-                to="/admin"
-                className={location.pathname === '/admin' ? classes.activeLink : classes.link}
-              >
+              <Button component={RouterLink} to="/admin" sx={getLinkStyle('/admin')}>
                 Admin Dashboard
               </Button>
             )}
