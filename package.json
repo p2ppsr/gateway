@@ -10,11 +10,30 @@
     "build:site": "webpack --config webpack.site.ts",
     "build:inject": "webpack --config webpack.inject.ts",
     "build": "concurrently \"npm run build:site\" \"npm run build:inject\"",
-    "start:server": "node build/server/index.js",
     "setup:db": "node scripts/mkenv.sh && knex migrate:latest && knex seed:run",
     "lint": "ts-standard --fix .",
     "prettier": "prettier --write \"**/*.{ts,tsx,js,json,css,md}\"",
-    "clean": "rimraf dist node_modules && npm install"
+    "clean": "rimraf dist node_modules && npm install",
+    "start:server": "node src/server.js",
+    "setup:server": "node src/setup.js"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   },
   "dependencies": {
     "@bsv/auth-express-middleware": "^1.2.0",
