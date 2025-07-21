@@ -1,18 +1,4 @@
-/**
- * @file src/routes/pay.ts
- *
- * POST route to complete a payment by submitting a transaction.
- * Validates the submitted transaction against the invoice created earlier, ensuring:
- * - The invoice exists and belongs to the caller.
- * - The transaction is well-formed and matches the expected locking script and amount.
- * - The payment button (if single-use) has not already been used.
- *
- * Upon successful validation, the database is updated to mark the payment as complete,
- * store the atomic BEEF transaction, and update the button's usage state and total paid.
- *
- * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
- */
-
+// src/routes/pay.ts
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
 import { Hash, P2PKH, PrivateKey, PublicKey, Transaction, Utils } from '@bsv/sdk'
@@ -24,26 +10,13 @@ export default {
   type: 'post',
   path: '/pay',
 
-  /**
-   * Express route handler to validate and record a completed payment.
-   *
-   * This function:
-   * - Confirms the payment ID exists, is incomplete, and matches the user.
-   * - Validates the atomic BEEF transaction structure and integrity.
-   * - Derives the expected locking script from the sender and merchant info.
-   * - Confirms the transaction includes an output matching the script and amount.
-   * - Marks the payment as complete and updates the payment button in the database.
-   *
-   * @param req - Express request with `paymentId` and `transaction { txid, atomicBeefTx }` in the body.
-   *              Also requires `auth.identityKey` from authentication middleware.
-   * @param res - Express response object used to return a success or failure message.
-   * @returns {Promise<void>} Sends HTTP 200 on success or appropriate error status.
-   */
   func: async (req: Request, res: Response): Promise<void> => {
     const { paymentId, transaction } = req.body as {
       paymentId: string
       transaction: { txid: string; atomicBeefTx: string }
     }
+    console.log('🔍 Pay request:', { paymentId, transaction })
+
     try {
       const payment = await db('payments')
         .where({
@@ -84,6 +57,8 @@ export default {
 
       // Parse and validate the transaction
       const { txid, atomicBeefTx } = transaction
+      console.log('🔍 parsedTXEnvelope:', { txid, atomicBeefTx })
+
       if (!txid || !atomicBeefTx || typeof atomicBeefTx !== 'string' || !/^[0-9a-fA-F]+$/.test(atomicBeefTx)) {
         throw new Error('Invalid transaction: txid or atomicBeefTx missing or invalid')
       }
@@ -91,9 +66,11 @@ export default {
       let bsvtx: Transaction
       try {
         const txArray = Utils.toArray(atomicBeefTx, 'hex')
+        console.log('🔍 txArray:', txArray)
         bsvtx = Transaction.fromAtomicBEEF(txArray)
+        console.log('🔍 bsvtx:', JSON.stringify(bsvtx, null, 2))
       } catch (e) {
-        console.error('❌ Transaction parsing failed:', e)
+        console.error('🔍 Transaction parsing failed:', e)
         throw new Error('Invalid transaction format: unable to parse atomicBeefTx')
       }
 
@@ -126,6 +103,8 @@ export default {
         x => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
       )
       if (!matchingOutput) {
+        console.log('🔍 Expected script:', derivedScript)
+        console.log('🔍 Expected sats:', expectedAmount)
         bsvtx.outputs.forEach((out, i) => {
           console.log(`🔍 Output ${i} script:`, out.lockingScript.toHex())
           console.log(`🔍 Output ${i} sats:`, out.satoshis)
@@ -163,7 +142,7 @@ export default {
         txid
       })
     } catch (error) {
-      console.error('❌ Pay error:', error)
+      console.error('🔍 Pay error:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

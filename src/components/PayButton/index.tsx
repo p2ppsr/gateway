@@ -17,29 +17,18 @@ import React, { useState } from 'react'
 import { WalletClient, AuthFetch, Transaction, Utils } from '@bsv/sdk'
 
 /**
- * PayButton component — initiates a blockchain payment via Metanet client.
+ * Reusable payment component.
  *
- * This reusable UI component integrates with a Gateway server and the WalletClient to:
- * - Request an invoice,
- * - Create a signed payment transaction (atomic BEEF),
- * - Submit it back to the backend for processing,
- * - Display success confirmation with transaction ID (txid).
- *
- * It uses `AuthFetch` to perform authenticated calls with the user's wallet, and
- * constructs an action transaction using `WalletClient.createAction()`.
- *
- * @component
- * @param {string} [text="Tip Now"] - Label shown on the button before payment.
- * @param {number} amount - The amount of currency to pay (typically in fiat equivalent).
- * @param {string} merchant - Identity key of the receiving merchant.
- * @param {string} button - ID of the payment button configured in the backend.
- * @param {string} [currency="BSV"] - Currency type to denominate the amount (e.g., "USD", "BSV").
- * @param {string} server - URL of the Gateway backend server (e.g., "http://localhost:3001").
- * @param {string} [loadingtext="Loading, please wait…"] - Text to show while processing.
- * @returns {JSX.Element} A button that triggers payment flow or a receipt with txid.
+ * @param text         Button label (default "Pay Now")
+ * @param amount       Amount in chosen currency (number)
+ * @param merchant     Merchant identity key (string)
+ * @param button       Payment-button ID (string)
+ * @param currency     "BSV" | "USD" | …
+ * @param server       Gateway back-end URL (e.g. "http://localhost:3001")
+ * @param loadingtext  Text while awaiting invoice / payment
  */
 const PayButton = ({
-  text = 'Tip Now',
+  text = 'Pay Now',
   amount,
   merchant,
   button,
@@ -99,12 +88,11 @@ const PayButton = ({
       let transaction, atomicBeefTx, txid
       try {
         transaction = Transaction.fromAtomicBEEF(tx.tx)
-        console.log('🔍 txid:', txid)
+        txid = transaction.id('hex')
         atomicBeefTx = Utils.toHex(tx.tx!)
-        console.log('🔍 atomicBeefTx:', atomicBeefTx)
       } catch (e) {
         console.error('❌ Transaction serialization failed:', e)
-        throw new Error('❌ Failed to serialize transaction')
+        throw new Error('Failed to serialize transaction')
       }
       const payPayload = { paymentId: invoice.paymentId, transaction: { txid, atomicBeefTx } }
       const resPay = await authFetch.fetch(`${server}/api/pay`, {
@@ -128,6 +116,9 @@ const PayButton = ({
     }
   }
 
+  /* ---------------------------------------------------------------------- */
+  /*  Render                                                               */
+  /* ---------------------------------------------------------------------- */
   if (!paid) {
     return (
       <button className="gateway-button-styles" onClick={handleClick} disabled={loading}>
@@ -136,22 +127,18 @@ const PayButton = ({
     )
   }
 
-return (
-  <div>
-    Payment Submitted
-    <br />
-    TXID:{' '}
-    <code>
-      <a
-        href="#"
-        onClick={() => window.open(`https://whatsonchain.com/tx/${txid}`, '_blank', 'noopener,noreferrer')}
-      >
-        {txid}
-      </a>
-    </code>
-  </div>
-)
-
+  return (
+    <div>
+      Payment Submitted
+      <br />
+      TXID:{' '}
+      <code>
+        <a href={`https://whatsonchain.com/tx/${txid}`} target="_blank" rel="noopener noreferrer">
+          {txid}
+        </a>
+      </code>
+    </div>
+  )
 }
 
 export default PayButton
