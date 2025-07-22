@@ -21,7 +21,7 @@ import QRCode from 'react-qr-code'
  * @property {string} downloadURL - Direct download URL for the Metanet client.
  * @property {string} platformLabel - Human-readable platform label ("Android", "iOS", "macOS", etc.).
  */
-type Props = {
+interface Props {
   downloadURL: string
   platformLabel: string
 }
@@ -58,7 +58,7 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
         boxShadow: 5
       }}
     >
-      <Typography variant="h6" fontWeight="bold" gutterBottom>
+      <Typography variant='h6' fontWeight='bold' gutterBottom>
         Gateway requires the {clientType}
       </Typography>
 
@@ -66,9 +66,9 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
         You can download it for your{' '}
         <Link
           href={downloadURL}
-          underline="hover"
-          target="_blank"
-          rel="noopener noreferrer"
+          underline='hover'
+          target='_blank'
+          rel='noopener noreferrer'
           sx={{ color: '#3aa0ff' }}
         >
           {platformLabel}
@@ -78,10 +78,10 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
 
       <Typography gutterBottom>
         <Link
-          href="https://github.com/bsv-blockchain/metanet-desktop/releases"
-          underline="hover"
-          target="_blank"
-          rel="noopener noreferrer"
+          href='https://github.com/bsv-blockchain/metanet-desktop/releases'
+          underline='hover'
+          target='_blank'
+          rel='noopener noreferrer'
           sx={{ color: '#3aa0ff' }}
         >
           All Metanet clients

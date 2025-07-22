@@ -58,6 +58,12 @@ interface Payment {
   merchant_id?: string
 }
 
+interface PaymentResponse {
+  status: string
+  message?: string
+  data: Payment[]
+}
+
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
@@ -71,28 +77,32 @@ const PaymentsList: React.FC = () => {
 
   const theme = useTheme()
 
-  const fetchPayments = async () => {
+  const fetchPayments = async (): Promise<void> => {
     setLoading(true)
     setError('')
     try {
       const url = `${location.protocol}//${location.host}/api/listPayments?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
       const response = await authFetch.fetch(url, { method: 'GET' })
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`❌ HTTP error! status: ${response.status.toString()}`)
       }
-      const data = await response.json()
+      const data: PaymentResponse = await response.json()
       if (data.status === 'error') {
-        throw new Error(data.message)
+        throw new Error(`❌ ${data.message ?? 'Failed to fetch payments'}`)
       }
       setPayments(data.data)
-    } catch (err: any) {
-      setError(`Fetching payments failed: ${err.message}`)
+      console.log(`✅ Successfully fetched ${data.data.length} payments`)
+      console.log('🔍 Payment data:', data.data)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`❌ Fetching payments failed: ${message}`)
+      console.error('❌ Error fetching payments:', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const acknowledgePayment = async (paymentId: string) => {
+  const acknowledgePayment = async (paymentId: string): Promise<void> => {
     try {
       const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
         method: 'POST',
@@ -103,23 +113,27 @@ const PaymentsList: React.FC = () => {
       })
       if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`)
+        throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`)
       }
-      const data = await response.json()
+      const data: PaymentResponse = await response.json()
       if (data.status === 'error') {
-        throw new Error(data.message)
+        throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`)
       }
+      console.log(`✅ Successfully acknowledged payment: ${paymentId}`)
+      console.log('🔍 Acknowledgment response:', data)
       await fetchPayments() // Refresh the list
-    } catch (err: any) {
-      setError(`Acknowledging payment failed: ${err.message}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`❌ Acknowledging payment failed: ${message}`)
+      console.error('❌ Error acknowledging payment:', message)
     }
   }
 
   useEffect(() => {
-    fetchPayments()
+    void fetchPayments()
   }, [page])
 
-  if (loading)
+  if (loading) {
     return (
       <Box
         sx={{
@@ -132,7 +146,8 @@ const PaymentsList: React.FC = () => {
         <CircularProgress />
       </Box>
     )
-  if (error) return <Typography color="error">{error}</Typography>
+  }
+  if (error !== '') return <Typography color='error'>{error}</Typography>
 
   return (
     <Container>
@@ -144,8 +159,8 @@ const PaymentsList: React.FC = () => {
           color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
         }}
       >
-        <Typography variant="h2">Payments</Typography>
-        <Typography variant="subtitle1">Acknowledge your incoming payments</Typography>
+        <Typography variant='h2'>Payments</Typography>
+        <Typography variant='subtitle1'>Acknowledge your incoming payments</Typography>
       </Box>
       <TableContainer component={Paper}>
         <Table>
@@ -171,7 +186,7 @@ const PaymentsList: React.FC = () => {
                 <TableCell>{payment.is_new ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   {payment.is_new && (
-                    <Button variant="contained" color="primary" onClick={() => acknowledgePayment(payment.payment_id)}>
+                    <Button variant='contained' color='primary' onClick={() => { acknowledgePayment(payment.payment_id).catch(() => {}) }}>
                       Acknowledge
                     </Button>
                   )}

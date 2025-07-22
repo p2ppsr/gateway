@@ -56,7 +56,7 @@ const collectInformation = async () => {
       rl.question(query, resolve)
     })
   }
-  let question = promisify(rl.question)
+  const question = promisify(rl.question)
 
   // get the hostname
   let dbHostname = await question('\nSQL database hostname (ENTER for 127.0.0.1): ')
@@ -123,9 +123,9 @@ const collectInformation = async () => {
 const testDatabaseConnection = async (host, port, user, pass, db, listen, domain, spawnNginx, bsvNet) => {
   console.log('\nTesting MySQL credentials...')
   const conn = mysql.createConnection({
-    host: host,
-    port: port,
-    user: user,
+    host,
+    port,
+    user,
     password: pass,
     database: db,
     multipleStatements: true
@@ -205,7 +205,7 @@ const setupDatabase = async () => {
       rl.question(query, resolve)
     })
   }
-  let question = promisify(rl.question)
+  const question = promisify(rl.question)
 
   console.log('Migrating your database...')
   const knex = require('knex')(require('../knexfile.js'))
@@ -223,7 +223,7 @@ If you are running a production server or if you already have a working
 database you want to keep, answer NO.
 `)
 
-  let setup = await question('ERASE and re-seed the database for development? [Y/N]: ')
+  const setup = await question('ERASE and re-seed the database for development? [Y/N]: ')
 
   if (setup === 'N' || setup === 'n' || setup === 'no' || setup === 'NO') {
     rl.close()

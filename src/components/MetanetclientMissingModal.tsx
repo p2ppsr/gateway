@@ -17,7 +17,7 @@ import MetanetclientModal from './MetanetclientModal'
  *
  * @property {boolean} open - Whether the modal is currently visible.
  */
-type Props = {
+interface Props {
   open: boolean
 }
 
@@ -38,7 +38,7 @@ type Props = {
 const MetanetclientMissingModal: React.FC<Props> = ({ open }) => {
   const info = usePlatformDownloadInfo()
 
-  if (!open || !info) return null
+  if (!open || (info == null)) return null
 
   return (
     <div

@@ -35,7 +35,6 @@ export default {
    * @returns {Promise<void>} Responds with JSON containing the filtered payment list or an error.
    */
   func: async (req: Request, res: Response): Promise<void> => {
-
     // Extract merchant ID from authentication context
     const merchantId = (req as any).auth.identityKey
 
@@ -53,7 +52,6 @@ export default {
     }
 
     try {
-
       // Build the query with mandatory conditions
       let query = db('payments')
         .where({ merchant_id: merchantId })
@@ -62,7 +60,7 @@ export default {
         .offset(offset)
 
       // Optionally filter by button ID if one is provided
-      if (buttonId) {
+      if (typeof buttonId === 'string' && buttonId !== '') {
         query = query.andWhere({ payment_button_id: buttonId })
       }
 

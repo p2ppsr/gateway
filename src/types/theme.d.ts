@@ -13,7 +13,7 @@ import { Theme as MUITheme } from '@mui/material/styles'
 
 declare module '@mui/material/styles' {
 
-   /**
+  /**
    * Extends the MUI Theme interface to include additional layout and template fields.
    *
    * @property {string} [maxContentWidth] - Optional maximum content width (e.g., '1200px').

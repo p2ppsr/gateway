@@ -15,12 +15,16 @@
  * @property {string | null} ios - App Store link for iOS or `null` if not available.
  * @property {string | null} android - Play Store link for Android or `null` if not available.
  */
-export type MetanetclientLinks = {
+export interface MetanetclientLinks {
   macos: string | null
   windows: string | null
   linux: string | null
   ios: string | null
   android: string | null
+}
+
+interface GitHubRelease {
+  tag_name: string
 }
 
 /**
@@ -34,19 +38,22 @@ const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
     const response = await fetch(
       'https://api.github.com/repos/bsv-blockchain/metanet-desktop/releases/latest'
     )
-    const data = await response.json()
+    const data: GitHubRelease = await response.json()
+    console.log('🔍 GitHub release data:', data)
 
-    const tag = data.tag_name // e.g. 'metanet-desktop-v0.5.1'
-    const version = tag.replace(/^metanet-desktop-v/, '') // e.g. '0.5.1'
+    const tag: string = data.tag_name // e.g. 'metanet-desktop-v0.5.1'
+    const version: string = tag.replace(/^metanet-desktop-v/, '') // e.g. '0.5.1'
 
-    return {
+    const links: MetanetclientLinks = {
       macos: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_aarch64.dmg`,
       windows: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_x64-setup.exe`,
       linux: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_amd64.AppImage`,
       ios: 'https://apps.apple.com/app/metanet/id0000000000', // TODO: update with actual link
       android: 'https://play.google.com/store/apps/details?id=com.metanet.browser' // TODO: update with actual link
     }
-  } catch (error) {
+    console.log('✅ Successfully fetched Metanet client links:', links)
+    return links
+  } catch (error: unknown) {
     console.error('❌ Failed to fetch latest Metanet client release:', error)
     return {
       macos: null,

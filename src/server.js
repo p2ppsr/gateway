@@ -2,7 +2,7 @@
  * @file server.js
  *
  * Entry point for running the Gateway backend in development mode using `ts-node`.
- * 
+ *
  * This file:
  * - Registers `ts-node` to enable direct execution of TypeScript files.
  * - Requires and runs `server.ts`, which contains the actual server logic.
@@ -17,4 +17,3 @@
 
 require('ts-node/register')
 require('./server.ts')
-

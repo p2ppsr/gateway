@@ -36,6 +36,7 @@ export default {
     try {
       const identityKey = (req as any).auth?.identityKey
 
+      // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
       const admin = identityKey ? await db('admins').where({ admin_id: identityKey }).first() : null
 
       res.status(200).json({

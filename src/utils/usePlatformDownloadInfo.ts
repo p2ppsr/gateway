@@ -34,57 +34,67 @@ const usePlatformDownloadInfo = (): DownloadInfo => {
   const [info, setInfo] = useState<DownloadInfo>(null)
 
   useEffect(() => {
-
     /**
      * Detects the desktop platform using the browser's user agent string.
      *
      * @returns {'macos' | 'windows' | 'linux'} The inferred desktop OS key.
      */
     const detectWebPlatform = (): keyof MetanetclientLinks => {
+      // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
       const ua = navigator.userAgent || navigator.platform || 'unknown'
-
-      if (/Mac/i.test(ua)) return 'macos'
-      if (/Win/i.test(ua)) return 'windows'
-      if (/Linux/i.test(ua)) return 'linux'
+      if (typeof ua === 'string' && ua !== '') {
+        if (/Mac/i.test(ua)) return 'macos'
+        if (/Win/i.test(ua)) return 'windows'
+        if (/Linux/i.test(ua)) return 'linux'
+      }
       return 'macos' // fallback
     }
 
     /**
      * Fetches the latest Metanet client links and sets the appropriate platform info.
      */
-    const fetchDownloadURL = async () => {
-      const links: MetanetclientLinks = await getLatestMetanetclientLinks()
+    const fetchDownloadURL = async (): Promise<void> => {
+      try {
+        const links: MetanetclientLinks = await getLatestMetanetclientLinks()
+        console.log('🔍 Metanet client links:', links)
+        console.log('🔍 Platform:', Platform.OS)
 
-      if (Platform.OS === 'ios') {
-        setInfo({
-          platformLabel: 'iOS',
-          downloadURL: links.ios ?? ''
-        })
-      } else if (Platform.OS === 'android') {
-        setInfo({
-          platformLabel: 'Android',
-          downloadURL: links.android ?? ''
-        })
-      } else if (Platform.OS === 'web') {
-        const desktopOS = detectWebPlatform()
-        const labelMap: Record<string, string> = {
-          macos: 'macOS',
-          windows: 'Windows',
-          linux: 'Linux'
+        if (typeof Platform.OS === 'string' && (Platform.OS as string) === 'ios') {
+          setInfo({
+            platformLabel: 'iOS',
+            downloadURL: links.ios ?? ''
+          })
+        } else if (typeof Platform.OS === 'string' && (Platform.OS as string) === 'android') {
+          setInfo({
+            platformLabel: 'Android',
+            downloadURL: links.android ?? ''
+          })
+        } else if (typeof Platform.OS === 'string' && (Platform.OS as string) === 'web') {
+          const desktopOS = detectWebPlatform()
+          const labelMap: Record<string, string> = {
+            macos: 'macOS',
+            windows: 'Windows',
+            linux: 'Linux'
+          }
+          setInfo({
+            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+            platformLabel: labelMap[desktopOS] || 'Desktop',
+            downloadURL: links[desktopOS] ?? ''
+          })
+        } else {
+          setInfo({
+            platformLabel: 'Unknown',
+            downloadURL: links.macos ?? ''
+          })
         }
-        setInfo({
-          platformLabel: labelMap[desktopOS] || 'Desktop',
-          downloadURL: links[desktopOS] ?? ''
-        })
-      } else {
-        setInfo({
-          platformLabel: 'Unknown',
-          downloadURL: links.macos ?? ''
-        })
+        console.log('✅ Set platform info:', info)
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        console.error('❌ Error fetching download URL:', message)
       }
     }
 
-    fetchDownloadURL().catch(console.error)
+    void fetchDownloadURL()
   }, [])
 
   return info

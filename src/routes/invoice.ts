@@ -13,18 +13,35 @@
 
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
-import { Hash, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk'
+import { randomBytes } from 'crypto'
+import { Hash, P2PKH, PrivateKey, PublicKey, Utils } from '@bsv/sdk'
 import { Request, Response } from 'express'
-import { Utils } from '@bsv/sdk'
 
 const db: Knex = knex(knexConfig)
+
+interface PaymentButton {
+  button_id: string
+  merchant_id: string
+  multi_use: boolean
+  used: boolean
+  variable_amount: boolean
+  amount: number
+  currency: string
+}
+
+interface RequestBody {
+  paymentButtonId: string
+  merchantId: string
+  currency: string
+  amount: number
+}
 
 export default {
   type: 'post',
   path: '/invoice',
   knex: db,
 
-    /**
+  /**
    * Express route handler to create a new invoice/payment entry.
    *
    * Validates that the payment button exists, belongs to the merchant, and is eligible for use.
@@ -40,25 +57,21 @@ export default {
    * @returns {Promise<void>} Sends a 200 success response with `paymentId` and derived outputs.
    */
   func: async (req: Request, res: Response): Promise<void> => {
-
     // Extract the necessary information from the request body
-    const { paymentButtonId, merchantId, currency, amount } = req.body as {
-      paymentButtonId: string
-      merchantId: string
-      currency: string
-      amount: number
-    }
+    const { paymentButtonId, merchantId, currency, amount }: RequestBody = req.body
+    console.log('🔍 Request body:', req.body)
 
     try {
       // Verify the payment button exists and belongs to the specified merchant
-      const button = await db('payment_buttons')
+      const button: PaymentButton | undefined = await db('payment_buttons')
         .where({
           button_id: paymentButtonId,
           merchant_id: merchantId
         })
         .first()
+      console.log('🔍 Payment button data:', button)
 
-      if (!button) {
+      if (button === undefined) {
         res.status(404).json({
           status: 'error',
           message: 'Payment button not found for the specified merchant'
@@ -85,7 +98,7 @@ export default {
       }
 
       // Create a new payment with complete=false
-      const paymentID = require('crypto').randomBytes(12).toString('hex')
+      const paymentID = randomBytes(12).toString('hex')
       await db('payments').insert({
         payment_id: paymentID,
         merchant_id: merchantId,
@@ -97,6 +110,7 @@ export default {
         exchange_rate: 1, // Placeholder, calculate the actual exchange rate as needed
         payment_button_id: paymentButtonId
       })
+      console.log(`✅ Payment invoice created: ${paymentID}`)
 
       const senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
       const recipientPublicKey = PublicKey.fromString(button.merchant_id)
@@ -125,8 +139,9 @@ export default {
           }
         ]
       })
-    } catch (error) {
-      console.error('❌ Error creating invoice:', error)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      console.error(`❌ Error creating invoice: ${message}`)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

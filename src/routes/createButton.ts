@@ -20,6 +20,21 @@ import type { Request, Response } from 'express'
 
 const db: Knex = knex(knexConfig)
 
+interface Merchant {
+  merchant_id: string
+  custom_fee_rate: number
+  welcomed: boolean
+  custom_fee: boolean
+}
+
+interface RequestBody {
+  amount: number
+  currency: string
+  variableAmount: boolean
+  multiUse: boolean
+  accepts: string
+}
+
 export default {
   type: 'post',
   path: '/createButton',
@@ -43,7 +58,8 @@ export default {
   func: async (req: Request, res: Response): Promise<void> => {
     const merchantId = (req as any).auth?.identityKey
 
-    const { amount, currency, variableAmount, multiUse, accepts } = req.body
+    const { amount, currency, variableAmount, multiUse, accepts }: RequestBody = req.body
+    console.log('🔍 Request body:', req.body)
     const validAccepts = ['BSV', 'fiat', 'both']
 
     if (
@@ -52,16 +68,17 @@ export default {
       typeof variableAmount !== 'boolean' ||
       typeof multiUse !== 'boolean' ||
       !validAccepts.includes(accepts) ||
-      !merchantId
+      merchantId === undefined
     ) {
       res.status(400).json({ status: 'error', message: 'Invalid parameters' })
       return
     }
 
     try {
-      const merchant = await db('merchants').where({ merchant_id: merchantId }).first()
+      const merchant: Merchant | undefined = await db('merchants').where({ merchant_id: merchantId }).first()
+      console.log('🔍 Merchant data:', merchant)
 
-      if (!merchant) {
+      if (merchant === undefined) {
         await db('merchants').insert({
           merchant_id: merchantId,
           custom_fee_rate: 0,
@@ -93,7 +110,7 @@ export default {
         message: 'Payment button created successfully',
         buttonId
       })
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('❌ Error creating payment button:', err)
       res.status(500).json({ status: 'error', message: 'Internal server error' })
     }

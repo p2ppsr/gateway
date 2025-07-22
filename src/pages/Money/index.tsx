@@ -1,6 +1,16 @@
-import React, { useState, useEffect } from 'react'
+/**
+ * @file src/pages/Money/index.tsx
+ *
+ * My Money Page — Placeholder for managing fiat withdrawals and profile settings.
+ *
+ * This component will allow users to withdraw fiat payments to their bank account
+ * and manage profile aspects like identity certificate registration.
+ * Currently a minimal implementation with commented-out logic for fetching payment buttons.
+ */
 
-const MyMoney = () => {
+import React from 'react'
+
+const MyMoney: React.FC = (): JSX.Element => {
   // const [loading, setLoading] = useState(true)
   // const [error, setError] = useState('')
   // const [page, setPage] = useState(1)
@@ -21,7 +31,7 @@ const MyMoney = () => {
   //             new TextDecoder().decode(response.body)
   //         )
   //         if (response.status === 'error') {
-  //             throw new Error(response.message)
+  //             throw new Error(`❌ ${response.message}`)
   //         }
   //         setButtons(data.data)
   //     } catch (err) {

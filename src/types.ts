@@ -76,7 +76,7 @@ export interface GatewayQuery {
  * @property {'findByMerchantId'} type - Query type.
  * @property {{ merchantId: string }} value - Merchant ID to match.
  */
-export type FindByMerchantIdQuery = {
+export interface FindByMerchantIdQuery {
   type: 'findByMerchantId'
   value: { merchantId: string }
 }
@@ -87,7 +87,7 @@ export type FindByMerchantIdQuery = {
  * @property {'findByPaymentId'} type - Query type.
  * @property {{ paymentId: string }} value - Payment ID to match.
  */
-export type FindByPaymentIdQuery = {
+export interface FindByPaymentIdQuery {
   type: 'findByPaymentId'
   value: { paymentId: string }
 }
@@ -98,7 +98,7 @@ export type FindByPaymentIdQuery = {
  * @property {'findByButtonId'} type - Query type.
  * @property {{ buttonId: string }} value - Button ID to match.
  */
-export type FindByButtonIdQuery = {
+export interface FindByButtonIdQuery {
   type: 'findByButtonId'
   value: { buttonId: string }
 }
@@ -109,7 +109,7 @@ export type FindByButtonIdQuery = {
  * @property {'findByTransactionId'} type - Query type.
  * @property {{ transactionId: string }} value - Transaction ID to match.
  */
-export type FindByTransactionIdQuery = {
+export interface FindByTransactionIdQuery {
   type: 'findByTransactionId'
   value: { transactionId: string }
 }
@@ -120,7 +120,7 @@ export type FindByTransactionIdQuery = {
  * @property {'findByAmount'} type - Query type.
  * @property {{ amount: number }} value - Amount to match.
  */
-export type FindByAmountQuery = {
+export interface FindByAmountQuery {
   type: 'findByAmount'
   value: { amount: number }
 }

@@ -1,6 +1,6 @@
 /**
  * @file src/pages/Create/index.tsx
- * 
+ *
  * Create Page — Allows users to configure and generate tipping button code.
  *
  * Users can customize the button text, payment amount, and CSS styles. Once configured,
@@ -39,6 +39,10 @@ const authFetch = new AuthFetch(wallet)
 interface CodeSnippetProps {
   code: string
   language: string
+}
+
+interface ButtonResponse {
+  buttonId?: string
 }
 
 const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
@@ -83,14 +87,14 @@ const Create: React.FC = () => {
   const [amountInSats, setAmountInSats] = useState(1000)
   const [currencySymbol, setCurrencySymbol] = useState('$')
   const currencyConverter = new CurrencyConverter()
-  const theme = useTheme()
 
   useEffect(() => {
-    ;(async () => {
+    void (async () => {
       try {
         const identity = await wallet.getPublicKey({ identityKey: true })
         setMerchant(identity.publicKey)
         setHasMetanet(true)
+        console.log('✅ Metanet identity fetched:', identity.publicKey)
       } catch (error) {
         console.error('❌ Failed to fetch Metanet identity:', error)
         setHasMetanet(false)
@@ -98,12 +102,12 @@ const Create: React.FC = () => {
     })()
   }, [])
 
-  const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     setCustomCSS(event.target.value)
   }
 
   useEffect(() => {
-    ;(async () => {
+    void (async () => {
       try {
         await currencyConverter.initialize()
         setCurrencySymbol(currencyConverter.getCurrencySymbol())
@@ -112,14 +116,15 @@ const Create: React.FC = () => {
           currencyConverter.preferredCurrency,
           'BSV'
         )
-        setAmountInSats(satoshis || 1000)
+        setAmountInSats(satoshis ?? 1000)
+        console.log('🔍 Converted amount to satoshis:', satoshis)
       } catch (error) {
         console.error('❌ Failed to fetch currency:', error)
       }
     })()
   }, [paymentAmount])
 
-  const handleAmountChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAmountChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const input = event.target.value.replace(/[^0-9.]/g, '')
     setPaymentAmount(input)
     setShowCode(false)
@@ -129,13 +134,15 @@ const Create: React.FC = () => {
         currencyConverter.preferredCurrency,
         'BSV'
       )
-      setAmountInSats(satoshis || 1000)
+      setAmountInSats(satoshis ?? 1000)
+      console.log('🔍 Converted input to satoshis:', satoshis)
     } catch (error) {
       console.error('❌ Error converting currency:', error)
     }
   }, [])
 
-  const handleCopyCode = async () => {
+  const handleCopyCode = async (): Promise<void> => {
+    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
     const code = `${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
   <div
     class="gateway-paybutton"
@@ -151,10 +158,12 @@ const Create: React.FC = () => {
       await navigator.clipboard.writeText(code)
       setCopySuccess('success')
       setTimeout(() => setCopySuccess(''), 2000)
-      toast.success('Code copied to clipboard')
+      toast.success('✅ Code copied to clipboard')
+      console.log('✅ Copied code to clipboard')
     } catch (err) {
       setCopySuccess('failed')
-      toast.error('Failed to copy code')
+      toast.error('❌ Failed to copy code')
+      console.error('❌ Failed to copy code:', err)
     }
   }
 
@@ -169,9 +178,9 @@ const Create: React.FC = () => {
     }
   }, [customCSS])
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     if (!hasMetanet) {
-      toast.error('Metanet client required! Download at https://metanet.bsvb.tech')
+      toast.error('❌ Metanet client required! Download at https://metanet.bsvb.tech')
       return
     }
 
@@ -191,70 +200,79 @@ const Create: React.FC = () => {
         }
       })
 
-      const data = await response.json()
-      if (data.buttonId) {
+      const data: ButtonResponse = await response.json()
+      if (data.buttonId !== undefined) {
         setButtonID(data.buttonId)
         setShowCode(true)
-        toast.success('Button created successfully')
+        toast.success('✅ Button created successfully')
+        console.log('✅ Button created with ID:', data.buttonId)
+        console.log('🔍 Button creation data:', data)
       } else {
-        toast.error('Failed to create button')
+        toast.error('❌ Failed to create button')
+        console.error('❌ Failed to create button: No buttonId in response')
       }
     } catch (error) {
       console.error('❌ Error creating button:', error)
-      toast.error('Error creating button')
+      toast.error('❌ Error creating button')
     }
   }
 
   return (
     <Root>
-      <Container maxWidth="lg">
+      <Container maxWidth='lg'>
         <ContentWrap>
           <CenteredHeader>
-            <Typography variant="h2">Create Your Tipping Button</Typography>
-            <Typography variant="subtitle1">Instantly generate code to embed tipping buttons on your site.</Typography>
+            <Typography variant='h2'>Create Your Tipping Button</Typography>
+            <Typography variant='subtitle1'>Instantly generate code to embed tipping buttons on your site.</Typography>
           </CenteredHeader>
 
           <Grid container spacing={4}>
             <Grid item xs={12} md={4}>
               <FormSection elevation={3}>
-                <Typography variant="h4" gutterBottom>
+                <Typography variant='h4' gutterBottom>
                   Configure Your Button
                 </Typography>
                 <TextFieldStyled
-                  label="Button Text"
+                  label='Button Text'
                   value={buttonText}
                   onChange={e => {
                     setButtonText(e.target.value)
                     setShowCode(false)
                   }}
                   fullWidth
-                  margin="normal"
+                  margin='normal'
                 />
                 <TextFieldStyled
-                  label="Tip Amount"
+                  label='Tip Amount'
                   value={paymentAmount}
-                  onChange={handleAmountChange}
-                  type="number"
+                  onChange={
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    (e: React.ChangeEvent<HTMLInputElement>) => { handleAmountChange(e) }
+                  }
+                  type='number'
                   fullWidth
-                  margin="normal"
+                  margin='normal'
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">{currencySymbol}</InputAdornment>
+                    startAdornment: <InputAdornment position='start'>{currencySymbol}</InputAdornment>
                   }}
                 />
                 <TextFieldStyled
-                  label="Custom CSS"
+                  label='Custom CSS'
                   value={customCSS}
                   onChange={handleCustomCSSChange}
                   fullWidth
-                  margin="normal"
+                  margin='normal'
                   multiline
                 />
                 <ButtonStyled
-                  variant="contained"
-                  color="primary"
+                  variant='contained'
+                  color='primary'
                   fullWidth
                   sx={{ marginTop: 2 }}
-                  onClick={handleSubmit}
+                  onClick={
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    () => { handleSubmit() }
+                  }
                 >
                   Generate Code
                 </ButtonStyled>
@@ -264,9 +282,9 @@ const Create: React.FC = () => {
             <Grid item xs={12} md={8}>
               <PreviewSection elevation={3} sx={{ position: 'relative' }}>
                 <Typography
-                  variant="h4"
+                  variant='h4'
                   gutterBottom
-                  component="div"
+                  component='div'
                   sx={{
                     display: 'flex',
                     justifyContent: 'space-between',
@@ -275,22 +293,30 @@ const Create: React.FC = () => {
                 >
                   Button Preview
                   {showCode && (
-                    <Tooltip title="Copy Code">
-                      <IconButton onClick={handleCopyCode}>
-                        {copySuccess === 'success' ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                    <Tooltip title='Copy Code'>
+                      <IconButton onClick={
+                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                        () => { handleCopyCode() }
+                      }
+                      >
+                        {copySuccess === 'success' ? <CheckCircleIcon color='success' /> : <ContentCopyIcon />}
                       </IconButton>
                     </Tooltip>
                   )}
                 </Typography>
-
-                {copySuccess === 'failed' && <Typography color="error">Failed to copy code!</Typography>}
+                {
+                copySuccess !== '' && copySuccess === 'failed' && <Typography color='error'>❌ Failed to copy code!</Typography>
+}
 
                 <Box>
-                  {showCode ? (
-                    <CodePreview>
-                      <CodeSnippet
-                        language="html"
-                        code={`${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
+                  {showCode
+                    ? (
+                      <CodePreview>
+                        <CodeSnippet
+                          language='html'
+                          code={
+                            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+                            `${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
   <div
     class="gateway-paybutton"
     data-merchant="${merchant}"
@@ -299,20 +325,22 @@ const Create: React.FC = () => {
     data-currency="BSV"
     data-text="${buttonText}"
     data-server="${location.protocol}//${location.host}"
-  ></div>`}
-                      />
-                    </CodePreview>
-                  ) : (
-                    <Typography>Click "Generate Code" to get the HTML code for your website!</Typography>
-                  )}
+  ></div>`
+}
+                        />
+                      </CodePreview>
+                      )
+                    : (
+                      <Typography>Click "Generate Code" to get the HTML code for your website!</Typography>
+                      )}
                 </Box>
 
-                <Typography variant="h5" gutterBottom>
+                <Typography variant='h5' gutterBottom>
                   Script for Head Tag
                 </Typography>
                 <CodePreview>
                   <CodeSnippet
-                    language="javascript"
+                    language='javascript'
                     code={`<script src="${location.protocol}//${location.host}/pay.js"></script>`}
                   />
                 </CodePreview>

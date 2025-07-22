@@ -36,7 +36,6 @@ export default {
    * @returns {Promise<void>} Sends JSON response with status and button data array.
    */
   func: async (req: Request, res: Response): Promise<void> => {
-
     // Extract the merchant's ID from the authentication context
     const merchantId = (req as any).auth.identityKey
 
@@ -56,7 +55,6 @@ export default {
     }
 
     try {
-
       // Start building the query
       let query = db('payment_buttons')
         .where({ merchant_id: merchantId })

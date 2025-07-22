@@ -8,13 +8,4 @@ asset [1m[32mfavicon.ico[39m[22m 4.19 KiB [1m[33m[compared for emit][39m
 asset [1m[32mpay.js.LICENSE.txt[39m[22m 3.35 KiB [1m[33m[compared for emit][39m[22m [from: public/pay.js.LICENSE.txt] [1m[32m[copied][39m[22m
 asset [1m[32mmanifest.json[39m[22m 593 bytes [1m[33m[compared for emit][39m[22m [from: public/manifest.json] [1m[32m[copied][39m[22m
 216 modules
-webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 661 ms
-assets by status 29 KiB [1m[32m[cached][39m[22m 7 assets
-asset [1m[32mpay.js[39m[22m 2.69 MiB [1m[32m[emitted][39m[22m (name: main)
-cached modules 2.35 MiB [1m[32m[cached][39m[22m 209 modules
-runtime modules 1.25 KiB 6 modules
-[1m./src/inject.tsx[39m[22m 2.7 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 45 ms
-assets by status 2.72 MiB [1m[32m[cached][39m[22m 8 assets
-cached modules 2.35 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 216 modules
-webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 18 ms
+webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 730 ms

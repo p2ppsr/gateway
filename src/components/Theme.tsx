@@ -46,7 +46,7 @@ const lightTheme = createTheme({
     primary: { main: '#424242' },
     secondary: { main: '#FC433F' },
     background: { default: '#ffffff' },
-    text: { primary: '#424242' } // Fallback global text color
+    text: { primary: '@typescript-eslint/restrict-template-expressions424242' } // Fallback global text color
   },
   maxContentWidth: '1440px'
 })
@@ -81,7 +81,7 @@ const darkTheme = createTheme({
  * @param baseTheme The base MUI theme (light or dark).
  * @returns Extended theme object with custom typography and templates.
  */
-const extendedTheme = (baseTheme: Theme) => ({
+const extendedTheme = (baseTheme: Theme): Theme => ({
   ...baseTheme,
   typography: {
     ...baseTheme.typography,
@@ -96,7 +96,7 @@ const extendedTheme = (baseTheme: Theme) => ({
   },
   templates: {
     page_wrap: {
-      maxWidth: `min(${baseTheme.maxContentWidth}, 100vw)`,
+      maxWidth: `min(${baseTheme.maxContentWidth ?? '1440px'}, 100vw)`,
       margin: 'auto',
       boxSizing: 'border-box',
       padding: baseTheme.spacing(7),
@@ -142,8 +142,8 @@ const extendedTheme = (baseTheme: Theme) => ({
  * @param children - React children to wrap in the themed layout.
  * @returns Themed UI container with children rendered inside.
  */
-const ThemeWrapper = ({ children }: { children: ReactNode }) => {
-  const [mode, setMode] = useState<'light' | 'dark'>('dark')
+const ThemeWrapper = ({ children }: { children: ReactNode }): JSX.Element => {
+  const [mode] = useState<'light' | 'dark'>('dark')
   const theme = useMemo(() => extendedTheme(mode === 'light' ? lightTheme : darkTheme), [mode])
 
   return (

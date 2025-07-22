@@ -36,7 +36,6 @@ import {
 import { makeStyles } from '@mui/styles'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 
-
 // One wallet + AuthFetch shared by this module
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
@@ -67,6 +66,12 @@ interface PaymentButton {
   used: boolean
   accepts: string
   total_paid: number | string
+}
+
+interface ButtonResponse {
+  status: string
+  message?: string
+  data: PaymentButton[]
 }
 
 const useStyles = makeStyles((theme: any) => ({
@@ -102,7 +107,7 @@ const PaymentButtonsList: React.FC = () => {
    * @param sortOrder - Sort order, either 'asc' or 'desc'.
    * @param usedFilter - Filter by usage: 'all', 'used', or 'unused'.
    */
-  const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused') => {
+  const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused'): Promise<void> => {
     setError('')
     try {
       setLoading(true)
@@ -110,21 +115,25 @@ const PaymentButtonsList: React.FC = () => {
       if (usedFilter !== 'all') url += `&usage=${usedFilter}`
 
       const response = await authFetch.fetch(url, { method: 'GET' })
-      const data = await response.json()
-      if (data.status === 'error') throw new Error(data.message)
+      const data: ButtonResponse = await response.json()
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch buttons'}`)
       setButtons(data.data)
-    } catch (err: any) {
-      setError(err.message)
+      console.log(`✅ Successfully fetched ${data.data.length} payment buttons`)
+      console.log('🔍 Button data:', data.data)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(message)
+      console.error('❌ Error fetching buttons:', message)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchButtons(page, sortOrder, usedFilter)
+    void fetchButtons(page, sortOrder, usedFilter)
   }, [page, sortOrder, usedFilter])
 
-  if (loading)
+  if (loading) {
     return (
       <div
         style={{
@@ -137,7 +146,8 @@ const PaymentButtonsList: React.FC = () => {
         <CircularProgress />
       </div>
     )
-  if (error)
+  }
+  if (error !== '') {
     return (
       <div
         style={{
@@ -147,9 +157,10 @@ const PaymentButtonsList: React.FC = () => {
           minHeight: '90vh'
         }}
       >
-        <Typography color="error">Error: {error}</Typography>
+        <Typography color='error'>Error: {error}</Typography>
       </div>
     )
+  }
 
   return (
     <Container
@@ -159,19 +170,19 @@ const PaymentButtonsList: React.FC = () => {
       }}
     >
       <Box className={classes.centeredHeader}>
-        <Typography variant="h2">Payment Buttons</Typography>
-        <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
+        <Typography variant='h2'>Payment Buttons</Typography>
+        <Typography variant='subtitle1'>View all the payment buttons you have created</Typography>
       </Box>
-      <FormControl variant="outlined" fullWidth margin="normal">
+      <FormControl variant='outlined' fullWidth margin='normal'>
         <InputLabel>Filter by usage</InputLabel>
         <Select
           value={usedFilter}
           onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
-          label="Filter by usage"
+          label='Filter by usage'
         >
-          <MenuItem value="all">All</MenuItem>
-          <MenuItem value="used">Used</MenuItem>
-          <MenuItem value="unused">Unused</MenuItem>
+          <MenuItem value='all'>All</MenuItem>
+          <MenuItem value='used'>Used</MenuItem>
+          <MenuItem value='unused'>Unused</MenuItem>
         </Select>
       </FormControl>
       <TableContainer component={Paper}>
@@ -206,13 +217,13 @@ const PaymentButtonsList: React.FC = () => {
       </TableContainer>
       {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
-        <Button variant="contained" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+        <Button variant='contained' onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           Previous
         </Button>
-        <Button variant="contained" onClick={() => setPage(page + 1)}>
+        <Button variant='contained' onClick={() => setPage(page + 1)}>
           Next
         </Button>
-        <Button variant="contained" onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
+        <Button variant='contained' onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
           Sort Order: {sortOrder.toUpperCase()}
         </Button>
       </Box>
