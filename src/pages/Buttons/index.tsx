@@ -1,232 +1,278 @@
 /**
  * @file src/pages/Buttons/index.tsx
  *
- * Displays a paginated, filterable table of payment buttons created by the user.
- * This component queries the backend via `authFetch` using the Metanet client
- * (WalletClient + AuthFetch) to retrieve a list of buttons and their metadata.
+ * Displays a paginated table of payment buttons created by the user.
+ * Each row represents a button, showing ID, amount, currency, and other details.
  *
- * - Filters by usage status (used, unused, all)
- * - Supports ascending/descending sort order
- * - Fetches 25 buttons per page with client-side pagination
- * - Renders details including ID, amount, currency, usage flags, and total paid
+ * - Fetches buttons from the backend using `authFetch` and the Metanet client.
+ * - Includes filters for usage (all, used, unused) and client-side sorting by total paid.
+ * - Implements an empty state with a CTA to create a button.
+ * - Uses MUI table components with pagination.
+ * - Utilizes `formatBSV` from `utils/general.ts` for consistent amount formatting.
+ * - Uses `logWithTimestamp` from `utils/logging.ts` with configuration from `logging.config.ts` to measure performance and color-code logs,
+ *   including detailed timing from fetch initiation to response, optimized for local testing.
+ * - Optimizes performance with a 100ms debounce to prevent multiple rapid fetch attempts.
+ * - Adjusted `useRef` type to `number | null` to align with browser `setTimeout` return type, correcting TS2322 error.
  *
- * Used in the Gateway UI to allow users to view and inspect their configured payment buttons.
+ * Used by the Gateway UI to manage user-created payment buttons. For local testing, delays are attributed to server or application logic,
+ * not external connections or hardware constraints (MacBook Pro M4 Max, 128GB RAM, 2TB SSD), guiding optimization efforts.
+ *
+ * Version: v2.3 (Updated 25Jul2025_1027 BST)
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
+  CircularProgress,
   Container,
-  Typography,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
-  CircularProgress,
+  Typography,
   Button,
-  useTheme,
-  Box
+  Paper,
+  Select,
+  MenuItem,
+  Stack,
+  TablePagination,
+  IconButton,
+  Box,
+  Card,
 } from '@mui/material'
-import { makeStyles } from '@mui/styles'
+import { ReceiptLong } from '@mui/icons-material'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { useTheme } from '@mui/material/styles'
+import { Link } from 'react-router-dom'
+import { formatBSV } from '../../utils/general'
+import { logWithTimestamp } from '../../utils/logging'
 
-// One wallet + AuthFetch shared by this module
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
 
-const formatBSV = (value: number | string): string => {
-  return parseFloat(value.toString()).toFixed(8)
-}
-
-/**
- * Structure of a payment button object.
- *
- * @property {string} button_id - Unique identifier for the payment button.
- * @property {number | string} amount - Amount configured for the button (may be fixed or variable).
- * @property {string} currency - Currency type (e.g., "BSV").
- * @property {boolean} variable_amount - Whether the user can specify the amount.
- * @property {boolean} multi_use - Whether the button can be used multiple times.
- * @property {boolean} used - Indicates whether the button has already been used.
- * @property {string} accepts - Comma-separated list of accepted token types or protocols.
- * @property {number | string} total_paid - Total amount received through this button.
- */
-interface PaymentButton {
-  button_id: string
-  amount: number | string
-  currency: string
-  variable_amount: boolean
-  multi_use: boolean
-  used: boolean
-  accepts: string
-  total_paid: number | string
-}
-
 interface ButtonResponse {
   status: string
   message?: string
-  data: PaymentButton[]
+  data: {
+    button_id: string
+    amount: number | string
+    currency: string
+    variable_amount: boolean
+    multi_use: boolean
+    used: boolean
+    accepts: string
+    total_paid: number | string
+  }[]
 }
 
-const useStyles = makeStyles((theme: any) => ({
-  centeredHeader: {
-    textAlign: 'center',
-    marginBottom: theme.spacing(3),
-    color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
-  }
-}))
-
-/**
- * Renders a paginated and filterable list of payment buttons.
- * Buttons are fetched from the server using `authFetch` and displayed in a table.
- * Users can filter by usage status and change the sort order.
- *
- * @returns A component that lists all created payment buttons with pagination and filters.
- */
 const PaymentButtonsList: React.FC = () => {
-  const [buttons, setButtons] = useState<PaymentButton[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [page, setPage] = useState(1)
+  const [buttons, setButtons] = useState<ButtonResponse['data']>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(25)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
-
   const theme = useTheme()
-  const classes = useStyles({ theme })
+  const fetchTimeout = useRef<number | null>(null) // Changed type to number | null
 
-  /**
-   * Fetches the list of payment buttons from the server with pagination, sorting, and filtering.
-   *
-   * @param page - Current page number (1-indexed).
-   * @param sortOrder - Sort order, either 'asc' or 'desc'.
-   * @param usedFilter - Filter by usage: 'all', 'used', or 'unused'.
-   */
-  const fetchButtons = async (page: number, sortOrder: 'asc' | 'desc', usedFilter: 'all' | 'used' | 'unused'): Promise<void> => {
+  const fetchButtons = async (pageNum: number, sort: string, usedFilterVal: string): Promise<void> => {
+    setLoading(true)
     setError('')
     try {
-      setLoading(true)
-      let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
-      if (usedFilter !== 'all') url += `&usage=${usedFilter}`
+      let url = `${location.protocol}//${location.host}/api/listButtons?sort=${sort}&limit=100&offset=0`
+      if (usedFilterVal !== 'all') url += `&usage=${usedFilterVal}`
 
+      logWithTimestamp('pages/Buttons', 'Starting fetch for buttons with URL:', url)
+
+      // Measure exact fetch duration
+      logWithTimestamp('pages/Buttons', 'Initiating API fetch')
       const response = await authFetch.fetch(url, { method: 'GET' })
+      logWithTimestamp('pages/Buttons', 'API fetch completed')
+
+      logWithTimestamp('pages/Buttons', 'API response status:', response.status)
       const data: ButtonResponse = await response.json()
       if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch buttons'}`)
-      setButtons(data.data)
-      console.log(`✅ Successfully fetched ${data.data.length} payment buttons`)
-      console.log('🔍 Button data:', data.data)
+      
+      const rawTotals = data.data.map(b => b.total_paid)
+      logWithTimestamp('pages/Buttons', 'Raw total_paid values:', rawTotals)
+
+      const sortedButtons = [...data.data].sort((a, b) => {
+        const aValue = parseFloat(formatBSV(a.total_paid)) || 0
+        const bValue = parseFloat(formatBSV(b.total_paid)) || 0
+        return sort === 'asc' ? aValue - bValue : bValue - aValue
+      })
+      const sortedTotals = sortedButtons.map(b => b.total_paid)
+      logWithTimestamp('pages/Buttons', 'Sorted total_paid values:', sortedTotals)
+
+      setButtons(sortedButtons)
+      logWithTimestamp('pages/Buttons', 'Rendered buttons state:', sortedButtons.map(b => b.total_paid))
+      if (usedFilterVal === 'used' && data.data.length === 0) {
+        logWithTimestamp('pages/Buttons', 'Debug: No used buttons found in API response - URL:', url, 'Response:', data)
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error'
+      logWithTimestamp('pages/Buttons', 'Error fetching buttons:', message)
       setError(message)
-      console.error('❌ Error fetching buttons:', message)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    void fetchButtons(page, sortOrder, usedFilter)
-  }, [page, sortOrder, usedFilter])
+    if (fetchTimeout.current) {
+      clearTimeout(fetchTimeout.current)
+    }
+    fetchTimeout.current = setTimeout(() => {
+      void fetchButtons(page, sortOrder, usedFilter)
+    }, 100) // Debounce by 100ms
+    return () => {
+      if (fetchTimeout.current) {
+        clearTimeout(fetchTimeout.current)
+      }
+    }
+  }, [page, sortOrder, usedFilter, rowsPerPage])
+
+  useEffect(() => {
+    setPage(0)
+  }, [usedFilter])
+
+  const paginatedButtons = buttons.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
 
   if (loading) {
     return (
-      <div
-        style={{
+      <Box
+        sx={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: '100vh'
+          minHeight: '100vh',
+          backgroundColor: theme.palette.background.default,
         }}
       >
         <CircularProgress />
-      </div>
+      </Box>
     )
   }
   if (error !== '') {
     return (
-      <div
-        style={{
+      <Box
+        sx={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          minHeight: '90vh'
+          minHeight: '90vh',
+          backgroundColor: theme.palette.background.default,
         }}
       >
         <Typography color='error'>Error: {error}</Typography>
-      </div>
+      </Box>
     )
   }
 
   return (
-    <Container
-      style={{
-        backgroundColor: theme.palette.background.default,
-        padding: theme.spacing(4)
-      }}
-    >
-      <Box className={classes.centeredHeader}>
+    <Container>
+      <Box
+        sx={{
+          textAlign: 'center',
+          marginBottom: theme.spacing(4),
+          marginTop: theme.spacing(5),
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+        }}
+      >
         <Typography variant='h2'>Payment Buttons</Typography>
         <Typography variant='subtitle1'>View all the payment buttons you have created</Typography>
       </Box>
-      <FormControl variant='outlined' fullWidth margin='normal'>
-        <InputLabel>Filter by usage</InputLabel>
-        <Select
-          value={usedFilter}
-          onChange={e => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
-          label='Filter by usage'
+      {buttons.length === 0 ? (
+        <Card
+          sx={{
+            maxWidth: 600,
+            margin: 'auto',
+            padding: theme.spacing(4),
+            textAlign: 'center',
+            backgroundColor: theme.palette.background.paper,
+          }}
         >
-          <MenuItem value='all'>All</MenuItem>
-          <MenuItem value='used'>Used</MenuItem>
-          <MenuItem value='unused'>Unused</MenuItem>
-        </Select>
-      </FormControl>
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Amount</TableCell>
-              <TableCell>Currency</TableCell>
-              <TableCell>Variable Amount</TableCell>
-              <TableCell>Multi-use</TableCell>
-              <TableCell>Used</TableCell>
-              <TableCell>Accepts</TableCell>
-              <TableCell>Total Paid</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {buttons.map(button => (
-              <TableRow key={button.button_id}>
-                <TableCell>{button.button_id}</TableCell>
-                <TableCell>{formatBSV(button.amount)}</TableCell>
-                <TableCell>{button.currency}</TableCell>
-                <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
-                <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
-                <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
-                <TableCell>{button.accepts}</TableCell>
-                <TableCell>{formatBSV(button.total_paid)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      {buttons.length === 0 && <Typography>No payment buttons found.</Typography>}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 2 }}>
-        <Button variant='contained' onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
-          Previous
-        </Button>
-        <Button variant='contained' onClick={() => setPage(page + 1)}>
-          Next
-        </Button>
-        <Button variant='contained' onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}>
-          Sort Order: {sortOrder.toUpperCase()}
-        </Button>
-      </Box>
+          <Stack spacing={3} alignItems="center">
+            <ReceiptLong sx={{ fontSize: 60, color: theme.palette.text.secondary }} />
+            <Typography variant="h2">No Payment Buttons Yet</Typography>
+            <Typography color="text.secondary">
+              It looks like you haven’t created any payment buttons. Get started by creating one now!
+            </Typography>
+            <Button variant="contained" component={Link} to="/" color="primary">
+              Create a Button
+            </Button>
+          </Stack>
+        </Card>
+      ) : (
+        <>
+          <Stack direction="row" spacing={2} sx={{ mb: 2, justifyContent: 'flex-end' }}>
+            <Select
+              value={usedFilter}
+              onChange={(e) => setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
+              variant="outlined"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="used">Used</MenuItem>
+              <MenuItem value="unused">Unused</MenuItem>
+            </Select>
+            <Button
+              variant="contained"
+              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+            >
+              Sort by Total: {sortOrder.toUpperCase()}
+            </Button>
+          </Stack>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Amount</TableCell>
+                  <TableCell>Currency</TableCell>
+                  <TableCell>Variable Amount</TableCell>
+                  <TableCell>Multi-use</TableCell>
+                  <TableCell>Used</TableCell>
+                  <TableCell>Accepts</TableCell>
+                  <TableCell>Total Paid</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {paginatedButtons.map((button) => (
+                  <TableRow key={button.button_id}>
+                    <TableCell>{button.button_id}</TableCell>
+                    <TableCell>{formatBSV(button.amount)}</TableCell>
+                    <TableCell>{button.currency}</TableCell>
+                    <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>{button.accepts}</TableCell>
+                    <TableCell>{formatBSV(button.total_paid)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            component="div"
+            count={buttons.length}
+            page={page}
+            onPageChange={(e, newPage) => {
+              setPage(newPage)
+              logWithTimestamp('pages/Buttons', 'Page changed to:', newPage, 'Rows:', paginatedButtons)
+            }}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10))
+              setPage(0)
+              logWithTimestamp('pages/Buttons', 'Rows per page changed to:', e.target.value)
+            }}
+            rowsPerPageOptions={[5, 10, 25]}
+          />
+        </>
+      )}
     </Container>
   )
 }

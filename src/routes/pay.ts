@@ -4,13 +4,15 @@
  * POST route to complete a payment by submitting a transaction.
  * Validates the submitted transaction against the invoice created earlier, ensuring:
  * - The invoice exists and belongs to the caller.
- * - The transaction is well-formed and matches the expected locking script and amount.
+ * - The transaction is well-formed and matches the expected locking script and tip amount (1 sat fee ignored).
  * - The payment button (if single-use) has not already been used.
  *
  * Upon successful validation, the database is updated to mark the payment as complete,
  * store the atomic BEEF transaction, and update the button's usage state and total paid.
  *
  * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
+ *
+ * Version: v1.0 (Updated 29Jul2025_0140 BST with Dynamic Key Derivation)
  */
 
 import knex, { Knex } from 'knex'
@@ -59,13 +61,13 @@ export default {
    * This function:
    * - Confirms the payment ID exists, is incomplete, and matches the user.
    * - Validates the atomic BEEF transaction structure and integrity.
-   * - Derives the expected locking script from the sender and merchant info.
-   * - Confirms the transaction includes an output matching the script and amount.
+   * - Derives the expected locking script using the authenticated sender's key.
+   * - Confirms the transaction includes an output matching the script and exact tip amount (1 sat fee ignored).
    * - Marks the payment as complete and updates the payment button in the database.
    *
    * @param req - Express request with `paymentId` and `transaction { txid, atomicBeefTx }` in the body.
    *              Also requires `auth.identityKey` from authentication middleware.
-   * @param res - Express response object used to return a success or failure message.
+   * @param res - Express response object to return a success or failure message.
    * @returns {Promise<void>} Sends HTTP 200 on success or appropriate error status.
    */
   func: async (req: AuthRequest, res: Response): Promise<void> => {
@@ -137,8 +139,8 @@ export default {
         throw new Error('❌ Transaction ID mismatch')
       }
 
-      // Derive expected script and amount
-      const senderPrivateKey: PrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
+      // Derive expected script and amount using authenticated key
+      const senderPrivateKey: PrivateKey = new PrivateKey(req.auth.identityKey, 'hex') // Use authenticated key
       const recipientPublicKey: PublicKey = PublicKey.fromString(button.merchant_id)
       const invoiceNumber: string = `2-3241645161d8-${payment.payment_id} 1`
       const senderPrivateKeyString: string = senderPrivateKey.toString()
@@ -154,15 +156,37 @@ export default {
       const derivedScript: string = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex()
       const expectedAmount: number = Math.round(payment.amount * 100000000) // Convert BSV to satoshis
 
-      // Check outputs for a match
+      // Enhanced debugging of transaction outputs
+      console.log('🔍 Expected locking script:', derivedScript)
+      console.log('🔍 Expected amount (sats):', expectedAmount)
+      let totalTransactionSatoshis = 0
+      bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
+        console.log(`🔍 Transaction Output ${i} script:`, out.lockingScript.toHex())
+        console.log(`🔍 Transaction Output ${i} sats:`, out.satoshis)
+        totalTransactionSatoshis += out.satoshis || 0
+      })
+      console.log('🔍 Total transaction satoshis:', totalTransactionSatoshis)
+
+      // Explicitly check expected vs received tip amount
       const matchingOutput = bsvtx.outputs.find(
         (x: Transaction['outputs'][number]): boolean => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
       )
+      if (matchingOutput) {
+        console.log('🔍 Verified: Expected amount', expectedAmount, 'matches received', matchingOutput.satoshis)
+      } else {
+        console.warn('❌ Mismatch: No output matches expected amount', expectedAmount)
+      }
+
+      // Verify total matches sum of outputs
+      const calculatedTotal = bsvtx.outputs.reduce((sum, out) => sum + (out.satoshis || 0), 0)
+      if (totalTransactionSatoshis !== calculatedTotal) {
+        console.warn('❌ Total satoshis mismatch: Logged', totalTransactionSatoshis, 'vs Calculated', calculatedTotal)
+      } else {
+        console.log('🔍 Verified: Total satoshis', totalTransactionSatoshis, 'matches sum of outputs')
+      }
+
+      // Check for exact match on tip amount (1 sat fee ignored as per requirement)
       if (matchingOutput == null) {
-        bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
-          console.log(`🔍 Output ${i} script:`, out.lockingScript.toHex())
-          console.log(`🔍 Output ${i} sats:`, out.satoshis)
-        })
         res.status(400).json({
           status: 'error',
           message: 'The transaction does not satisfy the invoice'

@@ -26,7 +26,7 @@ import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 
 // AuthFetch – constructed once per session
-const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost'
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
 

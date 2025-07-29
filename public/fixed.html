@@ -1,0 +1,37 @@
+<style>
+.gateway-paybutton-fixed {
+    border-radius: 2em;
+    border: none;
+    padding: 0.7em 1em 0.7em 1em;
+    min-width: 10em;
+    background: linear-gradient(145deg, #8484FA, #0F2);
+    color: white;
+    box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.3s;
+    font-weight: bold;
+    text-align: center;
+  }
+  .gateway-paybutton-fixed:hover {
+    cursor: pointer;
+    box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #ABABFF, #5050F2);
+  }
+  .gateway-paybutton-fixed.disabled {
+    opacity: 0.4;
+    background: gray;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+</style>
+<div
+  class="gateway-paybutton gateway-paybutton-fixed"
+  data-merchant="0282f7effd932d9d2a3774c287eacb9ace3728a753a0339e2f16998153e5d65963"
+  data-button="796ccf049f465077ac37b743"
+  data-amount="6"
+  data-currency="BSV"
+  data-text="Pay Now"
+  data-width="fit-content"
+  data-server="http://localhost:3000"
+>Pay Now 6 Sats</div>
+<script src="http://localhost:3000/pay.js"></script>

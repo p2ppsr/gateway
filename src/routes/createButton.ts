@@ -9,8 +9,11 @@
  * - Requires authentication middleware to populate `req.auth.identityKey`.
  * - Ensures the merchant exists or inserts a new one if needed.
  * - Generates a unique `button_id` and initializes all button fields.
+ * - Accepts `amount` in sats and converts to BSV decimal for storage.
  *
  * Used by the "Create" page in the Gateway frontend to configure tipping buttons.
+ *
+ * Version: v1.0 (Updated 28Jul2025_1129 BST with Sats-to-BSV Conversion)
  */
 
 import knex, { Knex } from 'knex'
@@ -28,7 +31,7 @@ interface Merchant {
 }
 
 interface RequestBody {
-  amount: number
+  amount: number // Amount in sats (integer)
   currency: string
   variableAmount: boolean
   multiUse: boolean
@@ -44,10 +47,10 @@ export default {
    *
    * Validates the request body and inserts a new record into `payment_buttons`.
    * Also ensures that the merchant is present in the `merchants` table,
-   * inserting a default record if not found.
+   * inserting a default record if not found. Converts amount from sats to BSV.
    *
    * @param req - Express request containing button config and auth context.
-   * @param req.body.amount - The payment amount (in BSV).
+   * @param req.body.amount - The payment amount in sats (integer).
    * @param req.body.currency - The currency string (e.g. "BSV").
    * @param req.body.variableAmount - Whether the button allows flexible amounts.
    * @param req.body.multiUse - Whether the button can be reused.
@@ -59,15 +62,16 @@ export default {
     const merchantId = (req as any).auth?.identityKey
 
     const { amount, currency, variableAmount, multiUse, accepts }: RequestBody = req.body
-    console.log('🔍 Request body:', req.body)
-    const validAccepts = ['BSV', 'fiat', 'both']
+    console.log('🔍 [Step 1] Create button request (sats):', { merchantId, amount, currency, variableAmount, multiUse, accepts })
 
     if (
       typeof amount !== 'number' ||
+      !Number.isInteger(amount) || // Validate integer sats
+      amount <= 0 ||
       typeof currency !== 'string' ||
       typeof variableAmount !== 'boolean' ||
       typeof multiUse !== 'boolean' ||
-      !validAccepts.includes(accepts) ||
+      !['BSV', 'fiat', 'both'].includes(accepts) ||
       merchantId === undefined
     ) {
       res.status(400).json({ status: 'error', message: 'Invalid parameters' })
@@ -76,7 +80,7 @@ export default {
 
     try {
       const merchant: Merchant | undefined = await db('merchants').where({ merchant_id: merchantId }).first()
-      console.log('🔍 Merchant data:', merchant)
+      console.log('🔍 [Step 2] Merchant data:', merchant)
 
       if (merchant === undefined) {
         await db('merchants').insert({
@@ -85,15 +89,19 @@ export default {
           welcomed: false,
           custom_fee: false
         })
-
         console.log('✅ Inserted new merchant')
       }
 
+      // Convert sats to BSV for storage (reason: current schema uses decimal BSV)
+      const amountInBSV = amount / 100000000
+      console.log('🔍 [Step 3] Converted amount to BSV:', amountInBSV)
+
+      // Generate unique button ID
       const buttonId = randomBytes(12).toString('hex')
 
       await db('payment_buttons').insert({
         button_id: buttonId,
-        amount,
+        amount: amountInBSV,
         currency,
         variable_amount: variableAmount,
         merchant_id: merchantId,

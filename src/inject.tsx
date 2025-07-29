@@ -9,42 +9,87 @@
  *    using any `data-*` attributes as props.
  *
  * This file is intended to be included via a `<script>` tag on external sites.
+ * Updated with merchant button style enhancements for branding.
+ * - All amounts are now handled as integer sats internally for precision.
  */
 
 import React from 'react'
 import { createRoot } from 'react-dom/client'
-import PayButton from './components/PayButton'
+import PayButton, { PayButtonProps } from './components/PayButton'
 
-// Define props interface for PayButton, matching the PayButton component's expected props
-interface PayButtonProps {
-  text?: string
-  amount: number
-  merchant: string
-  button: string
-  currency?: string
-  server: string
-  loadingtext?: string
-  [key: string]: string | number | undefined
-}
-
-// fail when there is no window object
+// Fail when there is no window object
 if (typeof window !== 'object') {
   throw new Error('❌ Window must be defined in order to use the Gateway inject script')
 }
 
 /**
- * Render a PayButton component into the specified DOM element.
+ * Render a PayButton component into the specified DOM element with enhanced merchant styles.
  *
  * @param {string} elementID - The ID of the DOM element to inject the PayButton into.
  * @param {PayButtonProps} props - Props to pass to the PayButton component, typically parsed from `data-*` attributes.
+ *                                - amount is in sats.
  */
 ;(window as any).PayButton = {}
 ;(window as any).PayButton.render = (elementID: string, props: PayButtonProps): void => {
+  console.log('🔍 [Step 1] Inject props (sats):', props) // Log props received by inject
   const element = document.getElementById(elementID)
   if (element != null) {
     const root = createRoot(element)
     root.render(<PayButton {...props} />)
     console.log(`✅ Rendered PayButton for ID: ${elementID}`)
+
+    // Apply enhanced merchant button styles
+    requestAnimationFrame(() => {
+      const buttonDiv = document.getElementById(elementID)
+      if (buttonDiv && buttonDiv.innerHTML.trim()) {
+        const supplementalStyle = document.createElement('style')
+        supplementalStyle.textContent = `
+          #${elementID}.gateway-paybutton {
+            padding: 0.8em 1.2em; /* Slightly larger padding for better touch targets */
+            border-radius: 2.5em; /* Softer corners for modern look */
+            border: 2px solid #4a90e2; /* Merchant brand blue border */
+            background-color: #ffffff; /* White background for contrast */
+            color: #4a90e2; /* Blue text to match border */
+            font-weight: 600; /* Bolder text for emphasis */
+            box-shadow: 0 4px 6px rgba(74, 144, 226, 0.2); /* Subtle shadow for depth */
+            transition: all 0.3s ease; /* Smooth transitions */
+            cursor: pointer;
+            display: inline-block; /* Ensure inline-block for layout */
+          }
+          #${elementID}.gateway-paybutton:hover {
+            background-color: #4a90e2; /* Blue background on hover */
+            color: #ffffff; /* White text on hover */
+            box-shadow: 0 6px 12px rgba(74, 144, 226, 0.3); /* Deeper shadow on hover */
+          }
+          #${elementID}.gateway-paybutton[data-disabled="true"] {
+            opacity: 0.6;
+            background-color: #cccccc; /* Grayed out when disabled */
+            border-color: #999999;
+            cursor: not-allowed;
+            pointer-events: none;
+          }
+          #${elementID}.gateway-paybutton-variable input {
+            width: 60px; /* Slightly wider input for variable amounts */
+            text-align: center;
+            margin: 0 6px;
+            padding: 3px;
+            border: 2px solid #4a90e2; /* Matching border */
+            border-radius: 0.5em;
+            background: #f9f9f9; /* Light gray background */
+            color: #333333; /* Darker text for readability */
+            font-weight: 500;
+            vertical-align: middle;
+          }
+        `
+        const existingStyle = document.querySelector(`style[data-style-for="${elementID}"]`)
+        if (existingStyle) document.head.removeChild(existingStyle)
+        supplementalStyle.setAttribute('data-style-for', elementID)
+        document.head.appendChild(supplementalStyle)
+        console.log(`🔍 PayButton style applied for ID: ${elementID}`)
+      } else {
+        console.warn(`⚠️ Button element not ready or empty for ID: ${elementID}`)
+      }
+    })
   } else {
     console.error(`❌ Failed to render PayButton: Element with ID ${elementID} not found`)
   }
@@ -53,6 +98,7 @@ if (typeof window !== 'object') {
 /**
  * Automatically finds and injects PayButton components into all elements with `class="gateway-paybutton"`.
  * Props are extracted from each element’s `data-*` attributes.
+ * - amount is interpreted as sats.
  */
 const bootstrapPayButtons = (): void => {
   const buttons = document.getElementsByClassName('gateway-paybutton')
@@ -68,7 +114,7 @@ const bootstrapPayButtons = (): void => {
     button.id = buttonID
     button.setAttribute('id', buttonID)
 
-    const props: PayButtonProps = { amount: 0, merchant: '', button: '', server: '' }
+    const props: PayButtonProps = { amount: 0, merchant: '', button: '', server: '', variable: false }
     if (button.hasAttributes()) {
       const attrs = button.attributes
       for (let j = 0; j < attrs.length; j++) {
@@ -76,12 +122,11 @@ const bootstrapPayButtons = (): void => {
           continue
         }
         const propName = attrs[j].name.substring(5)
-        // Convert 'amount' to number, others remain strings
         props[propName] = propName === 'amount' ? Number(attrs[j].value) : attrs[j].value
       }
     }
 
-    console.log('🔍 PayButton props for pay-', props.button ?? 'unknown', props)
+    console.log('🔍 [Step 2] Parsed props (sats):', props) // Log parsed props
     ;(window as any).PayButton.render(buttonID, props)
   }
 }

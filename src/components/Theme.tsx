@@ -6,7 +6,7 @@
  * extends them with responsive typography and reusable layout templates, and wraps
  * the app with a `ThemeProvider` and global `CssBaseline` reset.
  *
- * - Font: Satoshi
+ * - Font: Inter (updated from Satoshi per UI teammate's notes)
  * - Color modes: light and dark
  * - Responsive scaling of headers (h1, h2)
  * - Custom template styles: `page_wrap`, `subheading`, `centeredHeader`, etc.
@@ -22,57 +22,55 @@ import { Theme } from '@mui/material/styles'
  * Common typography settings applied to both light and dark themes.
  */
 const commonTypography = {
-  fontFamily: 'Satoshi'
-  // Removed top-level 'color' here; apply per-variant below, correct way to structure theme
+  fontFamily: 'Inter, sans-serif', // Updated from Satoshi per UI teammate's notes
 }
 
 /**
  * Base light mode MUI theme configuration.
  */
-const lightTheme = createTheme({
+const lightThemeBase = createTheme({
   spacing: 8,
   typography: {
     ...commonTypography,
-    h1: { fontWeight: 'bold', fontSize: '3em', color: '#424242' },
-    h2: { fontWeight: 'bold', fontSize: '2.5em', color: '#424242' },
-    h3: { fontWeight: 'normal', fontSize: '2em', color: '#424242' },
+    h1: { fontSize: '2.25rem', fontWeight: 700 }, // 36px, per UI notes
+    h2: { fontSize: '1.5rem', fontWeight: 600 },  // 24px, per UI notes
+    h3: { fontSize: '1.25rem', fontWeight: 600 }, // 20px, per UI notes
     h4: { fontSize: '1.75em', color: '#424242' },
     h5: { fontSize: '1.5em', color: '#424242' },
-    h6: { fontSize: '1.25em', color: '#424242' }
-    // Add other variants like body1, subtitle1 if needed: body1: { color: '#424242' }
+    h6: { fontSize: '1.25em', color: '#424242' },
   },
   palette: {
     mode: 'light',
-    primary: { main: '#424242' },
-    secondary: { main: '#FC433F' },
-    background: { default: '#ffffff' },
-    text: { primary: '@typescript-eslint/restrict-template-expressions424242' } // Fallback global text color
+    primary: { main: '#7F5AF0' }, // UI teammate's purple accent
+    background: { default: '#ffffff', paper: '#ffffff' }, // Adjusted to light mode defaults
+    text: { primary: '#424242', secondary: '#94A3B8' }, // UI teammate's text colors
+    divider: '#3E3E42', // UI teammate's divider
   },
-  maxContentWidth: '1440px'
+  maxContentWidth: '1440px',
 })
 
 /**
  * Base dark mode MUI theme configuration.
  */
-const darkTheme = createTheme({
+const darkThemeBase = createTheme({
   spacing: 8,
   typography: {
     ...commonTypography,
-    h1: { fontWeight: 'bold', fontSize: '3em', color: '#ffffff' },
-    h2: { fontWeight: 'bold', fontSize: '2.5em', color: '#ffffff' },
-    h3: { fontWeight: 'normal', fontSize: '2em', color: '#ffffff' },
-    h4: { fontSize: '1.75em', color: '#ffffff' },
-    h5: { fontSize: '1.5em', color: '#ffffff' },
-    h6: { fontSize: '1.25em', color: '#ffffff' }
+    h1: { fontSize: '2.25rem', fontWeight: 700 }, // 36px, per UI notes
+    h2: { fontSize: '1.5rem', fontWeight: 600 },  // 24px, per UI notes
+    h3: { fontSize: '1.25rem', fontWeight: 600 }, // 20px, per UI notes
+    h4: { fontSize: '1.75em', color: '#F2F2F2' },
+    h5: { fontSize: '1.5em', color: '#F2F2F2' },
+    h6: { fontSize: '1.25em', color: '#F2F2F2' },
   },
   palette: {
     mode: 'dark',
-    primary: { main: '#ffffff' },
-    secondary: { main: '#5E59F9' },
-    background: { default: '#323537' },
-    text: { primary: '#ffffff' } // Fallback global text color
+    primary: { main: '#7F5AF0' }, // UI teammate's purple accent
+    background: { default: '#1C1C1F', paper: '#2A2A2E' }, // UI teammate's dark mode
+    text: { primary: '#F2F2F2', secondary: '#94A3B8' }, // UI teammate's text colors
+    divider: '#3E3E42', // UI teammate's divider
   },
-  maxContentWidth: '1440px'
+  maxContentWidth: '1440px',
 })
 
 /**
@@ -87,12 +85,46 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
     ...baseTheme.typography,
     h1: {
       ...baseTheme.typography.h1,
-      [baseTheme.breakpoints.down('md')]: { fontSize: '1.8em' }
+      [baseTheme.breakpoints.down('md')]: { fontSize: '1.8em' },
     },
     h2: {
       ...baseTheme.typography.h2,
-      [baseTheme.breakpoints.down('md')]: { fontSize: '1.6em' }
-    }
+      [baseTheme.breakpoints.down('md')]: { fontSize: '1.6em' },
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          textTransform: 'none',
+          fontWeight: 600,
+          padding: '10px 24px',
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12,
+          padding: '24px',
+        },
+      },
+    },
+    MuiTextField: {
+      defaultProps: {
+        variant: 'outlined', // All text fields will be the same style by default
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        head: {
+          backgroundColor: '#333337',
+          fontWeight: 600,
+          color: '#94A3B8',
+        },
+      },
+    },
   },
   templates: {
     page_wrap: {
@@ -102,7 +134,7 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
       padding: baseTheme.spacing(7),
       [baseTheme.breakpoints.down('lg')]: { padding: baseTheme.spacing(5) },
       [baseTheme.breakpoints.down('md')]: { padding: baseTheme.spacing(3) },
-      [baseTheme.breakpoints.down('sm')]: { padding: baseTheme.spacing(1) }
+      [baseTheme.breakpoints.down('sm')]: { padding: baseTheme.spacing(1) },
     },
     subheading: {
       fontWeight: 'bold',
@@ -112,7 +144,7 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
       color: baseTheme.palette.mode === 'dark' ? '#FFF' : '#424242',
       textAlign: 'center',
       margin: 'auto',
-      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' }
+      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' },
     },
     subheading_f: {
       fontWeight: 'bold',
@@ -121,14 +153,14 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
       color: baseTheme.palette.mode === 'dark' ? '#FFF' : '#424242',
       maxWidth: '600px',
       textAlign: 'left',
-      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' }
+      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' },
     },
     centeredHeader: {
       textAlign: 'center',
       marginBottom: baseTheme.spacing(7),
-      color: baseTheme.palette.mode === 'dark' ? '#ffffff' : '#000000'
-    }
-  }
+      color: baseTheme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+    },
+  },
 })
 
 /**
@@ -143,8 +175,8 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
  * @returns Themed UI container with children rendered inside.
  */
 const ThemeWrapper = ({ children }: { children: ReactNode }): JSX.Element => {
-  const [mode] = useState<'light' | 'dark'>('dark')
-  const theme = useMemo(() => extendedTheme(mode === 'light' ? lightTheme : darkTheme), [mode])
+  const [mode] = useState<'light' | 'dark'>('dark') // Default to dark per UI teammate's notes
+  const theme = useMemo(() => extendedTheme(mode === 'light' ? lightThemeBase : darkThemeBase), [mode])
 
   return (
     <ThemeProvider theme={theme}>

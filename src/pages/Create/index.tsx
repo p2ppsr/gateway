@@ -1,35 +1,43 @@
 /**
  * @file src/pages/Create/index.tsx
  *
- * Create Page — Allows users to configure and generate tipping button code.
+ * Create Page — Allows users to configure and generate payment button code.
  *
- * Users can customize the button text, payment amount, and CSS styles. Once configured,
- * a button is created using the Metanet identity, and corresponding embeddable HTML and script
- * code is displayed, which can be copied for integration into websites.
+ * Users can customize the button text, payment amount (fixed or variable in satoshis), and CSS styles.
+ * Once configured, a button is created using the Metanet identity, and corresponding embeddable HTML
+ * and script code is displayed, which can be copied for integration into websites.
  *
  * The page also checks for Metanet client presence and provides user feedback via toast notifications.
+ * - Calls /api/createButton to register the button and get buttonId for the generated code, triggered by "Generate Button".
+ * - Added "Generate Button" to finalize creation before copying, with live preview updates for editing.
+ * - For variable payments, flags variableAmount=true with no default amount, leaving the amount fully
+ *   determined by the customer via pay.js prompt.
+ * - Copies both the button HTML and the pay.js script tag as a single block for ease of use.
+ * - Does not write to .html files; users manually add code to their webpages.
+ * - Copy Code button is always visible, using a static image when disabled to ensure tooltip visibility, switching to an active icon after generation.
+ * - Generated HTML includes default text and amount display for visible rendering even without pay.js.
+ * - Preview aligns with generated button by defaulting to text-width, with optional data-width override and centering enforced.
+ * - UI enhanced with continuous flashing effects with a 1-second period using CSS animations, flashing only the Copy Code icon initially (when disabled), and independent cross-flashing between Generate Button and Copy Code icon during hover.
+ *
+ * Version: v4.78 (Updated 27Jul2025_2055 BST)
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { Typography, Container, Grid, Box, InputAdornment, Tooltip, IconButton } from '@mui/material'
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { Typography, Container, Grid, Box, InputAdornment, Tooltip, IconButton, RadioGroup, FormControlLabel, Radio, Card, Stack, Button as MUIButton } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import {
   Root,
   ContentWrap,
-  FormSection,
-  PreviewSection,
-  CodePreview,
   CenteredHeader,
   TextFieldStyled,
-  ButtonStyled
 } from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
-import { CurrencyConverter } from 'amountinator'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { toast } from 'react-toastify'
+import { logWithTimestamp } from '../../utils/logging'
 
 // One wallet + AuthFetch shared by this module
 const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
@@ -42,6 +50,8 @@ interface CodeSnippetProps {
 }
 
 interface ButtonResponse {
+  status: string
+  message?: string
   buttonId?: string
 }
 
@@ -60,14 +70,16 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
 }
 
 const Create: React.FC = () => {
-  const [buttonText, setButtonText] = useState('Pay Now')
-  const [paymentAmount, setPaymentAmount] = useState('5')
+  const [buttonText_fixed, setButtonText_fixed] = useState('Pay Now')
+  const [buttonText_variable, setButtonText_variable] = useState('Pay Now')
+  const [paymentType, setPaymentType] = useState<'fixed' | 'variable'>('fixed')
+  const [fixedSatAmount, setFixedSatAmount] = useState('5')
   const [merchant, setMerchant] = useState('')
   const [buttonID, setButtonID] = useState('')
   const [showCode, setShowCode] = useState(false)
   const [hasMetanet, setHasMetanet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
-  const [customCSS, setCustomCSS] = useState(`.gateway-button-styles {
+  const [customCSS_fixed, setCustomCSS_fixed] = useState(`.gateway-paybutton-fixed {
     border-radius: 2em;
     border: none;
     padding: 0.7em 1em 0.7em 1em;
@@ -78,273 +90,430 @@ const Create: React.FC = () => {
     user-select: none;
     transition: all 0.3s;
     font-weight: bold;
+    text-align: center;
   }
-  .gateway-button-styles:hover {
+  .gateway-paybutton-fixed:hover {
     cursor: pointer;
     box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
     background: linear-gradient(145deg, #ABABFF, #5050F2);
+  }
+  .gateway-paybutton-fixed.disabled {
+    opacity: 0.4;
+    background: gray;
+    cursor: not-allowed;
+    pointer-events: none;
   }`)
-  const [amountInSats, setAmountInSats] = useState(1000)
-  const [currencySymbol, setCurrencySymbol] = useState('$')
-  const currencyConverter = new CurrencyConverter()
+  const [customCSS_variable, setCustomCSS_variable] = useState(`.gateway-paybutton-variable {
+    border-radius: 2em;
+    border: none;
+    padding: 0.7em 1em 0.7em 1em;
+    min-width: 10em;
+    background: linear-gradient(145deg, #FF6B6B, #4ECDC4);
+    color: white;
+    box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.3s;
+    font-weight: bold;
+    text-align: center;
+  }
+  .gateway-paybutton-variable:hover {
+    cursor: pointer;
+    box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #FF8787, #6BE8D9);
+  }
+  .gateway-paybutton-variable.disabled {
+    opacity: 0.4;
+    background: gray;
+    cursor: not-allowed;
+    pointer-events: none;
+  }`)
+  const [previewCode_fixed, setPreviewCode_fixed] = useState('')
+  const [previewCode_variable, setPreviewCode_variable] = useState('')
+  const [previewFixedHtml, setPreviewFixedHtml] = useState('')
+  const [previewVariableHtml, setPreviewVariableHtml] = useState('')
+  const [styleElement_fixed, setStyleElement_fixed] = useState<HTMLStyleElement | null>(null)
+  const [styleElement_variable, setStyleElement_variable] = useState<HTMLStyleElement | null>(null)
+  const [renderKey, setRenderKey] = useState(0) // Dummy state for forcing re-render on switch
+  const [isGenerateHovered, setIsGenerateHovered] = useState(false)
+  const [isCopyHovered, setIsCopyHovered] = useState(false)
+  const generateButtonRef = useRef<HTMLButtonElement>(null)
+  const copyIconRef = useRef<HTMLSpanElement | null>(null)
+  const previewContainerRef = useRef<HTMLDivElement>(null)
+  const isMounted = useRef(false)
 
   useEffect(() => {
+    logWithTimestamp('pages/Create', 'useEffect: Starting merchant fetch (v4.78)')
     void (async () => {
       try {
         const identity = await wallet.getPublicKey({ identityKey: true })
         setMerchant(identity.publicKey)
         setHasMetanet(true)
-        console.log('✅ Metanet identity fetched:', identity.publicKey)
+        logWithTimestamp('pages/Create', 'useEffect: Merchant identity fetched:', identity.publicKey)
+        updatePreviewCodes()
       } catch (error) {
-        console.error('❌ Failed to fetch Metanet identity:', error)
+        logWithTimestamp('pages/Create', 'useEffect: Failed to fetch Metanet identity:', error)
         setHasMetanet(false)
       }
     })()
   }, [])
 
-  const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    setCustomCSS(event.target.value)
-  }
+  useLayoutEffect(() => {
+    logWithTimestamp('pages/Create', 'useLayoutEffect: Running with hasMetanet:', hasMetanet, 'isMounted:', isMounted.current)
+    if (isMounted.current && hasMetanet) {
+      if (generateButtonRef.current) {
+        generateButtonRef.current.classList.add('preview-flash-generate')
+        logWithTimestamp('pages/Create', 'useLayoutEffect: Added flashGenerate animation to Generate Button')
+      }
+    } else if (generateButtonRef.current) {
+      generateButtonRef.current.classList.remove('preview-flash-generate')
+      logWithTimestamp('pages/Create', 'useLayoutEffect: Removed flashGenerate animation from Generate Button')
+    }
+    isMounted.current = true
+    logWithTimestamp('pages/Create', 'useLayoutEffect: Completed, isMounted set to true')
+  }, [hasMetanet])
 
   useEffect(() => {
-    void (async () => {
-      try {
-        await currencyConverter.initialize()
-        setCurrencySymbol(currencyConverter.getCurrencySymbol())
-        const satoshis = await currencyConverter.convertCurrency(
-          Number(paymentAmount),
-          currencyConverter.preferredCurrency,
-          'BSV'
-        )
-        setAmountInSats(satoshis ?? 1000)
-        console.log('🔍 Converted amount to satoshis:', satoshis)
-      } catch (error) {
-        console.error('❌ Failed to fetch currency:', error)
-      }
-    })()
-  }, [paymentAmount])
-
-  const handleAmountChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-    const input = event.target.value.replace(/[^0-9.]/g, '')
-    setPaymentAmount(input)
-    setShowCode(false)
-    try {
-      const satoshis = await currencyConverter.convertCurrency(
-        Number(input),
-        currencyConverter.preferredCurrency,
-        'BSV'
-      )
-      setAmountInSats(satoshis ?? 1000)
-      console.log('🔍 Converted input to satoshis:', satoshis)
-    } catch (error) {
-      console.error('❌ Error converting currency:', error)
+    if (merchant) {
+      logWithTimestamp('pages/Create', 'useEffect: Updating UI for paymentType:', paymentType, 'merchant:', merchant, 'renderKey:', renderKey)
+      setRenderKey(prev => prev + 1) // Force re-render to update field visibility
+      updatePreviewCodes()
     }
-  }, [])
+  }, [paymentType, merchant])
+
+  useEffect(() => {
+    const newStyleElement = document.createElement('style')
+    newStyleElement.id = 'custom-button-styles-fixed'
+    newStyleElement.textContent = customCSS_fixed
+    document.head.appendChild(newStyleElement)
+    setStyleElement_fixed(newStyleElement)
+    logWithTimestamp('pages/Create', 'useEffect: Applied fixed custom CSS to style element:', customCSS_fixed)
+    if (previewCode_fixed && previewContainerRef.current) {
+      generatePreviewHtml('fixed')
+    }
+    return () => {
+      if (styleElement_fixed) document.head.removeChild(styleElement_fixed)
+    }
+  }, [customCSS_fixed, previewCode_fixed])
+
+  useEffect(() => {
+    const newStyleElement = document.createElement('style')
+    newStyleElement.id = 'custom-button-styles-variable'
+    newStyleElement.textContent = customCSS_variable
+    document.head.appendChild(newStyleElement)
+    setStyleElement_variable(newStyleElement)
+    logWithTimestamp('pages/Create', 'useEffect: Applied variable custom CSS to style element:', customCSS_variable)
+    if (previewCode_variable && previewContainerRef.current) {
+      generatePreviewHtml('variable')
+    }
+    return () => {
+      if (styleElement_variable) document.head.removeChild(styleElement_variable)
+    }
+  }, [customCSS_variable, previewCode_variable])
+
+  useEffect(() => {
+    if (copyIconRef.current && !buttonID) {
+      copyIconRef.current.classList.add('preview-flash-copy')
+      logWithTimestamp('pages/Create', 'useEffect: Added preview-flash-copy class to Copy Icon')
+    } else if (copyIconRef.current && buttonID) {
+      copyIconRef.current.classList.remove('preview-flash-copy')
+      logWithTimestamp('pages/Create', 'useEffect: Removed preview-flash-copy class from Copy Icon')
+    }
+    if (previewContainerRef.current) {
+      previewContainerRef.current.classList.add('create-page')
+      logWithTimestamp('pages/Create', 'useEffect: Applied create-page class to preview container')
+    }
+  }, [buttonID, previewContainerRef])
+
+  const updatePreviewCodes = useCallback(() => {
+    logWithTimestamp('pages/Create', 'updatePreviewCodes: Starting update for paymentType:', paymentType, 'merchant:', merchant)
+    if (!merchant) {
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Skipping due to missing merchant')
+      return
+    }
+    const fixedCode = `<style>\n${customCSS_fixed.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-fixed"\n  data-merchant="${merchant}"\n  data-button="${buttonID || 'temp-fixed'}"\n  data-amount="${fixedSatAmount}"\n  data-currency="BSV"\n  data-text="${buttonText_fixed}"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_fixed} ${fixedSatAmount} Sats</div>`
+    const variableCode = `<style>\n${customCSS_variable.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-variable"\n  data-merchant="${merchant}"\n  data-button="${buttonID || 'temp-variable'}"\n  data-currency="BSV"\n  data-text="${buttonText_variable}"\n  data-variable="true"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_variable} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" /> Sats</div>`
+    setPreviewCode_fixed(fixedCode)
+    setPreviewCode_variable(variableCode)
+    logWithTimestamp('pages/Create', 'updatePreviewCodes: Codes generated - fixed:', fixedCode, 'variable:', variableCode)
+    if (styleElement_fixed) {
+      styleElement_fixed.textContent = customCSS_fixed
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied fixed custom CSS:', customCSS_fixed)
+    }
+    if (styleElement_variable) {
+      styleElement_variable.textContent = customCSS_variable
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied variable custom CSS:', customCSS_variable)
+    }
+    // Delay to ensure styles are applied
+    requestAnimationFrame(() => {
+      generatePreviewHtml('fixed')
+      generatePreviewHtml('variable')
+      setShowCode(true)
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Previews generated for paymentType:', paymentType, 'after delay')
+    })
+  }, [customCSS_fixed, customCSS_variable, fixedSatAmount, merchant, buttonText_fixed, buttonText_variable, buttonID, paymentType, styleElement_fixed, styleElement_variable])
+
+  useEffect(() => {
+    if (merchant) {
+      logWithTimestamp('pages/Create', 'useEffect: Triggering updatePreviewCodes on state change - paymentType:', paymentType, 'customCSS_fixed:', customCSS_fixed.substring(0, 50) + '...', 'customCSS_variable:', customCSS_variable.substring(0, 50) + '...')
+      updatePreviewCodes()
+    }
+  }, [customCSS_fixed, customCSS_variable, buttonText_fixed, buttonText_variable, fixedSatAmount, paymentType, merchant, updatePreviewCodes])
+
+  useEffect(() => {
+    logWithTimestamp('pages/Create', 'useEffect: Updating field visibility for paymentType:', paymentType, 'renderKey:', renderKey)
+    setRenderKey(prev => prev + 1) // Force re-render for field visibility on paymentType change
+  }, [paymentType])
+
+  const generatePreviewHtml = (type: 'fixed' | 'variable') => {
+    logWithTimestamp('pages/Create', 'generatePreviewHtml: Starting for type:', type, 'current paymentType:', paymentType, 'isSelected:', type === paymentType)
+    const text = type === 'fixed' ? buttonText_fixed : buttonText_variable
+    const isSelected = type === paymentType
+    const className = type === 'fixed' ? `gateway-paybutton-fixed${isSelected ? '' : ' disabled'}` : `gateway-paybutton-variable${isSelected ? '' : ' disabled'}`
+    let html = ''
+    if (type === 'fixed') {
+      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} ${fixedSatAmount} Sats</div>` // Add centering
+      setPreviewFixedHtml(html)
+    } else {
+      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" /> Sats</div>` // Add centering
+      setPreviewVariableHtml(html)
+    }
+    logWithTimestamp('pages/Create', 'generatePreviewHtml: Generated for type:', type, 'HTML:', html, 'className:', className)
+  }
+
+  const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    if (paymentType === 'fixed') {
+      setCustomCSS_fixed(event.target.value)
+    } else {
+      setCustomCSS_variable(event.target.value)
+    }
+    logWithTimestamp('pages/Create', 'handleCustomCSSChange: Updated CSS for paymentType:', paymentType)
+  }
+
+  const handleButtonTextChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    if (paymentType === 'fixed') {
+      setButtonText_fixed(event.target.value)
+    } else {
+      setButtonText_variable(event.target.value)
+    }
+    logWithTimestamp('pages/Create', 'handleButtonTextChange: Updated button text for paymentType:', paymentType)
+  }
+
+  const handlePaymentTypeChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    logWithTimestamp('pages/Create', 'handlePaymentTypeChange: Before update - current paymentType:', paymentType, 'new value:', event.target.value)
+    const newType = event.target.value as 'fixed' | 'variable'
+    setPaymentType(newType)
+    logWithTimestamp('pages/Create', 'handlePaymentTypeChange: After update - new paymentType:', newType)
+  }
+
+  const handleFixedSatChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const input = event.target.value.replace(/[^0-9]/g, '')
+    const satValue = Math.max(1, Math.min(1000, Number(input) || 5))
+    setFixedSatAmount(satValue.toString())
+    logWithTimestamp('pages/Create', 'handleFixedSatChange: Updated to', satValue)
+  }
 
   const handleCopyCode = async (): Promise<void> => {
-    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-    const code = `${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
-  <div
-    class="gateway-paybutton"
-    data-merchant="${merchant}"
-    data-button="${buttonID}"
-    data-amount="${amountInSats}"
-    data-currency="BSV"
-    data-text="${buttonText}"
-    data-server="${location.protocol}//${location.host}"
-  ></div>`
-
+    const codeToCopy = `${paymentType === 'fixed' ? previewCode_fixed : previewCode_variable}\n<script src="${location.protocol}//${location.host}/pay.js"></script>`
+    logWithTimestamp('pages/Create', 'handleCopyCode: Attempting to copy', paymentType, 'code:', codeToCopy)
     try {
-      await navigator.clipboard.writeText(code)
+      await navigator.clipboard.writeText(codeToCopy)
       setCopySuccess('success')
       setTimeout(() => setCopySuccess(''), 2000)
       toast.success('✅ Code copied to clipboard')
-      console.log('✅ Copied code to clipboard')
+      logWithTimestamp('pages/Create', 'handleCopyCode: Copied to clipboard')
     } catch (err) {
       setCopySuccess('failed')
       toast.error('❌ Failed to copy code')
-      console.error('❌ Failed to copy code:', err)
+      logWithTimestamp('pages/Create', 'handleCopyCode: Failed to copy code:', err)
     }
   }
 
-  useEffect(() => {
-    const styleElement = document.createElement('style')
-    styleElement.id = 'custom-button-styles'
-    styleElement.innerHTML = customCSS
-    document.head.appendChild(styleElement)
-
-    return () => {
-      document.head.removeChild(styleElement)
-    }
-  }, [customCSS])
-
-  const handleSubmit = async (): Promise<void> => {
-    if (!hasMetanet) {
-      toast.error('❌ Metanet client required! Download at https://metanet.bsvb.tech')
+  const handleGenerateButton = async () => {
+    if (!hasMetanet || !merchant) {
+      toast.error('❌ Metanet identity not available')
       return
     }
 
     try {
       const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/createButton`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          merchant,
-          amount: Number(paymentAmount) / 100000000, // Convert satoshis to BSV
+          amount: paymentType === 'fixed' ? parseInt(fixedSatAmount) : 0, // 0 for variable buttons
           currency: 'BSV',
-          multiUse: true,
-          variableAmount: true,
+          variableAmount: paymentType === 'variable',
+          multiUse: true, // Default to true for flexibility
           accepts: 'BSV'
-        }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        })
       })
 
       const data: ButtonResponse = await response.json()
-      if (data.buttonId !== undefined) {
+      if (data.status === 'success' && data.buttonId) {
         setButtonID(data.buttonId)
-        setShowCode(true)
         toast.success('✅ Button created successfully')
-        console.log('✅ Button created with ID:', data.buttonId)
-        console.log('🔍 Button creation data:', data)
+        logWithTimestamp('pages/Create', 'handleGenerateButton: Button created with ID:', data.buttonId)
+        updatePreviewCodes() // Refresh previews with new buttonId
       } else {
-        toast.error('❌ Failed to create button')
-        console.error('❌ Failed to create button: No buttonId in response')
+        throw new Error(data.message || 'Failed to create button')
       }
-    } catch (error) {
-      console.error('❌ Error creating button:', error)
-      toast.error('❌ Error creating button')
+    } catch (err) {
+      logWithTimestamp('pages/Create', 'handleGenerateButton: Error creating button:', err)
+      toast.error('❌ Failed to create button')
     }
   }
 
   return (
     <Root>
-      <Container maxWidth='lg'>
+      <Container maxWidth="lg" sx={{ ...(useTheme().templates?.page_wrap || {}) }}>
         <ContentWrap>
           <CenteredHeader>
-            <Typography variant='h2'>Create Your Tipping Button</Typography>
-            <Typography variant='subtitle1'>Instantly generate code to embed tipping buttons on your site.</Typography>
+            <Typography variant='h2'>Create Your Payment Button</Typography>
+            <Typography variant='subtitle1'>Edit code live in the left panel to update the preview buttons for your site.</Typography>
           </CenteredHeader>
 
           <Grid container spacing={4}>
-            <Grid item xs={12} md={4}>
-              <FormSection elevation={3}>
-                <Typography variant='h4' gutterBottom>
-                  Configure Your Button
-                </Typography>
-                <TextFieldStyled
-                  label='Button Text'
-                  value={buttonText}
-                  onChange={e => {
-                    setButtonText(e.target.value)
-                    setShowCode(false)
-                  }}
-                  fullWidth
-                  margin='normal'
-                />
-                <TextFieldStyled
-                  label='Tip Amount'
-                  value={paymentAmount}
-                  onChange={
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    (e: React.ChangeEvent<HTMLInputElement>) => { handleAmountChange(e) }
-                  }
-                  type='number'
-                  fullWidth
-                  margin='normal'
-                  InputProps={{
-                    startAdornment: <InputAdornment position='start'>{currencySymbol}</InputAdornment>
-                  }}
-                />
-                <TextFieldStyled
-                  label='Custom CSS'
-                  value={customCSS}
-                  onChange={handleCustomCSSChange}
-                  fullWidth
-                  margin='normal'
-                  multiline
-                />
-                <ButtonStyled
-                  variant='contained'
-                  color='primary'
-                  fullWidth
-                  sx={{ marginTop: 2 }}
-                  onClick={
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    () => { handleSubmit() }
-                  }
-                >
-                  Generate Code
-                </ButtonStyled>
-              </FormSection>
+            <Grid item xs={12} md={7}>
+              <Stack spacing={3}>
+                <Card>
+                  <Typography variant='h3' gutterBottom>
+                    Button Details
+                  </Typography>
+                  <TextFieldStyled
+                    label='Button Text'
+                    value={paymentType === 'fixed' ? buttonText_fixed : buttonText_variable}
+                    onChange={handleButtonTextChange}
+                    fullWidth
+                  />
+                  <RadioGroup
+                    value={paymentType}
+                    onChange={handlePaymentTypeChange}
+                    sx={{ mt: 2, display: 'flex', flexDirection: 'row' }}
+                  >
+                    <FormControlLabel
+                      value="fixed"
+                      control={<Radio />}
+                      label="Fixed Amount"
+                    />
+                    <FormControlLabel
+                      value="variable"
+                      control={<Radio />}
+                      label="Variable Amount"
+                    />
+                  </RadioGroup>
+                  {paymentType === 'fixed' && (
+                    <TextFieldStyled
+                      label='Fixed Sat Amount (1-1000)'
+                      value={fixedSatAmount}
+                      onChange={handleFixedSatChange}
+                      type='number'
+                      fullWidth
+                      InputProps={{ startAdornment: <InputAdornment position='start'>sat</InputAdornment> }}
+                      helperText='Enter fixed satoshis (1-1000)'
+                    />
+                  )}
+                  <Tooltip title="Press to enable copy icon">
+                    <MUIButton
+                      ref={generateButtonRef}
+                      variant="contained"
+                      color="primary"
+                      onClick={handleGenerateButton}
+                      sx={{ mt: 2, ...(isGenerateHovered && { opacity: 0.7, transition: 'opacity 0.3s' }) }}
+                      disabled={!hasMetanet}
+                      onMouseEnter={() => setIsGenerateHovered(true)}
+                      onMouseLeave={() => setIsGenerateHovered(false)}
+                    >
+                      Generate Button
+                    </MUIButton>
+                  </Tooltip>
+                </Card>
+                <Card>
+                  <Typography variant='h3' gutterBottom>
+                    Custom Styling
+                  </Typography>
+                  <TextFieldStyled
+                    label='Custom CSS'
+                    value={paymentType === 'fixed' ? customCSS_fixed : customCSS_variable}
+                    onChange={handleCustomCSSChange}
+                    fullWidth
+                    multiline
+                  />
+                </Card>
+              </Stack>
             </Grid>
 
-            <Grid item xs={12} md={8}>
-              <PreviewSection elevation={3} sx={{ position: 'relative' }}>
+            <Grid item xs={12} md={5}>
+              <Card>
                 <Typography
-                  variant='h4'
+                  variant='h3'
                   gutterBottom
                   component='div'
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
+                  sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
                   Button Preview
-                  {showCode && (
-                    <Tooltip title='Copy Code'>
-                      <IconButton onClick={
-                        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                        () => { handleCopyCode() }
-                      }
-                      >
-                        {copySuccess === 'success' ? <CheckCircleIcon color='success' /> : <ContentCopyIcon />}
-                      </IconButton>
-                    </Tooltip>
-                  )}
+                  <span
+                    ref={copyIconRef}
+                    onMouseEnter={() => setIsCopyHovered(true)}
+                    onMouseLeave={() => setIsCopyHovered(false)}
+                  >
+                    {buttonID ? (
+                      <Tooltip title="Copy Code" arrow>
+                        <IconButton
+                          onClick={handleCopyCode}
+                          disabled={false}
+                          sx={{ ...(isCopyHovered && { opacity: 0.7, transition: 'opacity 0.3s' }), ...(isGenerateHovered && { animation: 'flashCopy 1s infinite' }) }}
+                        >
+                          {copySuccess === 'success' ? <CheckCircleIcon color='success' /> : <ContentCopyIcon />}
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title="Press Generate Button" arrow>
+                        <span
+                          style={{ opacity: 0.5, cursor: 'not-allowed', ...(isCopyHovered && { opacity: 0.7, transition: 'opacity 0.3s' }) }}
+                          onClick={(e) => e.preventDefault()} // Nullify click
+                          className="preview-flash-copy"
+                        >
+                          <ContentCopyIcon />
+                        </span>
+                      </Tooltip>
+                    )}
+                  </span>
                 </Typography>
-                {
-                copySuccess !== '' && copySuccess === 'failed' && <Typography color='error'>❌ Failed to copy code!</Typography>
-}
+
+                {typeof copySuccess === 'string' && copySuccess !== '' && copySuccess === 'failed' && <Typography color='error'>❌ Failed to copy code!</Typography>}
+
+                {showCode && (
+                  <Box ref={previewContainerRef}>
+                    <Box sx={{ mb: 2 }}>
+                      <div
+                        dangerouslySetInnerHTML={{ __html: previewFixedHtml }}
+                      />
+                    </Box>
+                    <Box sx={{ mb: 2 }}>
+                      <div
+                        dangerouslySetInnerHTML={{ __html: previewVariableHtml }}
+                      />
+                    </Box>
+                  </Box>
+                )}
 
                 <Box>
-                  {showCode
-                    ? (
-                      <CodePreview>
-                        <CodeSnippet
-                          language='html'
-                          code={
-                            // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                            `${customCSS ? `<style>\n${customCSS}\n</style>` : ''}
-  <div
-    class="gateway-paybutton"
-    data-merchant="${merchant}"
-    data-button="${buttonID}"
-    data-amount="${amountInSats}"
-    data-currency="BSV"
-    data-text="${buttonText}"
-    data-server="${location.protocol}//${location.host}"
-  ></div>`
-}
-                        />
-                      </CodePreview>
-                      )
-                    : (
-                      <Typography>Click "Generate Code" to get the HTML code for your website!</Typography>
-                      )}
+                  <CodeSnippet
+                    key={paymentType === 'fixed' ? previewCode_fixed : previewCode_variable}
+                    language='html'
+                    code={paymentType === 'fixed' ? previewCode_fixed : previewCode_variable}
+                  />
                 </Box>
 
-                <Typography variant='h5' gutterBottom>
+                <Typography variant='h3' gutterBottom sx={{ mt: 2 }}>
                   Script for Head Tag
                 </Typography>
-                <CodePreview>
+                <Box>
                   <CodeSnippet
                     language='javascript'
                     code={`<script src="${location.protocol}//${location.host}/pay.js"></script>`}
                   />
-                </CodePreview>
-              </PreviewSection>
+                </Box>
+              </Card>
             </Grid>
           </Grid>
         </ContentWrap>
