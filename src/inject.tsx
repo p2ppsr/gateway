@@ -11,6 +11,7 @@
  * This file is intended to be included via a `<script>` tag on external sites.
  * Updated with merchant button style enhancements for branding.
  * - All amounts are now handled as integer sats internally for precision.
+ * - Version: v1.5 (Updated 29Jul2025_1015 BST with Sibling Hidden Div Creation)
  */
 
 import React from 'react'
@@ -115,18 +116,38 @@ const bootstrapPayButtons = (): void => {
     button.setAttribute('id', buttonID)
 
     const props: PayButtonProps = { amount: 0, merchant: '', button: '', server: '', variable: false }
+    const dataAttrs: { [key: string]: string } = {}
     if (button.hasAttributes()) {
       const attrs = button.attributes
-      for (let j = 0; j < attrs.length; j++) {
+      for (let j = attrs.length - 1; j >= 0; j--) { // Reverse to avoid index issues on removal
         if (!attrs[j].name.startsWith('data-')) {
           continue
         }
         const propName = attrs[j].name.substring(5)
-        props[propName] = propName === 'amount' ? Number(attrs[j].value) : attrs[j].value
+        const value = attrs[j].value
+        props[propName] = propName === 'amount' ? Number(value) : value
+        dataAttrs[propName] = value
+        button.removeAttribute(attrs[j].name) // Remove data-* from visible div
       }
     }
 
     console.log('🔍 [Step 2] Parsed props (sats):', props) // Log parsed props
+
+    // Create and insert sibling hidden data div
+    const hiddenDiv = document.createElement('div')
+    hiddenDiv.className = 'gateway-paybutton-fixed' // Use -fixed for now; can conditional on props.variable later
+    hiddenDiv.id = `pay-hidden-${Math.floor(Math.random() * 100000)}`
+    hiddenDiv.style.display = 'none'
+    for (const [key, value] of Object.entries(dataAttrs)) {
+      hiddenDiv.setAttribute(`data-${key}`, value)
+    }
+    if (button.parentNode) {
+      button.parentNode.insertBefore(hiddenDiv, button)
+      console.log('🔍 Created and inserted sibling hidden div:', hiddenDiv.outerHTML)
+    } else {
+      console.warn('⚠️ No parent node for button; skipping hidden div insertion')
+    }
+
     ;(window as any).PayButton.render(buttonID, props)
   }
 }

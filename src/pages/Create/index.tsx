@@ -3,7 +3,7 @@
  *
  * Create Page — Allows users to configure and generate payment button code.
  *
- * Users can customize the button text, payment amount (fixed or variable in satoshis), and CSS styles.
+ * Users can customize the button text, payment amount (fixed or variable in satoshis), spending description, and CSS styles.
  * Once configured, a button is created using the Metanet identity, and corresponding embeddable HTML
  * and script code is displayed, which can be copied for integration into websites.
  *
@@ -18,8 +18,10 @@
  * - Generated HTML includes default text and amount display for visible rendering even without pay.js.
  * - Preview aligns with generated button by defaulting to text-width, with optional data-width override and centering enforced.
  * - UI enhanced with continuous flashing effects with a 1-second period using CSS animations, flashing only the Copy Code icon initially (when disabled), and independent cross-flashing between Generate Button and Copy Code icon during hover.
+ * - Variable button preview input field is read-only to prevent merchant interaction.
+ * - Added spending description textbox with gap, no helper text.
  *
- * Version: v4.78 (Updated 27Jul2025_2055 BST)
+ * Version: v4.8.8 (Updated 29Jul2025_2106 BST with Fixed Rendering, Textbox Gap, No Helper Text)
  */
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
@@ -72,6 +74,8 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
 const Create: React.FC = () => {
   const [buttonText_fixed, setButtonText_fixed] = useState('Pay Now')
   const [buttonText_variable, setButtonText_variable] = useState('Pay Now')
+  const [spendingDescription_fixed, setSpendingDescription_fixed] = useState('Tip paid to merchant')
+  const [spendingDescription_variable, setSpendingDescription_variable] = useState('Tip paid to merchant')
   const [paymentType, setPaymentType] = useState<'fixed' | 'variable'>('fixed')
   const [fixedSatAmount, setFixedSatAmount] = useState('5')
   const [merchant, setMerchant] = useState('')
@@ -133,7 +137,7 @@ const Create: React.FC = () => {
   const [previewVariableHtml, setPreviewVariableHtml] = useState('')
   const [styleElement_fixed, setStyleElement_fixed] = useState<HTMLStyleElement | null>(null)
   const [styleElement_variable, setStyleElement_variable] = useState<HTMLStyleElement | null>(null)
-  const [renderKey, setRenderKey] = useState(0) // Dummy state for forcing re-render on switch
+  const [renderKey, setRenderKey] = useState(0)
   const [isGenerateHovered, setIsGenerateHovered] = useState(false)
   const [isCopyHovered, setIsCopyHovered] = useState(false)
   const generateButtonRef = useRef<HTMLButtonElement>(null)
@@ -142,7 +146,7 @@ const Create: React.FC = () => {
   const isMounted = useRef(false)
 
   useEffect(() => {
-    logWithTimestamp('pages/Create', 'useEffect: Starting merchant fetch (v4.78)')
+    logWithTimestamp('pages/Create', 'useEffect: Starting merchant fetch (v4.8.8)')
     void (async () => {
       try {
         const identity = await wallet.getPublicKey({ identityKey: true })
@@ -153,6 +157,7 @@ const Create: React.FC = () => {
       } catch (error) {
         logWithTimestamp('pages/Create', 'useEffect: Failed to fetch Metanet identity:', error)
         setHasMetanet(false)
+        updatePreviewCodes() // Render previews even without Metanet
       }
     })()
   }, [])
@@ -173,12 +178,12 @@ const Create: React.FC = () => {
   }, [hasMetanet])
 
   useEffect(() => {
-    if (merchant) {
+    if (merchant || !hasMetanet) {
       logWithTimestamp('pages/Create', 'useEffect: Updating UI for paymentType:', paymentType, 'merchant:', merchant, 'renderKey:', renderKey)
       setRenderKey(prev => prev + 1) // Force re-render to update field visibility
       updatePreviewCodes()
     }
-  }, [paymentType, merchant])
+  }, [paymentType, merchant, hasMetanet])
 
   useEffect(() => {
     const newStyleElement = document.createElement('style')
@@ -186,14 +191,18 @@ const Create: React.FC = () => {
     newStyleElement.textContent = customCSS_fixed
     document.head.appendChild(newStyleElement)
     setStyleElement_fixed(newStyleElement)
-    logWithTimestamp('pages/Create', 'useEffect: Applied fixed custom CSS to style element:', customCSS_fixed)
-    if (previewCode_fixed && previewContainerRef.current) {
+    logWithTimestamp('pages/Create', 'useEffect: Applied fixed custom CSS:', customCSS_fixed.substring(0, 50) + '...')
+    if (previewContainerRef.current) {
       generatePreviewHtml('fixed')
+      logWithTimestamp('pages/Create', 'useEffect: Generated fixed preview HTML')
     }
     return () => {
-      if (styleElement_fixed) document.head.removeChild(styleElement_fixed)
+      if (styleElement_fixed) {
+        document.head.removeChild(styleElement_fixed)
+        logWithTimestamp('pages/Create', 'useEffect: Removed fixed style element')
+      }
     }
-  }, [customCSS_fixed, previewCode_fixed])
+  }, [customCSS_fixed])
 
   useEffect(() => {
     const newStyleElement = document.createElement('style')
@@ -201,14 +210,18 @@ const Create: React.FC = () => {
     newStyleElement.textContent = customCSS_variable
     document.head.appendChild(newStyleElement)
     setStyleElement_variable(newStyleElement)
-    logWithTimestamp('pages/Create', 'useEffect: Applied variable custom CSS to style element:', customCSS_variable)
-    if (previewCode_variable && previewContainerRef.current) {
+    logWithTimestamp('pages/Create', 'useEffect: Applied variable custom CSS:', customCSS_variable.substring(0, 50) + '...')
+    if (previewContainerRef.current) {
       generatePreviewHtml('variable')
+      logWithTimestamp('pages/Create', 'useEffect: Generated variable preview HTML')
     }
     return () => {
-      if (styleElement_variable) document.head.removeChild(styleElement_variable)
+      if (styleElement_variable) {
+        document.head.removeChild(styleElement_variable)
+        logWithTimestamp('pages/Create', 'useEffect: Removed variable style element')
+      }
     }
-  }, [customCSS_variable, previewCode_variable])
+  }, [customCSS_variable])
 
   useEffect(() => {
     if (copyIconRef.current && !buttonID) {
@@ -216,53 +229,36 @@ const Create: React.FC = () => {
       logWithTimestamp('pages/Create', 'useEffect: Added preview-flash-copy class to Copy Icon')
     } else if (copyIconRef.current && buttonID) {
       copyIconRef.current.classList.remove('preview-flash-copy')
-      logWithTimestamp('pages/Create', 'useEffect: Removed preview-flash-copy class from Copy Icon')
+      logWithTimestamp('pages/Create', 'useEffect: Removed preview-flash-copy class to Copy Icon')
     }
     if (previewContainerRef.current) {
       previewContainerRef.current.classList.add('create-page')
       logWithTimestamp('pages/Create', 'useEffect: Applied create-page class to preview container')
     }
+    updatePreviewCodes()
   }, [buttonID, previewContainerRef])
 
   const updatePreviewCodes = useCallback(() => {
     logWithTimestamp('pages/Create', 'updatePreviewCodes: Starting update for paymentType:', paymentType, 'merchant:', merchant)
-    if (!merchant) {
-      logWithTimestamp('pages/Create', 'updatePreviewCodes: Skipping due to missing merchant')
-      return
-    }
-    const fixedCode = `<style>\n${customCSS_fixed.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-fixed"\n  data-merchant="${merchant}"\n  data-button="${buttonID || 'temp-fixed'}"\n  data-amount="${fixedSatAmount}"\n  data-currency="BSV"\n  data-text="${buttonText_fixed}"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_fixed} ${fixedSatAmount} Sats</div>`
-    const variableCode = `<style>\n${customCSS_variable.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-variable"\n  data-merchant="${merchant}"\n  data-button="${buttonID || 'temp-variable'}"\n  data-currency="BSV"\n  data-text="${buttonText_variable}"\n  data-variable="true"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_variable} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" /> Sats</div>`
+    const fixedCode = `<style>\n${customCSS_fixed.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-fixed"\n  data-merchant="${merchant || 'temp-merchant'}"\n  data-button="${buttonID || 'temp-fixed'}"\n  data-amount="${fixedSatAmount}"\n  data-currency="BSV"\n  data-text="${buttonText_fixed}"\n  data-description="${spendingDescription_fixed}"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_fixed} ${fixedSatAmount} Sats</div>`
+    const variableCode = `<style>\n${customCSS_variable.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-variable"\n  data-merchant="${merchant || 'temp-merchant'}"\n  data-button="${buttonID || 'temp-variable'}"\n  data-currency="BSV"\n  data-text="${buttonText_variable}"\n  data-description="${spendingDescription_variable}"\n  data-variable="true"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_variable} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" readonly /> Sats</div>`
     setPreviewCode_fixed(fixedCode)
     setPreviewCode_variable(variableCode)
-    logWithTimestamp('pages/Create', 'updatePreviewCodes: Codes generated - fixed:', fixedCode, 'variable:', variableCode)
+    logWithTimestamp('pages/Create', 'updatePreviewCodes: Codes generated - fixed:', fixedCode.substring(0, 50) + '...', 'variable:', variableCode.substring(0, 50) + '...')
     if (styleElement_fixed) {
       styleElement_fixed.textContent = customCSS_fixed
-      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied fixed custom CSS:', customCSS_fixed)
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied fixed custom CSS:', customCSS_fixed.substring(0, 50) + '...')
     }
     if (styleElement_variable) {
       styleElement_variable.textContent = customCSS_variable
-      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied variable custom CSS:', customCSS_variable)
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied variable custom CSS:', customCSS_variable.substring(0, 50) + '...')
     }
-    // Delay to ensure styles are applied
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       generatePreviewHtml('fixed')
       generatePreviewHtml('variable')
-      setShowCode(true)
       logWithTimestamp('pages/Create', 'updatePreviewCodes: Previews generated for paymentType:', paymentType, 'after delay')
-    })
-  }, [customCSS_fixed, customCSS_variable, fixedSatAmount, merchant, buttonText_fixed, buttonText_variable, buttonID, paymentType, styleElement_fixed, styleElement_variable])
-
-  useEffect(() => {
-    if (merchant) {
-      logWithTimestamp('pages/Create', 'useEffect: Triggering updatePreviewCodes on state change - paymentType:', paymentType, 'customCSS_fixed:', customCSS_fixed.substring(0, 50) + '...', 'customCSS_variable:', customCSS_variable.substring(0, 50) + '...')
-      updatePreviewCodes()
-    }
-  }, [customCSS_fixed, customCSS_variable, buttonText_fixed, buttonText_variable, fixedSatAmount, paymentType, merchant, updatePreviewCodes])
-
-  useEffect(() => {
-    logWithTimestamp('pages/Create', 'useEffect: Updating field visibility for paymentType:', paymentType, 'renderKey:', renderKey)
-    setRenderKey(prev => prev + 1) // Force re-render for field visibility on paymentType change
-  }, [paymentType])
+    }, 0)
+  }, [customCSS_fixed, customCSS_variable, fixedSatAmount, merchant, buttonText_fixed, buttonText_variable, spendingDescription_fixed, spendingDescription_variable, buttonID, paymentType, styleElement_fixed, styleElement_variable])
 
   const generatePreviewHtml = (type: 'fixed' | 'variable') => {
     logWithTimestamp('pages/Create', 'generatePreviewHtml: Starting for type:', type, 'current paymentType:', paymentType, 'isSelected:', type === paymentType)
@@ -271,10 +267,10 @@ const Create: React.FC = () => {
     const className = type === 'fixed' ? `gateway-paybutton-fixed${isSelected ? '' : ' disabled'}` : `gateway-paybutton-variable${isSelected ? '' : ' disabled'}`
     let html = ''
     if (type === 'fixed') {
-      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} ${fixedSatAmount} Sats</div>` // Add centering
+      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} ${fixedSatAmount} Sats</div>`
       setPreviewFixedHtml(html)
     } else {
-      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" /> Sats</div>` // Add centering
+      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" readonly /> Sats</div>`
       setPreviewVariableHtml(html)
     }
     logWithTimestamp('pages/Create', 'generatePreviewHtml: Generated for type:', type, 'HTML:', html, 'className:', className)
@@ -283,26 +279,40 @@ const Create: React.FC = () => {
   const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (paymentType === 'fixed') {
       setCustomCSS_fixed(event.target.value)
+      logWithTimestamp('pages/Create', 'handleCustomCSSChange: Updated fixed CSS:', event.target.value.substring(0, 50) + '...')
     } else {
       setCustomCSS_variable(event.target.value)
+      logWithTimestamp('pages/Create', 'handleCustomCSSChange: Updated variable CSS:', event.target.value.substring(0, 50) + '...')
     }
-    logWithTimestamp('pages/Create', 'handleCustomCSSChange: Updated CSS for paymentType:', paymentType)
   }
 
   const handleButtonTextChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    if (paymentType === 'fixed') {
-      setButtonText_fixed(event.target.value)
-    } else {
-      setButtonText_variable(event.target.value)
+    const { name, value } = event.target
+    if (name === 'buttonText') {
+      if (paymentType === 'fixed') {
+        setButtonText_fixed(value)
+      } else {
+        setButtonText_variable(value)
+      }
+      logWithTimestamp('pages/Create', 'handleButtonTextChange: Updated button text for paymentType:', paymentType, 'value:', value)
+    } else if (name === 'spendingDescription') {
+      if (paymentType === 'fixed') {
+        setSpendingDescription_fixed(value)
+      } else {
+        setSpendingDescription_variable(value)
+      }
+      logWithTimestamp('pages/Create', 'handleButtonTextChange: Updated spending description for paymentType:', paymentType, 'value:', value)
     }
-    logWithTimestamp('pages/Create', 'handleButtonTextChange: Updated button text for paymentType:', paymentType)
   }
 
   const handlePaymentTypeChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     logWithTimestamp('pages/Create', 'handlePaymentTypeChange: Before update - current paymentType:', paymentType, 'new value:', event.target.value)
     const newType = event.target.value as 'fixed' | 'variable'
     setPaymentType(newType)
+    setButtonID('') // Reset buttonID to disable copy icon until Generate is pressed
+    setShowCode(false) // Reset showCode to disable copy icon
     logWithTimestamp('pages/Create', 'handlePaymentTypeChange: After update - new paymentType:', newType)
+    updatePreviewCodes()
   }
 
   const handleFixedSatChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -321,6 +331,9 @@ const Create: React.FC = () => {
       setTimeout(() => setCopySuccess(''), 2000)
       toast.success('✅ Code copied to clipboard')
       logWithTimestamp('pages/Create', 'handleCopyCode: Copied to clipboard')
+      // Reset to disable copy icon
+      setButtonID('')
+      setShowCode(false)
     } catch (err) {
       setCopySuccess('failed')
       toast.error('❌ Failed to copy code')
@@ -331,28 +344,33 @@ const Create: React.FC = () => {
   const handleGenerateButton = async () => {
     if (!hasMetanet || !merchant) {
       toast.error('❌ Metanet identity not available')
+      logWithTimestamp('pages/Create', 'handleGenerateButton: Metanet identity not available')
       return
     }
 
     try {
+      const payload = {
+        currency: 'BSV',
+        variableAmount: paymentType === 'variable',
+        multiUse: true,
+        accepts: 'BSV',
+        description: paymentType === 'fixed' ? spendingDescription_fixed : spendingDescription_variable,
+        ...(paymentType === 'fixed' && { amount: parseInt(fixedSatAmount) })
+      }
+      logWithTimestamp('pages/Create', 'handleGenerateButton: Sending payload:', payload)
       const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/createButton`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: paymentType === 'fixed' ? parseInt(fixedSatAmount) : 0, // 0 for variable buttons
-          currency: 'BSV',
-          variableAmount: paymentType === 'variable',
-          multiUse: true, // Default to true for flexibility
-          accepts: 'BSV'
-        })
+        body: JSON.stringify(payload)
       })
 
       const data: ButtonResponse = await response.json()
       if (data.status === 'success' && data.buttonId) {
         setButtonID(data.buttonId)
+        setShowCode(true) // Enable copy icon
         toast.success('✅ Button created successfully')
         logWithTimestamp('pages/Create', 'handleGenerateButton: Button created with ID:', data.buttonId)
-        updatePreviewCodes() // Refresh previews with new buttonId
+        updatePreviewCodes()
       } else {
         throw new Error(data.message || 'Failed to create button')
       }
@@ -380,6 +398,7 @@ const Create: React.FC = () => {
                   </Typography>
                   <TextFieldStyled
                     label='Button Text'
+                    name='buttonText'
                     value={paymentType === 'fixed' ? buttonText_fixed : buttonText_variable}
                     onChange={handleButtonTextChange}
                     fullWidth
@@ -408,9 +427,16 @@ const Create: React.FC = () => {
                       type='number'
                       fullWidth
                       InputProps={{ startAdornment: <InputAdornment position='start'>sat</InputAdornment> }}
-                      helperText='Enter fixed satoshis (1-1000)'
                     />
                   )}
+                  <TextFieldStyled
+                    label='Spending Description'
+                    name='spendingDescription'
+                    value={paymentType === 'fixed' ? spendingDescription_fixed : spendingDescription_variable}
+                    onChange={handleButtonTextChange}
+                    fullWidth
+                    sx={{ mt: 2 }}
+                  />
                   <Tooltip title="Press to enable copy icon">
                     <MUIButton
                       ref={generateButtonRef}
@@ -455,46 +481,32 @@ const Create: React.FC = () => {
                     onMouseEnter={() => setIsCopyHovered(true)}
                     onMouseLeave={() => setIsCopyHovered(false)}
                   >
-                    {buttonID ? (
-                      <Tooltip title="Copy Code" arrow>
+                    <Tooltip title={buttonID ? "Copy Code" : "Press Generate Button"} arrow>
+                      <span>
                         <IconButton
                           onClick={handleCopyCode}
-                          disabled={false}
+                          disabled={!buttonID}
                           sx={{ ...(isCopyHovered && { opacity: 0.7, transition: 'opacity 0.3s' }), ...(isGenerateHovered && { animation: 'flashCopy 1s infinite' }) }}
                         >
                           {copySuccess === 'success' ? <CheckCircleIcon color='success' /> : <ContentCopyIcon />}
                         </IconButton>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip title="Press Generate Button" arrow>
-                        <span
-                          style={{ opacity: 0.5, cursor: 'not-allowed', ...(isCopyHovered && { opacity: 0.7, transition: 'opacity 0.3s' }) }}
-                          onClick={(e) => e.preventDefault()} // Nullify click
-                          className="preview-flash-copy"
-                        >
-                          <ContentCopyIcon />
-                        </span>
-                      </Tooltip>
-                    )}
+                      </span>
+                    </Tooltip>
                   </span>
                 </Typography>
 
-                {typeof copySuccess === 'string' && copySuccess !== '' && copySuccess === 'failed' && <Typography color='error'>❌ Failed to copy code!</Typography>}
-
-                {showCode && (
-                  <Box ref={previewContainerRef}>
-                    <Box sx={{ mb: 2 }}>
-                      <div
-                        dangerouslySetInnerHTML={{ __html: previewFixedHtml }}
-                      />
-                    </Box>
-                    <Box sx={{ mb: 2 }}>
-                      <div
-                        dangerouslySetInnerHTML={{ __html: previewVariableHtml }}
-                      />
-                    </Box>
-                  </Box>
+                {typeof copySuccess === 'string' && copySuccess !== '' && copySuccess === 'failed' && (
+                  <Typography color='error'>❌ Failed to copy code!</Typography>
                 )}
+
+                <Box ref={previewContainerRef}>
+                  <Box sx={{ mb: 2 }}>
+                    <div dangerouslySetInnerHTML={{ __html: previewFixedHtml }} />
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <div dangerouslySetInnerHTML={{ __html: previewVariableHtml }} />
+                  </Box>
+                </Box>
 
                 <Box>
                   <CodeSnippet

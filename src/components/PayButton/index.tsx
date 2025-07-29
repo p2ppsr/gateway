@@ -12,11 +12,13 @@
  *
  * It integrates with the Metanet client's `AuthFetch` and `WalletClient` for secure, user-controlled signing.
  * - All amounts are handled as BSV decimals internally (to match current DB schema), converted from sats input.
+ * - Supports variable amount buttons with user input (data-variable="true").
+ * - Prevents payment flow triggering on variable input field clicks with stopPropagation on multiple events.
  *
- * Version: v1.3 (Updated 29Jul2025_0240 BST with Corrected Sibling Layout)
+ * Version: v1.5.17 (Updated 29Jul2025_1540 BST with Zero Satoshis Fallback)
  */
 
-import React, { useState, useRef, ReactElement } from 'react'
+import React, { useState, useRef, useEffect, ReactElement } from 'react'
 import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
 
 // Define interfaces based on @bsv/sdk
@@ -40,7 +42,7 @@ interface ListOutputsArgs {
 // Define props interface with sats as integer
 export interface PayButtonProps {
   text?: string // Templated text with {amount} placeholder (default "Pay Now {amount} Sats")
-  amount: number // Amount in sats (integer, required)
+  amount: number // Amount in sats (integer, 0 for variable)
   merchant: string
   button: string
   currency?: string
@@ -67,11 +69,11 @@ interface PayResponse {
  * Reusable payment component.
  *
  * @param text         Button label template (default "Pay Now {amount} Sats")
- * @param amount       Amount in sats (integer)
+ * @param amount       Amount in sats (integer, 0 for variable)
  * @param merchant     Merchant identity key (string)
  * @param button       Payment-button ID (string)
  * @param currency     "BSV" | "USD" | … (used for display or server compatibility)
- * @param server       Gateway back-end URL (e.g. "http://localhost:3001")
+ * @param server       Gateway back-end URL (e.g. "http://localhost:3000")
  * @param loadingtext  Text while awaiting invoice / payment
  */
 const PayButton = ({
@@ -81,42 +83,87 @@ const PayButton = ({
   button,
   currency = 'BSV',
   server,
-  loadingtext = 'Loading, please wait…'
+  loadingtext = 'Loading, please wait…',
+  variable = false
 }: PayButtonProps): ReactElement => {
   const [loading, setLoading] = useState(false)
   const [paid, setPaid] = useState(false)
   const [txid, setTxid] = useState<string | null>(null)
-  const buttonRef = useRef<HTMLDivElement>(null)
+  const [variableAmount, setVariableAmount] = useState<string>("1") // Default to 1 for variable buttons
+  const nodeTextRef = useRef<HTMLDivElement>(null)
 
-  // Construct dynamic button label by replacing {amount} placeholder
-  const buttonLabel = text.replace('{amount}', amount.toString());
+  // Construct dynamic button label for variable buttons
+  const buttonLabel = variable ? `${text.split('{amount}')[0]}${variableAmount} ${text.split('{amount}')[1] || 'Sats'}` : text.replace('{amount}', amount.toString());
+  console.log('🔍 Button label:', buttonLabel);
 
-  const handleClick = async (event: React.MouseEvent<HTMLDivElement>): Promise<void> => {
-    // Prevent event from bubbling up if clicking outside text
-    event.stopPropagation();
+  const handleVariableAmountChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    const input = event.target.value.replace(/[^0-9]/g, '') // Strip non-digits
+    const satValue = Math.max(1, Math.min(1000, Number(input) || 1)) // Clamp 1-1000
+    setVariableAmount(satValue.toString())
+    console.log('🔍 Variable amount updated:', satValue)
+  }
+
+  const handleClick = async (e: React.MouseEvent<HTMLDivElement>): Promise<void> => {
+    if (loading) return
+    // Safely check if click originated from input field using nativeEvent
+    const target = e.nativeEvent.target as HTMLElement | null
+    if (target && target.tagName === 'INPUT') {
+      console.log('🔍 Click on input field ignored')
+      return
+    }
+    console.log('🔍 Button click received, target:', target?.tagName || 'unknown')
     setLoading(true)
     try {
-      const WALLET_ORIGIN = 'localhost:3301' // Matches Metanet client port
+      // Use variableAmount if variable, else props.amount
+      const effectiveAmount = variable ? Number(variableAmount) : amount
+
+      // Validate effective amount
+      if (!Number.isInteger(effectiveAmount) || effectiveAmount <= 0 || effectiveAmount > 1000) {
+        throw new Error('❌ Invalid amount: must be a positive integer between 1 and 1000 sats')
+      }
+      console.log('🔍 [Step 1] Client requested amount (sats):', effectiveAmount)
+
+      const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321' // Configurable port
       const wallet = new WalletClient('auto', WALLET_ORIGIN)
       const authFetch = new AuthFetch(wallet)
 
-      // Validate sats as integer and within safe range
-      if (!Number.isInteger(amount) || amount <= 0 || amount > 1000000) {
-        throw new Error('❌ Invalid amount: must be a positive integer up to 1,000,000 sats')
-      }
-      console.log('🔍 [Step 1] Client requested amount (sats):', amount) // Log client amount
-
-      // Debug wallet connection and funds
-      try {
-        const walletOutputs = await wallet.listOutputs({ basket: '' }) // Use empty basket as confirmed
-        console.log('🔍 Wallet outputs:', walletOutputs)
-        if (walletOutputs.outputs.length && walletOutputs.outputs[0].satoshis < amount + 1) {
-          throw new Error('❌ Insufficient funds: need at least ' + (amount + 1) + ' sats')
+      // Debug wallet connection and funds with retry
+      let walletOutputs: ListOutputsResult | null = null
+      const substrates = [
+        { type: 'HTTPWalletJSON', substrate: 'json-api', skip: false },
+        { type: 'HTTPWalletWire', substrate: 'Cicada', skip: false },
+        { type: 'WindowCWISubstrate', substrate: 'window.CWI', skip: typeof window === 'undefined' || !(window as any).CWI },
+        { type: 'XDMSubstrate', substrate: 'XDM', skip: false },
+        { type: 'ReactNativeWebView', substrate: 'react-native', skip: false }
+      ]
+      for (const { type, substrate, skip } of substrates) {
+        if (skip) {
+          console.log(`🔍 Skipping ${type} substrate (not available)`)
+          continue
         }
-        console.log('🔍 Wallet selected inputs:', await wallet.listOutputs({ basket: '' })) // Updated with empty basket
-      } catch (walletErr) {
-        console.error('❌ Wallet connection or funds failed:', walletErr)
+        try {
+          console.log(`🔍 Attempting wallet connection with ${type} on ${WALLET_ORIGIN}`)
+          const instance = new WalletClient(substrate as 'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api' | 'react-native', WALLET_ORIGIN)
+          const versionPromise = instance.getVersion({})
+          const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Timeout on ${type}`)), 2000))
+          await Promise.race([versionPromise, timeoutPromise])
+          console.log(`✅ Wallet version retrieved with ${type}`)
+          walletOutputs = await instance.listOutputs({ basket: button }) // Use button ID as basket
+          console.log(`✅ Wallet connected with ${type} on ${WALLET_ORIGIN}`, walletOutputs)
+          wallet.substrate = instance.substrate // Set successful substrate
+          break
+        } catch (walletErr) {
+          console.error(`❌ Wallet connection failed with ${type} on ${WALLET_ORIGIN}:`, walletErr)
+        }
       }
+      if (!walletOutputs) throw new Error('❌ All wallet connection attempts failed')
+
+      console.log('🔍 Wallet outputs for basket:', button, walletOutputs)
+      // Skip basket-specific check if empty, rely on createAction
+      if (walletOutputs.outputs.length > 0 && walletOutputs.outputs[0].satoshis < effectiveAmount + 1) {
+        throw new Error('❌ Insufficient funds in basket: need at least ' + (effectiveAmount + 1) + ' sats')
+      }
+      console.log('🔍 Wallet selected inputs:', walletOutputs)
 
       const resStatus = await authFetch.fetch(`${server}/api/getStatus`, {
         method: 'GET'
@@ -125,7 +172,7 @@ const PayButton = ({
       if (status.status !== 'success') throw new Error('❌ Cannot reach server')
 
       // Convert sats to BSV for server request (reason: server expects BSV)
-      const amountInBSV = amount / 100000000
+      const amountInBSV = effectiveAmount / 100000000
       console.log('🔍 [Step 2] Converted amount to BSV:', amountInBSV)
 
       // Send amount in BSV to server
@@ -142,15 +189,19 @@ const PayButton = ({
       const invoice: InvoiceResponse = await resInv.json()
       if (invoice.status !== 'success') throw new Error(`❌ ${invoice.message ?? 'Invoice creation failed'}`)
 
-      // Verify outputs match requested amount
-      const outputsWithSats = invoice.outputs?.map(output => ({
+      // Verify outputs match requested amount, with fallback for variable buttons
+      let outputsWithSats = invoice.outputs?.map(output => ({
         ...output,
         satoshis: Math.round(output.satoshis) // Ensure integer sats
       })) || []
-      if (outputsWithSats.length && outputsWithSats[0].satoshis !== amount) {
-        console.warn('❌ Output satoshis mismatch:', outputsWithSats[0].satoshis, 'vs expected', amount)
+      if (variable && outputsWithSats.length && outputsWithSats[0].satoshis === 0) {
+        console.log('🔍 Server returned zero satoshis for variable button, using effectiveAmount:', effectiveAmount)
+        outputsWithSats[0].satoshis = effectiveAmount
       }
-      console.log('🔍 [Step 3] Client received outputs (sats):', outputsWithSats) // Log received outputs
+      if (outputsWithSats.length && outputsWithSats[0].satoshis !== effectiveAmount) {
+        console.warn('❌ Output satoshis mismatch:', outputsWithSats[0].satoshis, 'vs expected', effectiveAmount)
+      }
+      console.log('🔍 [Step 3] Client received outputs (sats):', outputsWithSats)
 
       const tx = await wallet.createAction({
         description: button,
@@ -201,47 +252,43 @@ const PayButton = ({
       alert(message)
     } finally {
       setLoading(false)
-      if (buttonRef.current) {
-        buttonRef.current.setAttribute('data-disabled', loading.toString())
-      }
     }
   }
 
-  const buttonDataStyle: React.CSSProperties = {
-    display: 'none', // Hide data div from view
-  };
-
-  const buttonStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'center', // Center the text
-    alignItems: 'center',
-    width: 'fit-content',
-  };
+  useEffect(() => {
+    const container = nodeTextRef.current?.parentElement
+    if (container) {
+      container.style.display = 'flex'
+      container.style.justifyContent = 'center'
+      container.style.alignItems = 'center'
+      container.style.width = 'fit-content'
+      container.setAttribute('data-disabled', loading.toString())
+      console.log('🔍 Applied container styles and events')
+    }
+  }, [loading, paid]) // Re-apply on state changes
 
   if (!paid) {
-    return (
-      <>
-        <div
-          ref={buttonRef}
-          className="gateway-paybutton-fixed"
-          style={buttonDataStyle} // Data div hidden
-          data-merchant={merchant}
-          data-button={button}
-          data-amount={amount}
-          data-currency={currency}
-          data-server={server}
-          id={`pay-${Math.random().toString(36).substr(2, 5)}`} // Generate unique ID
-        />
-        <div
-          className="gateway-paybutton"
-          style={buttonStyle} // Apply centered styling
-          onClick={handleClick} // Ensure entire div is clickable
-          data-disabled={loading.toString()}
-        >
-          <div className="nodeText">{loading ? loadingtext : buttonLabel}</div>
+    if (variable) {
+      return (
+        <div ref={nodeTextRef} className="nodeText" onClick={handleClick}>
+          {text.split('{amount}')[0]}
+          <input
+            type="number"
+            value={variableAmount}
+            onChange={handleVariableAmountChange}
+            onClick={(e) => e.stopPropagation()} // Stop click bubbling
+            onMouseDown={(e) => e.stopPropagation()} // Stop mouse down bubbling
+            onKeyDown={(e) => e.stopPropagation()} // Stop key down bubbling
+            min="1"
+            max="1000"
+            style={{ width: '60px', textAlign: 'center', margin: '0 6px', padding: '3px', border: '2px solid #4a90e2', borderRadius: '0.5em', background: '#f9f9f9', color: '#333', fontWeight: '500', verticalAlign: 'middle' }}
+            disabled={loading}
+          />
+          {text.split('{amount}')[1] || 'Sats'}
         </div>
-      </>
-    )
+      )
+    }
+    return <div ref={nodeTextRef} className="nodeText" onClick={handleClick}>{loading ? loadingtext : buttonLabel}</div>
   }
 
   return (
