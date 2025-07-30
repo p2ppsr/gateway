@@ -12,10 +12,12 @@
  * - `usage` ("used" | "unused" | "all"): Filter by usage status (default: "all")
  *
  * Used by the Gateway frontend to display the list of configured buttons for a merchant.
+ *
+ * Version: v1.1 (Updated 30Jul2025_0049 BST with Description Column)
  */
 
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile' // Assumes knexfile.js renamed to knexfile.ts
+import knexConfig from '../../knexfile'
 import { Request, Response } from 'express'
 
 const db: Knex = knex(knexConfig)
@@ -29,6 +31,7 @@ export default {
    *
    * Retrieves payment buttons based on merchant identity and optional filters,
    * including usage status, multi-use flag, pagination, and sort order.
+   * Includes the custom description field for each button.
    *
    * @param req - Express request object, must include `auth.identityKey` from middleware.
    *              Accepts query parameters: `limit`, `offset`, `sort`, `excludeSingleUse`, `usage`.
@@ -55,8 +58,20 @@ export default {
     }
 
     try {
-      // Start building the query
+      // Start building the query with explicit column selection
       let query = db('payment_buttons')
+        .select(
+          'button_id',
+          'amount',
+          'currency',
+          'variable_amount',
+          'merchant_id',
+          'multi_use',
+          'used',
+          'accepts',
+          'total_paid',
+          'description'
+        )
         .where({ merchant_id: merchantId })
         .orderBy('created_at', sort)
         .limit(limit)
@@ -73,10 +88,10 @@ export default {
       } else if (usage === 'unused') {
         query = query.andWhere('used', '=', false)
       }
-      // Note: 'all' does not require any additional filtering
 
       // Execute the query to get the list of buttons
       const buttons = await query
+      console.log('🔍 [listButtons] Fetched buttons:', buttons.map(b => ({ button_id: b.button_id, description: b.description })))
 
       // Respond with the list of buttons
       res.status(200).json({
@@ -85,7 +100,7 @@ export default {
         message: 'Payment buttons fetched successfully'
       })
     } catch (error) {
-      console.error('❌ Error listing payment buttons:', error)
+      console.error('❌ [listButtons] Error listing payment buttons:', error)
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

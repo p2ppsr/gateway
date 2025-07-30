@@ -11,7 +11,7 @@
  * Used by the Gateway UI to initiate a payment flow after clicking a tipping button.
  * - All amounts are handled as BSV decimals internally (to match current DB schema).
  *
- * Version: v1.7 (Updated 28Jul2025_1137 BST with Fixed Satoshis Logic)
+ * Version: v1.10 (Updated 29Jul2025_2125 BST with Custom Spending Description)
  */
 
 import knex, { Knex } from 'knex'
@@ -31,6 +31,7 @@ interface PaymentButton {
   amount: number // Amount in BSV (decimal)
   currency: string
   created_at?: string // Optional timestamp
+  description?: string // Custom spending description
 }
 
 interface RequestBody {
@@ -59,7 +60,7 @@ export default {
    * @param req - Express request with `paymentButtonId`, `merchantId`, `currency`, and `amount` in BSV in body.
    *              Auth middleware must populate `req.auth.identityKey`.
    * @param res - Express response object for sending success or error responses.
-   * @returns {Promise<void>} Sends a 200 success response with `paymentId` and derived outputs.
+   * @returns {Promise<void>} Sends a 200 success response with `paymentId` and derived outputs including merchantId and custom description.
    */
   func: async (req: Request, res: Response): Promise<void> => {
     // Extract the necessary information from the request body
@@ -74,7 +75,7 @@ export default {
           merchant_id: merchantId
         })
         .first()
-      console.log('🔍 [Step 2] Payment button data (BSV):', button) // Log database amount
+      console.log('🔍 [Step 2] Payment button data (BSV):', { ...button, description: button?.description || 'Not set' }) // Log database amount and description
 
       if (button === undefined) {
         res.status(404).json({
@@ -148,25 +149,37 @@ export default {
       const pkh = new P2PKH()
       const derivedScript = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex()
 
-      // Use button amount in BSV, convert to satoshis for output (reason: client expects satoshis)
-      const satoshis = Math.round(button.amount * 100000000)
+      // Use client-provided amount for variable buttons, button amount for fixed
+      const satoshis = Math.round((button.variable_amount ? amount : button.amount) * 100000000)
+      console.log('🔍 [Step 4] Calculated satoshis for output:', satoshis)
 
-      // Respond with the payment ID
+      // Use custom description from payment_buttons, fallback to default
+      const outputDescription = button.description || 'Tip paid to merchant'
+      console.log('🔍 [Step 5] Using output description:', outputDescription)
+
+      // Respond with the payment ID and outputs including merchantId
+      const outputs = [
+        {
+          lockingScript: derivedScript,
+          satoshis, // Amount in satoshis based on client or button amount
+          outputDescription,
+          merchantId // Add merchantId for Metanet spending window
+        }
+      ]
+      console.log('🔍 [Step 6] Response outputs:', outputs)
+
       res.status(200).json({
         status: 'success',
         message: 'Invoice created successfully',
         paymentId: paymentID,
-        outputs: [
-          {
-            lockingScript: derivedScript,
-            satoshis, // Amount in satoshis based on button amount
-            outputDescription: 'Tip paid to merchant'
-          }
-        ]
+        outputs
       })
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`❌ Error creating invoice: ${message}`)
+      console.error(`❌ Error creating invoice: ${message}`, {
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        requestBody: req.body
+      })
       res.status(500).json({
         status: 'error',
         message: 'Internal server error'

@@ -19,9 +19,9 @@
  * - Preview aligns with generated button by defaulting to text-width, with optional data-width override and centering enforced.
  * - UI enhanced with continuous flashing effects with a 1-second period using CSS animations, flashing only the Copy Code icon initially (when disabled), and independent cross-flashing between Generate Button and Copy Code icon during hover.
  * - Variable button preview input field is read-only to prevent merchant interaction.
- * - Added spending description textbox with gap, no helper text.
+ * - Added spending description textbox with gap, no helper text, live-updated data-description.
  *
- * Version: v4.8.8 (Updated 29Jul2025_2106 BST with Fixed Rendering, Textbox Gap, No Helper Text)
+ * Version: v4.8.12 (Updated 30Jul2025_0212 BST with Fixed Text Node for Fixed Button Preview)
  */
 
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
@@ -74,8 +74,8 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
 const Create: React.FC = () => {
   const [buttonText_fixed, setButtonText_fixed] = useState('Pay Now')
   const [buttonText_variable, setButtonText_variable] = useState('Pay Now')
-  const [spendingDescription_fixed, setSpendingDescription_fixed] = useState('Tip paid to merchant')
-  const [spendingDescription_variable, setSpendingDescription_variable] = useState('Tip paid to merchant')
+  const [spendingDescription_fixed, setSpendingDescription_fixed] = useState('Payment to merchant with buttonId: abc123...')
+  const [spendingDescription_variable, setSpendingDescription_variable] = useState('Payment to merchant with buttonId: abc123...')
   const [paymentType, setPaymentType] = useState<'fixed' | 'variable'>('fixed')
   const [fixedSatAmount, setFixedSatAmount] = useState('5')
   const [merchant, setMerchant] = useState('')
@@ -145,8 +145,28 @@ const Create: React.FC = () => {
   const previewContainerRef = useRef<HTMLDivElement>(null)
   const isMounted = useRef(false)
 
+  const updatePreviewCodes = useCallback(() => {
+    logWithTimestamp('pages/Create', 'updatePreviewCodes: Starting update for paymentType:', paymentType, 'merchant:', merchant)
+    const fixedCode = `<style>\n${customCSS_fixed.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-fixed"\n  data-merchant="${merchant || 'temp-merchant'}"\n  data-button="${buttonID || 'temp-fixed'}"\n  data-amount="${fixedSatAmount}"\n  data-currency="BSV"\n  data-text="${buttonText_fixed}"\n  data-description="${spendingDescription_fixed}"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_fixed} ${fixedSatAmount} Sats</div>`
+    const variableCode = `<style>\n${customCSS_variable.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-variable"\n  data-merchant="${merchant || 'temp-merchant'}"\n  data-button="${buttonID || 'temp-variable'}"\n  data-currency="BSV"\n  data-text="${buttonText_variable}"\n  data-description="${spendingDescription_variable}"\n  data-variable="true"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_variable} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+    setPreviewCode_fixed(fixedCode)
+    setPreviewCode_variable(variableCode)
+    logWithTimestamp('pages/Create', 'updatePreviewCodes: Codes generated - fixed:', fixedCode.substring(0, 50) + '...', 'variable:', variableCode.substring(0, 50) + '...')
+    if (styleElement_fixed) {
+      styleElement_fixed.textContent = customCSS_fixed
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied fixed custom CSS:', customCSS_fixed.substring(0, 50) + '...')
+    }
+    if (styleElement_variable) {
+      styleElement_variable.textContent = customCSS_variable
+      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied variable custom CSS:', customCSS_variable.substring(0, 50) + '...')
+    }
+    generatePreviewHtml('fixed')
+    generatePreviewHtml('variable')
+    logWithTimestamp('pages/Create', 'updatePreviewCodes: Previews generated for paymentType:', paymentType)
+  }, [customCSS_fixed, customCSS_variable, fixedSatAmount, merchant, buttonText_fixed, buttonText_variable, spendingDescription_fixed, spendingDescription_variable, buttonID, paymentType, styleElement_fixed, styleElement_variable])
+
   useEffect(() => {
-    logWithTimestamp('pages/Create', 'useEffect: Starting merchant fetch (v4.8.8)')
+    logWithTimestamp('pages/Create', 'useEffect: Starting merchant fetch (v4.8.12)')
     void (async () => {
       try {
         const identity = await wallet.getPublicKey({ identityKey: true })
@@ -160,7 +180,7 @@ const Create: React.FC = () => {
         updatePreviewCodes() // Render previews even without Metanet
       }
     })()
-  }, [])
+  }, [updatePreviewCodes])
 
   useLayoutEffect(() => {
     logWithTimestamp('pages/Create', 'useLayoutEffect: Running with hasMetanet:', hasMetanet, 'isMounted:', isMounted.current)
@@ -183,7 +203,7 @@ const Create: React.FC = () => {
       setRenderKey(prev => prev + 1) // Force re-render to update field visibility
       updatePreviewCodes()
     }
-  }, [paymentType, merchant, hasMetanet])
+  }, [paymentType, merchant, hasMetanet, updatePreviewCodes])
 
   useEffect(() => {
     const newStyleElement = document.createElement('style')
@@ -236,44 +256,28 @@ const Create: React.FC = () => {
       logWithTimestamp('pages/Create', 'useEffect: Applied create-page class to preview container')
     }
     updatePreviewCodes()
-  }, [buttonID, previewContainerRef])
+  }, [buttonID, previewContainerRef, updatePreviewCodes])
 
-  const updatePreviewCodes = useCallback(() => {
-    logWithTimestamp('pages/Create', 'updatePreviewCodes: Starting update for paymentType:', paymentType, 'merchant:', merchant)
-    const fixedCode = `<style>\n${customCSS_fixed.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-fixed"\n  data-merchant="${merchant || 'temp-merchant'}"\n  data-button="${buttonID || 'temp-fixed'}"\n  data-amount="${fixedSatAmount}"\n  data-currency="BSV"\n  data-text="${buttonText_fixed}"\n  data-description="${spendingDescription_fixed}"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_fixed} ${fixedSatAmount} Sats</div>`
-    const variableCode = `<style>\n${customCSS_variable.trim()}\n</style>\n<div\n  class="gateway-paybutton gateway-paybutton-variable"\n  data-merchant="${merchant || 'temp-merchant'}"\n  data-button="${buttonID || 'temp-variable'}"\n  data-currency="BSV"\n  data-text="${buttonText_variable}"\n  data-description="${spendingDescription_variable}"\n  data-variable="true"\n  data-width="fit-content"\n  data-server="${location.protocol}//${location.host}"\n>${buttonText_variable} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-    setPreviewCode_fixed(fixedCode)
-    setPreviewCode_variable(variableCode)
-    logWithTimestamp('pages/Create', 'updatePreviewCodes: Codes generated - fixed:', fixedCode.substring(0, 50) + '...', 'variable:', variableCode.substring(0, 50) + '...')
-    if (styleElement_fixed) {
-      styleElement_fixed.textContent = customCSS_fixed
-      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied fixed custom CSS:', customCSS_fixed.substring(0, 50) + '...')
-    }
-    if (styleElement_variable) {
-      styleElement_variable.textContent = customCSS_variable
-      logWithTimestamp('pages/Create', 'updatePreviewCodes: Re-applied variable custom CSS:', customCSS_variable.substring(0, 50) + '...')
-    }
-    setTimeout(() => {
-      generatePreviewHtml('fixed')
-      generatePreviewHtml('variable')
-      logWithTimestamp('pages/Create', 'updatePreviewCodes: Previews generated for paymentType:', paymentType, 'after delay')
-    }, 0)
-  }, [customCSS_fixed, customCSS_variable, fixedSatAmount, merchant, buttonText_fixed, buttonText_variable, spendingDescription_fixed, spendingDescription_variable, buttonID, paymentType, styleElement_fixed, styleElement_variable])
+  useEffect(() => {
+    logWithTimestamp('pages/Create', 'useEffect: Updating previews for description change - paymentType:', paymentType, 'fixedDescription:', spendingDescription_fixed, 'variableDescription:', spendingDescription_variable)
+    updatePreviewCodes()
+  }, [spendingDescription_fixed, spendingDescription_variable, updatePreviewCodes])
 
   const generatePreviewHtml = (type: 'fixed' | 'variable') => {
     logWithTimestamp('pages/Create', 'generatePreviewHtml: Starting for type:', type, 'current paymentType:', paymentType, 'isSelected:', type === paymentType)
     const text = type === 'fixed' ? buttonText_fixed : buttonText_variable
     const isSelected = type === paymentType
-    const className = type === 'fixed' ? `gateway-paybutton-fixed${isSelected ? '' : ' disabled'}` : `gateway-paybutton-variable${isSelected ? '' : ' disabled'}`
+    const className = type === 'fixed' ? `gateway-paybutton gateway-paybutton-fixed${isSelected ? '' : ' disabled'}` : `gateway-paybutton gateway-paybutton-variable${isSelected ? '' : ' disabled'}`
     let html = ''
     if (type === 'fixed') {
-      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} ${fixedSatAmount} Sats</div>`
+      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${buttonText_fixed}" data-description="${spendingDescription_fixed}">${buttonText_fixed} ${fixedSatAmount} Sats</div>`
       setPreviewFixedHtml(html)
+      logWithTimestamp('pages/Create', 'generatePreviewHtml: Fixed preview HTML set:', html)
     } else {
-      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block">${text} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+      html = `<div class="${className}" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${spendingDescription_variable}">${buttonText_variable} <input type="number" value="" min="1" max="10000" style="width: 50px; text-align: center;" readonly /> Sats</div>`
       setPreviewVariableHtml(html)
+      logWithTimestamp('pages/Create', 'generatePreviewHtml: Variable preview HTML set:', html)
     }
-    logWithTimestamp('pages/Create', 'generatePreviewHtml: Generated for type:', type, 'HTML:', html, 'className:', className)
   }
 
   const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {

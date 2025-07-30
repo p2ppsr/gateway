@@ -2,19 +2,20 @@
  * @file src/routes/createButton.ts
  *
  * POST route to create a new payment button. This endpoint receives configuration
- * options such as amount, currency, multi-use status, and accepted payment types,
- * validates the input, ensures the merchant exists, and inserts a new record
- * into the `payment_buttons` table.
+ * options such as amount, currency, multi-use status, accepted payment types, and
+ * spending description, validates the input, ensures the merchant exists, and inserts
+ * a new record into the `payment_buttons` table.
  *
  * - Requires authentication middleware to populate `req.auth.identityKey`.
  * - Ensures the merchant exists or inserts a new one if needed.
  * - Generates a unique `button_id` and initializes all button fields.
  * - Accepts `amount` in sats and converts to BSV decimal for storage.
  * - For variableAmount: true, allows amount: 0 or omitted, storing 0.0 in DB.
+ * - Stores custom spending description for use in invoice route.
  *
  * Used by the "Create" page in the Gateway frontend to configure tipping buttons.
  *
- * Version: v1.5 (Updated 29Jul2025_1643 BST with Enhanced Error Logging)
+ * Version: v1.6 (Updated 29Jul2025_2202 BST with Spending Description Storage)
  */
 
 import knex, { Knex } from 'knex'
@@ -37,6 +38,7 @@ interface RequestBody {
   variableAmount: boolean
   multiUse: boolean
   accepts: string
+  description: string // Custom spending description
 }
 
 export default {
@@ -56,23 +58,24 @@ export default {
    * @param req.body.variableAmount - Whether the button allows flexible amounts.
    * @param req.body.multiUse - Whether the button can be reused.
    * @param req.body.accepts - What the button accepts ("BSV", "fiat", or "both").
+   * @param req.body.description - Custom description for Metanet spending window.
    * @param res - Express response object to send success or error response.
    * @returns {Promise<void>} Sends a 200 success response with `buttonId` or an error.
    */
   func: async (req: Request, res: Response): Promise<void> => {
     const merchantId = (req as any).auth?.identityKey
-
-    const { amount = 0, currency, variableAmount, multiUse, accepts }: RequestBody = req.body
-    console.log('🔍 [Step 1] Create button request (sats):', { merchantId, amount, currency, variableAmount, multiUse, accepts })
+    const { amount = 0, currency, variableAmount, multiUse, accepts, description }: RequestBody = req.body
+    console.log('🔍 [Step 1] Create button request (sats):', { merchantId, amount, currency, variableAmount, multiUse, accepts, description })
 
     if (
       typeof currency !== 'string' ||
       typeof variableAmount !== 'boolean' ||
       typeof multiUse !== 'boolean' ||
       !['BSV', 'fiat', 'both'].includes(accepts) ||
+      typeof description !== 'string' || description.trim() === '' ||
       merchantId === undefined
     ) {
-      console.log('❌ Validation failed:', { currency, variableAmount, multiUse, accepts, merchantId })
+      console.log('❌ Validation failed:', { currency, variableAmount, multiUse, accepts, description, merchantId })
       res.status(400).json({ status: 'error', message: 'Invalid parameters' })
       return
     }
@@ -118,7 +121,8 @@ export default {
         multi_use: multiUse,
         used: false,
         total_paid: 0,
-        accepts
+        accepts,
+        description
       })
       await db('payment_buttons').insert({
         button_id: buttonId,
@@ -129,7 +133,8 @@ export default {
         multi_use: multiUse,
         used: false,
         total_paid: 0,
-        accepts
+        accepts,
+        description
       })
 
       console.log('✅ Inserted payment button:', buttonId)

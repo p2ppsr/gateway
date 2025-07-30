@@ -13,11 +13,12 @@
  *   including detailed timing from fetch initiation to response, optimized for local testing.
  * - Optimizes performance with a 100ms debounce to prevent multiple rapid fetch attempts.
  * - Adjusted `useRef` type to `number | null` to align with browser `setTimeout` return type, correcting TS2322 error.
+ * - Added `description` column to the table for custom spending descriptions.
  *
  * Used by the Gateway UI to manage user-created payment buttons. For local testing, delays are attributed to server or application logic,
  * not external connections or hardware constraints (MacBook Pro M4 Max, 128GB RAM, 2TB SSD), guiding optimization efforts.
  *
- * Version: v2.3 (Updated 25Jul2025_1027 BST)
+ * Version: v2.4 (Updated 30Jul2025_0049 BST with Description Column)
  */
 
 import React, { useState, useEffect, useRef } from 'react'
@@ -64,6 +65,7 @@ interface ButtonResponse {
     used: boolean
     accepts: string
     total_paid: number | string
+    description: string
   }[]
 }
 
@@ -220,7 +222,7 @@ const PaymentButtonsList: React.FC = () => {
             </Select>
             <Button
               variant="contained"
-              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              onChange={(e) => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
             >
               Sort by Total: {sortOrder.toUpperCase()}
             </Button>
@@ -237,6 +239,7 @@ const PaymentButtonsList: React.FC = () => {
                   <TableCell>Used</TableCell>
                   <TableCell>Accepts</TableCell>
                   <TableCell>Total Paid</TableCell>
+                  <TableCell>Description</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -250,6 +253,7 @@ const PaymentButtonsList: React.FC = () => {
                     <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
                     <TableCell>{button.accepts}</TableCell>
                     <TableCell>{formatBSV(button.total_paid)}</TableCell>
+                    <TableCell>{button.description}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
