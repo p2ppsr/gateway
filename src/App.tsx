@@ -8,6 +8,7 @@
  * - Added explicit return type for `App` to satisfy `@typescript-eslint/explicit-function-return-type`.
  * - Rewrote `setInterval` to avoid misused Promise warning.
  * - Prefixed IIFE in `useEffect` with `void` to prevent floating promise warning.
+ * - Replaced process.env with utils/constants.ts for configuration.
  */
 
 import React, { useState, useEffect } from 'react'
@@ -24,15 +25,15 @@ import { CssBaseline } from '@mui/material'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
+import { CONFIG } from './utils/constants'
 
 // AuthFetch – constructed once per session
-const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost'
+console.log('CONFIG:', CONFIG)
+const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
 
-const API_BASE =
-  process.env.API_BASE ??
-  `${window.location.protocol}//${window.location.hostname}:${process.env.API_PORT ?? process.env.HTTP_PORT ?? 3001}`
+const API_BASE = CONFIG.API_BASE
 
 /**
  * The main React component for the application.

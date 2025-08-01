@@ -2,26 +2,27 @@
  * @file src/routes/createButton.ts
  *
  * POST route to create a new payment button. This endpoint receives configuration
- * options such as amount, currency, multi-use status, accepted payment types, and
- * spending description, validates the input, ensures the merchant exists, and inserts
- * a new record into the `payment_buttons` table.
+ * options such as amount, currency, multi-use status, accepted payment types,
+ * validates the input, ensures the merchant exists, and inserts a new record
+ * into the `payment_buttons` table.
  *
  * - Requires authentication middleware to populate `req.auth.identityKey`.
  * - Ensures the merchant exists or inserts a new one if needed.
  * - Generates a unique `button_id` and initializes all button fields.
  * - Accepts `amount` in sats and converts to BSV decimal for storage.
  * - For variableAmount: true, allows amount: 0 or omitted, storing 0.0 in DB.
- * - Stores custom spending description for use in invoice route.
+ * - Added input validation and sanitization with express-validator for description (max 80 chars).
  *
  * Used by the "Create" page in the Gateway frontend to configure tipping buttons.
  *
- * Version: v1.6 (Updated 29Jul2025_2202 BST with Spending Description Storage)
+ * Version: v1.8 (Updated 30Jul2025_1116 BST with Description Validation and Sanitization)
  */
 
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
 import { randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
+import { body, validationResult } from 'express-validator'
 
 const db: Knex = knex(knexConfig)
 
@@ -44,6 +45,21 @@ interface RequestBody {
 export default {
   type: 'post',
   path: '/createButton',
+  middlewares: [
+    body('description')
+      .trim()
+      .escape()
+      .isLength({ min: 1, max: 80 })
+      .withMessage('Description must be a string between 1 and 80 characters'),
+    body('currency').trim().isIn(['BSV', 'fiat', 'both']).withMessage('Currency must be BSV, fiat, or both'),
+    body('variableAmount').isBoolean().withMessage('variableAmount must be a boolean'),
+    body('multiUse').isBoolean().withMessage('multiUse must be a boolean'),
+    body('accepts').trim().isIn(['BSV', 'fiat', 'both']).withMessage('Accepts must be BSV, fiat, or both'),
+    body('amount')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Amount must be a non-negative integer')
+  ],
 
   /**
    * Express route handler to create a new payment button.
@@ -63,30 +79,28 @@ export default {
    * @returns {Promise<void>} Sends a 200 success response with `buttonId` or an error.
    */
   func: async (req: Request, res: Response): Promise<void> => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      console.log('❌ [createButton] Validation errors:', errors.array())
+      res.status(400).json({ status: 'error', message: 'Invalid parameters', errors: errors.array() })
+      return
+    }
+
     const merchantId = (req as any).auth?.identityKey
     const { amount = 0, currency, variableAmount, multiUse, accepts, description }: RequestBody = req.body
     console.log('🔍 [Step 1] Create button request (sats):', { merchantId, amount, currency, variableAmount, multiUse, accepts, description })
 
-    if (
-      typeof currency !== 'string' ||
-      typeof variableAmount !== 'boolean' ||
-      typeof multiUse !== 'boolean' ||
-      !['BSV', 'fiat', 'both'].includes(accepts) ||
-      typeof description !== 'string' || description.trim() === '' ||
-      merchantId === undefined
-    ) {
-      console.log('❌ Validation failed:', { currency, variableAmount, multiUse, accepts, description, merchantId })
-      res.status(400).json({ status: 'error', message: 'Invalid parameters' })
+    if (!merchantId) {
+      console.log('❌ [createButton] Missing merchantId from auth context')
+      res.status(401).json({ status: 'error', message: 'Unauthorized: Missing merchant identity' })
       return
     }
 
-    if (variableAmount === false) {
-      if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-        console.log('❌ Validation failed for fixed button: amount must be a positive integer', { amount })
-        res.status(400).json({ status: 'error', message: 'Invalid parameters: fixed buttons require a positive integer amount' })
-        return
-      }
-    } // Allow amount: 0 or undefined for variableAmount: true
+    if (variableAmount === false && (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0)) {
+      console.log('❌ [createButton] Validation failed for fixed button: amount must be a positive integer', { amount })
+      res.status(400).json({ status: 'error', message: 'Invalid parameters: fixed buttons require a positive integer amount' })
+      return
+    }
 
     try {
       console.log('🔍 [Step 2] Checking merchant existence for:', merchantId)
@@ -101,10 +115,10 @@ export default {
           welcomed: false,
           custom_fee: false
         })
-        console.log('✅ Inserted new merchant:', merchantId)
+        console.log('✅ [createButton] Inserted new merchant:', merchantId)
       }
 
-      // Convert sats to BSV for storage (reason: current schema uses decimal BSV)
+      // Convert sats to BSV for storage
       const amountInBSV = variableAmount ? 0 : amount / 100000000
       console.log('🔍 [Step 5] Converted amount to BSV:', amountInBSV)
 
@@ -137,7 +151,7 @@ export default {
         description
       })
 
-      console.log('✅ Inserted payment button:', buttonId)
+      console.log('✅ [createButton] Inserted payment button:', buttonId)
 
       res.status(200).json({
         status: 'success',
@@ -146,10 +160,9 @@ export default {
       })
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
-      const errorStack = err instanceof Error ? err.stack : 'No stack trace'
-      console.error('❌ Error creating payment button:', {
+      console.error('❌ [createButton] Error creating payment button:', {
         message: errorMessage,
-        stack: errorStack,
+        stack: err instanceof Error ? err.stack : 'No stack trace',
         requestBody: req.body
       })
       res.status(500).json({ status: 'error', message: 'Internal server error' })

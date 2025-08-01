@@ -4,6 +4,7 @@
  * Express server setup for the Gateway application.
  * Registers route handlers from the aggregated routes in `src/routes/index.ts`.
  * Configures middleware and starts the server on the specified port.
+ * Includes security enhancements with Helmet and rate limiting.
  */
 
 import dotenv from 'dotenv'
@@ -17,6 +18,8 @@ import { createPaymentMiddleware, PaymentMiddlewareOptions } from '@bsv/payment-
 import routes from './routes'
 import { spawn } from 'child_process'
 import knexConfig from '../knexfile'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 
 dotenv.config()
 
@@ -65,13 +68,35 @@ const SPAWN_NGINX = process.env.SPAWN_NGINX
  */
 const WALLET_STORAGE_URL = process.env.WALLET_STORAGE_URL ?? ''
 
+/**
+ * Allowed origin for CORS (configurable via .env).
+ * @default 'http://localhost:3000' for development
+ */
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? 'http://localhost:3000'
+
 const app = express()
 
+// Apply rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-Rate-Limit-*` headers
+})
+app.use(limiter)
+console.log('🔍 Rate limiting applied: 100 requests per 15 minutes per IP')
+
+// Apply Helmet for security headers
+app.use(helmet())
+console.log('🔍 Helmet security headers applied')
+
+// Parse JSON bodies with a generous limit
 app.use(bodyParser.json({ limit: '1gb' }))
 
-// CORS headers and preflight response
+// Configure CORS with restricted origin
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', '*')
+  res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
   res.header('Access-Control-Allow-Headers', '*')
   res.header('Access-Control-Allow-Methods', '*')
   res.header('Access-Control-Expose-Headers', '*')
@@ -103,7 +128,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
  * Initializes the Express server, configures middleware, registers routes, and starts listening.
  * @async
  */
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
 ;(async () => {
   // Initialize WalletClient
   try {
@@ -113,6 +137,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       chain: 'main'
     })
     console.log('🔍 Wallet initialized:', wallet)
+
+    // Validate SERVER_PRIVATE_KEY to prevent empty or invalid keys
+    if (!process.env.SERVER_PRIVATE_KEY || process.env.SERVER_PRIVATE_KEY.length !== 64) {
+      throw new Error('❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex characters)')
+    }
 
     /**
      * Attaches authentication middleware to validate requests.
@@ -186,7 +215,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('❌ Failed to initialize wallet:', message)
-    throw new Error(`❌ Failed to initialize wallet: ${message}`)
+    console.error('❌ Failed to initialize server:', message)
+    throw new Error(`❌ Failed to initialize server: ${message}`)
   }
 })()

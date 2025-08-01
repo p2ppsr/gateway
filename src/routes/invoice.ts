@@ -10,8 +10,9 @@
  *
  * Used by the Gateway UI to initiate a payment flow after clicking a tipping button.
  * - All amounts are handled as BSV decimals internally (to match current DB schema).
+ * - Added input validation and sanitization with express-validator.
  *
- * Version: v1.10 (Updated 29Jul2025_2125 BST with Custom Spending Description)
+ * Version: v1.11 (Updated 30Jul2025_1132 BST with Input Validation and Updated Fallback Description)
  */
 
 import knex, { Knex } from 'knex'
@@ -19,6 +20,7 @@ import knexConfig from '../../knexfile'
 import { randomBytes } from 'crypto'
 import { Hash, P2PKH, PrivateKey, PublicKey, Utils } from '@bsv/sdk'
 import { Request, Response } from 'express'
+import { body, validationResult } from 'express-validator'
 
 const db: Knex = knex(knexConfig)
 
@@ -31,7 +33,7 @@ interface PaymentButton {
   amount: number // Amount in BSV (decimal)
   currency: string
   created_at?: string // Optional timestamp
-  description?: string // Custom spending description
+  description: string // Custom spending description
 }
 
 interface RequestBody {
@@ -44,7 +46,12 @@ interface RequestBody {
 export default {
   type: 'post',
   path: '/invoice',
-  knex: db,
+  middlewares: [
+    body('paymentButtonId').trim().escape().isString().notEmpty().withMessage('paymentButtonId must be a non-empty string'),
+    body('merchantId').trim().escape().isString().notEmpty().withMessage('merchantId must be a non-empty string'),
+    body('currency').trim().isIn(['BSV', 'fiat', 'both']).withMessage('Currency must be BSV, fiat, or both'),
+    body('amount').isFloat({ min: 0 }).withMessage('Amount must be a non-negative number')
+  ],
 
   /**
    * Express route handler to create a new invoice/payment entry.
@@ -63,9 +70,22 @@ export default {
    * @returns {Promise<void>} Sends a 200 success response with `paymentId` and derived outputs including merchantId and custom description.
    */
   func: async (req: Request, res: Response): Promise<void> => {
-    // Extract the necessary information from the request body
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      console.log('❌ [invoice] Validation errors:', errors.array())
+      res.status(400).json({ status: 'error', message: 'Invalid parameters', errors: errors.array() })
+      return
+    }
+
+    const senderIdentityKey = (req as any).auth?.identityKey
+    if (!senderIdentityKey) {
+      console.log('❌ [invoice] Missing sender identity key from auth context')
+      res.status(401).json({ status: 'error', message: 'Unauthorized: Missing sender identity' })
+      return
+    }
+
     const { paymentButtonId, merchantId, currency, amount }: RequestBody = req.body
-    console.log('🔍 [Step 1] Request body (BSV):', { paymentButtonId, merchantId, currency, amount }) // Log incoming amount
+    console.log('🔍 [invoice] [Step 1] Request body (BSV):', { paymentButtonId, merchantId, currency, amount })
 
     try {
       // Verify the payment button exists and belongs to the specified merchant
@@ -75,9 +95,10 @@ export default {
           merchant_id: merchantId
         })
         .first()
-      console.log('🔍 [Step 2] Payment button data (BSV):', { ...button, description: button?.description || 'Not set' }) // Log database amount and description
+      console.log('🔍 [invoice] [Step 2] Payment button data (BSV):', { ...button, description: button?.description || 'Not set' })
 
       if (button === undefined) {
+        console.log('❌ [invoice] Payment button not found for merchant:', { paymentButtonId, merchantId })
         res.status(404).json({
           status: 'error',
           message: 'Payment button not found for the specified merchant'
@@ -87,6 +108,7 @@ export default {
 
       // Verify the button has not already been used if it is a single-use button
       if (!button.multi_use && button.used) {
+        console.log('❌ [invoice] Single-use button already used:', paymentButtonId)
         res.status(400).json({
           status: 'error',
           message: 'This single-use button has already been used'
@@ -95,11 +117,12 @@ export default {
       }
 
       // Verify the amount matches or the button is variable (all in BSV)
-      console.log('🔍 [Step 3] Validation check: Requested amount=', amount, 'BSV vs Button amount=', button.amount, 'BSV')
-      if (!button.variable_amount && Math.abs(amount - button.amount) > 0.0000000001) { // Allow for floating-point precision
+      console.log('🔍 [invoice] [Step 3] Validation check: Requested amount=', amount, 'BSV vs Button amount=', button.amount, 'BSV')
+      if (!button.variable_amount && Math.abs(amount - button.amount) > 0.0000000001) {
+        console.log('❌ [invoice] Amount mismatch for fixed-amount button:', { requested: amount, expected: button.amount })
         res.status(400).json({
           status: 'error',
-          message: 'Amount mismatch for fixed-amount button (expected BSV).'
+          message: 'Amount mismatch for fixed-amount button (expected BSV)'
         })
         return
       }
@@ -110,14 +133,14 @@ export default {
         payment_id: paymentID,
         merchant_id: merchantId,
         completed: false,
-        from: (req as any).auth.identityKey,
+        from: senderIdentityKey,
         transaction_info: '',
         amount, // Stored as BSV
         currency,
         exchange_rate: 1, // Placeholder, BSV-based
         payment_button_id: paymentButtonId
       })
-      console.log(`✅ Payment invoice created: ${paymentID}`)
+      console.log(`✅ [invoice] Payment invoice created: ${paymentID}`)
 
       // Determine sender private key based on button creation context
       let senderPrivateKey: PrivateKey
@@ -125,15 +148,15 @@ export default {
         const hasCreatedAt = (await db('information_schema.columns')
           .where({ table_name: 'payment_buttons', column_name: 'created_at' })
           .first()) !== undefined
-        if (!hasCreatedAt || !button.created_at || new Date(button.created_at) < new Date('25Jul2025_1200 BST')) {
+        if (!hasCreatedAt || !button.created_at || new Date(button.created_at) < new Date('2025-07-25T12:00:00Z')) {
           senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
-          console.log('🔍 Using hardcoded key for pre-v1.2 or missing created_at button:', button.button_id)
+          console.log('🔍 [invoice] Using hardcoded key for pre-v1.2 or missing created_at button:', button.button_id)
         } else {
-          senderPrivateKey = new PrivateKey((req as any).auth.identityKey, 'hex')
-          console.log('🔍 Using authenticated identity key for new button')
+          senderPrivateKey = new PrivateKey(senderIdentityKey, 'hex')
+          console.log('🔍 [invoice] Using authenticated identity key for new button')
         }
       } catch (err) {
-        console.warn('🔍 created_at column check failed, using hardcoded key as fallback:', err)
+        console.warn('🔍 [invoice] created_at column check failed, using hardcoded key as fallback:', err)
         senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
       }
       const recipientPublicKey = PublicKey.fromString(button.merchant_id)
@@ -151,11 +174,11 @@ export default {
 
       // Use client-provided amount for variable buttons, button amount for fixed
       const satoshis = Math.round((button.variable_amount ? amount : button.amount) * 100000000)
-      console.log('🔍 [Step 4] Calculated satoshis for output:', satoshis)
+      console.log('🔍 [invoice] [Step 4] Calculated satoshis for output:', satoshis)
 
-      // Use custom description from payment_buttons, fallback to default
-      const outputDescription = button.description || 'Tip paid to merchant'
-      console.log('🔍 [Step 5] Using output description:', outputDescription)
+      // Use custom description from payment_buttons, fallback to dynamic default
+      const outputDescription = button.description || `Payment to merchant with buttonId: ${button.button_id}`
+      console.log('🔍 [invoice] [Step 5] Using output description:', outputDescription)
 
       // Respond with the payment ID and outputs including merchantId
       const outputs = [
@@ -166,7 +189,7 @@ export default {
           merchantId // Add merchantId for Metanet spending window
         }
       ]
-      console.log('🔍 [Step 6] Response outputs:', outputs)
+      console.log('🔍 [invoice] [Step 6] Response outputs:', outputs)
 
       res.status(200).json({
         status: 'success',
@@ -176,7 +199,8 @@ export default {
       })
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      console.error(`❌ Error creating invoice: ${message}`, {
+      console.error('❌ [invoice] Error creating invoice:', {
+        message,
         stack: error instanceof Error ? error.stack : 'No stack trace',
         requestBody: req.body
       })
