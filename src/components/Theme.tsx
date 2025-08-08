@@ -22,7 +22,7 @@ import { Theme } from '@mui/material/styles'
  * Common typography settings applied to both light and dark themes.
  */
 const commonTypography = {
-  fontFamily: 'Inter, sans-serif', // Updated from Satoshi per UI teammate's notes
+  fontFamily: 'Inter, sans-serif' // Updated from Satoshi per UI teammate's notes
 }
 
 /**
@@ -33,20 +33,20 @@ const lightThemeBase = createTheme({
   typography: {
     ...commonTypography,
     h1: { fontSize: '2.25rem', fontWeight: 700 }, // 36px, per UI notes
-    h2: { fontSize: '1.5rem', fontWeight: 600 },  // 24px, per UI notes
+    h2: { fontSize: '1.5rem', fontWeight: 600 }, // 24px, per UI notes
     h3: { fontSize: '1.25rem', fontWeight: 600 }, // 20px, per UI notes
     h4: { fontSize: '1.75em', color: '#424242' },
     h5: { fontSize: '1.5em', color: '#424242' },
-    h6: { fontSize: '1.25em', color: '#424242' },
+    h6: { fontSize: '1.25em', color: '#424242' }
   },
   palette: {
     mode: 'light',
     primary: { main: '#7F5AF0' }, // UI teammate's purple accent
     background: { default: '#ffffff', paper: '#ffffff' }, // Adjusted to light mode defaults
     text: { primary: '#424242', secondary: '#94A3B8' }, // UI teammate's text colors
-    divider: '#3E3E42', // UI teammate's divider
+    divider: '#3E3E42' // UI teammate's divider
   },
-  maxContentWidth: '1440px',
+  maxContentWidth: '1440px'
 })
 
 /**
@@ -57,20 +57,20 @@ const darkThemeBase = createTheme({
   typography: {
     ...commonTypography,
     h1: { fontSize: '2.25rem', fontWeight: 700 }, // 36px, per UI notes
-    h2: { fontSize: '1.5rem', fontWeight: 600 },  // 24px, per UI notes
+    h2: { fontSize: '1.5rem', fontWeight: 600 }, // 24px, per UI notes
     h3: { fontSize: '1.25rem', fontWeight: 600 }, // 20px, per UI notes
     h4: { fontSize: '1.75em', color: '#F2F2F2' },
     h5: { fontSize: '1.5em', color: '#F2F2F2' },
-    h6: { fontSize: '1.25em', color: '#F2F2F2' },
+    h6: { fontSize: '1.25em', color: '#F2F2F2' }
   },
   palette: {
     mode: 'dark',
     primary: { main: '#7F5AF0' }, // UI teammate's purple accent
     background: { default: '#1C1C1F', paper: '#2A2A2E' }, // UI teammate's dark mode
     text: { primary: '#F2F2F2', secondary: '#94A3B8' }, // UI teammate's text colors
-    divider: '#3E3E42', // UI teammate's divider
+    divider: '#3E3E42' // UI teammate's divider
   },
-  maxContentWidth: '1440px',
+  maxContentWidth: '1440px'
 })
 
 /**
@@ -85,12 +85,12 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
     ...baseTheme.typography,
     h1: {
       ...baseTheme.typography.h1,
-      [baseTheme.breakpoints.down('md')]: { fontSize: '1.8em' },
+      [baseTheme.breakpoints.down('md')]: { fontSize: '1.8em' }
     },
     h2: {
       ...baseTheme.typography.h2,
-      [baseTheme.breakpoints.down('md')]: { fontSize: '1.6em' },
-    },
+      [baseTheme.breakpoints.down('md')]: { fontSize: '1.6em' }
+    }
   },
   components: {
     MuiButton: {
@@ -99,32 +99,32 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
           borderRadius: 8,
           textTransform: 'none',
           fontWeight: 600,
-          padding: '10px 24px',
-        },
-      },
+          padding: '10px 24px'
+        }
+      }
     },
     MuiCard: {
       styleOverrides: {
         root: {
           borderRadius: 12,
-          padding: '24px',
-        },
-      },
+          padding: '24px'
+        }
+      }
     },
     MuiTextField: {
       defaultProps: {
-        variant: 'outlined', // All text fields will be the same style by default
-      },
+        variant: 'outlined' // All text fields will be the same style by default
+      }
     },
     MuiTableCell: {
       styleOverrides: {
         head: {
           backgroundColor: '#333337',
           fontWeight: 600,
-          color: '#94A3B8',
-        },
-      },
-    },
+          color: '#94A3B8'
+        }
+      }
+    }
   },
   templates: {
     page_wrap: {
@@ -134,7 +134,7 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
       padding: baseTheme.spacing(7),
       [baseTheme.breakpoints.down('lg')]: { padding: baseTheme.spacing(5) },
       [baseTheme.breakpoints.down('md')]: { padding: baseTheme.spacing(3) },
-      [baseTheme.breakpoints.down('sm')]: { padding: baseTheme.spacing(1) },
+      [baseTheme.breakpoints.down('sm')]: { padding: baseTheme.spacing(1) }
     },
     subheading: {
       fontWeight: 'bold',
@@ -144,7 +144,7 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
       color: baseTheme.palette.mode === 'dark' ? '#FFF' : '#424242',
       textAlign: 'center',
       margin: 'auto',
-      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' },
+      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' }
     },
     subheading_f: {
       fontWeight: 'bold',
@@ -153,14 +153,14 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
       color: baseTheme.palette.mode === 'dark' ? '#FFF' : '#424242',
       maxWidth: '600px',
       textAlign: 'left',
-      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' },
+      [baseTheme.breakpoints.up('lg')]: { fontSize: '32px' }
     },
     centeredHeader: {
       textAlign: 'center',
       marginBottom: baseTheme.spacing(7),
-      color: baseTheme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-    },
-  },
+      color: baseTheme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+    }
+  }
 })
 
 /**

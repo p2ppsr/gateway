@@ -58,19 +58,13 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
         boxShadow: 5
       }}
     >
-      <Typography variant='h6' fontWeight='bold' gutterBottom>
+      <Typography variant="h6" fontWeight="bold" gutterBottom>
         Gateway requires the {clientType}
       </Typography>
 
       <Typography gutterBottom>
         You can download it for your{' '}
-        <Link
-          href={downloadURL}
-          underline='hover'
-          target='_blank'
-          rel='noopener noreferrer'
-          sx={{ color: '#3aa0ff' }}
-        >
+        <Link href={downloadURL} underline="hover" target="_blank" rel="noopener noreferrer" sx={{ color: '#3aa0ff' }}>
           {platformLabel}
         </Link>
         :
@@ -78,10 +72,10 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
 
       <Typography gutterBottom>
         <Link
-          href='https://github.com/bsv-blockchain/metanet-desktop/releases'
-          underline='hover'
-          target='_blank'
-          rel='noopener noreferrer'
+          href="https://github.com/bsv-blockchain/metanet-desktop/releases"
+          underline="hover"
+          target="_blank"
+          rel="noopener noreferrer"
           sx={{ color: '#3aa0ff' }}
         >
           All Metanet clients

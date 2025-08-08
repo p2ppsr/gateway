@@ -35,9 +35,7 @@ interface GitHubRelease {
  */
 const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
   try {
-    const response = await fetch(
-      'https://api.github.com/repos/bsv-blockchain/metanet-desktop/releases/latest'
-    )
+    const response = await fetch('https://api.github.com/repos/bsv-blockchain/metanet-desktop/releases/latest')
     const data: GitHubRelease = await response.json()
     console.log('🔍 GitHub release data:', data)
 

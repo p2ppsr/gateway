@@ -10,19 +10,19 @@
  */
 
 exports.up = async function (knex) {
-  await knex.raw('SELECT 1'); // Debug: Confirm Knex connection
-  await knex.schema.table('payment_buttons', (table) => {
-    table.text('description').nullable().defaultTo('Payment to merchant with buttonId: abc123...');
-  });
-  await knex.raw('SELECT 1'); // Debug: Confirm schema update
-  console.log('✅ Added description column to payment_buttons table');
-};
+  await knex.raw('SELECT 1') // Debug: Confirm Knex connection
+  await knex.schema.table('payment_buttons', table => {
+    table.text('description').nullable().defaultTo('Payment to merchant with buttonId: abc123...')
+  })
+  await knex.raw('SELECT 1') // Debug: Confirm schema update
+  console.log('✅ Added description column to payment_buttons table')
+}
 
 exports.down = async function (knex) {
-  await knex.raw('SELECT 1'); // Debug: Confirm Knex connection
-  await knex.schema.table('payment_buttons', (table) => {
-    table.dropColumn('description');
-  });
-  await knex.raw('SELECT 1'); // Debug: Confirm schema rollback
-  console.log('✅ Removed description column from payment_buttons table');
-};
+  await knex.raw('SELECT 1') // Debug: Confirm Knex connection
+  await knex.schema.table('payment_buttons', table => {
+    table.dropColumn('description')
+  })
+  await knex.raw('SELECT 1') // Debug: Confirm schema rollback
+  console.log('✅ Removed description column from payment_buttons table')
+}

@@ -15,11 +15,15 @@
  * - Supports variable amount buttons with user input (data-variable="true").
  * - Prevents payment flow triggering on variable input field clicks with stopPropagation on multiple events.
  *
- * Version: v1.5.17 (Updated 29Jul2025_1540 BST with Zero Satoshis Fallback)
+ * Version: v2.2 (Updated 05Aug2025_0645 BST to include lockingScript in pay request)
+ * Change Log:
+ * - 04Aug2025_2345 BST (v2.0): Initial version, using paymentId exclusively instead of buttonId, reflecting database schema change.
+ * - 05Aug2025_0610 BST (v2.1): Fixed paymentId propagation in payPayload to ensure invoice.transaction_id is used correctly, resolving undefined paymentId issue in /api/pay requests.
+ * - 05Aug2025_0645 BST (v2.2): Added lockingScript to payPayload to allow server validation without re-derivation, restoring pre-transaction_id change behavior.
  */
-
 import React, { useState, useRef, useEffect, ReactElement } from 'react'
 import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
+import { MAX_PAYMENT_SATS } from '../../utils/constants'
 
 // Define interfaces based on @bsv/sdk
 export interface ListOutputsResult {
@@ -27,24 +31,22 @@ export interface ListOutputsResult {
   BEEF?: any
   outputs: WalletOutput[]
 }
-
 interface WalletOutput {
   satoshis: number
   // Add other WalletOutput properties as needed (e.g., script, txid) based on @bsv/sdk docs
 }
-
 interface ListOutputsArgs {
   basket?: string
   limit?: number
   // Add other ListOutputsArgs properties as needed based on @bsv/sdk docs
 }
 
-// Define props interface with sats as integer
+// Define props interface with paymentId as the primary identifier
 export interface PayButtonProps {
   text?: string // Templated text with {amount} placeholder (default "Pay Now {amount} Sats")
   amount: number // Amount in sats (integer, 0 for variable)
   merchant: string
-  button: string
+  paymentId: string // Replaced button with paymentId as the primary identifier
   currency?: string
   server: string
   loadingtext?: string
@@ -55,7 +57,7 @@ export interface PayButtonProps {
 interface InvoiceResponse {
   status: string
   message?: string
-  paymentId: string
+  transaction_id: string // Updated to match invoice.ts v2.3 response
   outputs: CreateActionOutput[] | undefined
 }
 
@@ -68,19 +70,19 @@ interface PayResponse {
 /**
  * Reusable payment component.
  *
- * @param text         Button label template (default "Pay Now {amount} Sats")
- * @param amount       Amount in sats (integer, 0 for variable)
- * @param merchant     Merchant identity key (string)
- * @param button       Payment-button ID (string)
- * @param currency     "BSV" | "USD" | … (used for display or server compatibility)
- * @param server       Gateway back-end URL (e.g. "http://localhost:3000")
- * @param loadingtext  Text while awaiting invoice / payment
+ * @param text Button label template (default "Pay Now {amount} Sats")
+ * @param amount Amount in sats (integer, 0 for variable)
+ * @param merchant Merchant identity key (string)
+ * @param paymentId Payment button ID (string, replacing buttonId)
+ * @param currency "BSV" | "USD" | … (used for display or server compatibility)
+ * @param server Gateway back-end URL (e.g. "http://localhost:3000")
+ * @param loadingtext Text while awaiting invoice / payment
  */
 const PayButton = ({
   text = 'Pay Now {amount} Sats',
   amount,
   merchant,
-  button,
+  paymentId,
   currency = 'BSV',
   server,
   loadingtext = 'Loading, please wait…',
@@ -89,16 +91,18 @@ const PayButton = ({
   const [loading, setLoading] = useState(false)
   const [paid, setPaid] = useState(false)
   const [txid, setTxid] = useState<string | null>(null)
-  const [variableAmount, setVariableAmount] = useState<string>("1") // Default to 1 for variable buttons
+  const [variableAmount, setVariableAmount] = useState<string>('1') // Default to 1 for variable buttons
   const nodeTextRef = useRef<HTMLDivElement>(null)
 
   // Construct dynamic button label for variable buttons
-  const buttonLabel = variable ? `${text.split('{amount}')[0]}${variableAmount} ${text.split('{amount}')[1] || 'Sats'}` : text.replace('{amount}', amount.toString());
-  console.log('🔍 Button label:', buttonLabel);
+  const buttonLabel = variable
+    ? `${text.split('{amount}')[0]}${variableAmount} ${text.split('{amount}')[1] || 'Sats'}`
+    : text.replace('{amount}', amount.toString())
+  console.log('🔍 Button label:', buttonLabel)
 
   const handleVariableAmountChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const input = event.target.value.replace(/[^0-9]/g, '') // Strip non-digits
-    const satValue = Math.max(1, Math.min(1000, Number(input) || 1)) // Clamp 1-1000
+    const satValue = Math.max(1, Math.min(MAX_PAYMENT_SATS, Number(input) || 1))
     setVariableAmount(satValue.toString())
     console.log('🔍 Variable amount updated:', satValue)
   }
@@ -116,23 +120,24 @@ const PayButton = ({
     try {
       // Use variableAmount if variable, else props.amount
       const effectiveAmount = variable ? Number(variableAmount) : amount
-
-      // Validate effective amount
-      if (!Number.isInteger(effectiveAmount) || effectiveAmount <= 0 || effectiveAmount > 1000) {
-        throw new Error('❌ Invalid amount: must be a positive integer between 1 and 1000 sats')
+      // Validate effectiveAmount
+      if (!Number.isInteger(effectiveAmount) || effectiveAmount <= 0 || effectiveAmount > MAX_PAYMENT_SATS) {
+        throw new Error(`❌ Invalid amount: must be a positive integer between 1 and ${MAX_PAYMENT_SATS}`)
       }
       console.log('🔍 [Step 1] Client requested amount (sats):', effectiveAmount)
-
       const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321' // Configurable port
       const wallet = new WalletClient('auto', WALLET_ORIGIN)
       const authFetch = new AuthFetch(wallet)
-
       // Debug wallet connection and funds with retry
       let walletOutputs: ListOutputsResult | null = null
       const substrates = [
         { type: 'HTTPWalletJSON', substrate: 'json-api', skip: false },
         { type: 'HTTPWalletWire', substrate: 'Cicada', skip: false },
-        { type: 'WindowCWISubstrate', substrate: 'window.CWI', skip: typeof window === 'undefined' || !(window as any).CWI },
+        {
+          type: 'WindowCWISubstrate',
+          substrate: 'window.CWI',
+          skip: typeof window === 'undefined' || !(window as any).CWI
+        },
         { type: 'XDMSubstrate', substrate: 'XDM', skip: false },
         { type: 'ReactNativeWebView', substrate: 'react-native', skip: false }
       ]
@@ -143,12 +148,17 @@ const PayButton = ({
         }
         try {
           console.log(`🔍 Attempting wallet connection with ${type} on ${WALLET_ORIGIN}`)
-          const instance = new WalletClient(substrate as 'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api' | 'react-native', WALLET_ORIGIN)
+          const instance = new WalletClient(
+            substrate as 'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api' | 'react-native',
+            WALLET_ORIGIN
+          )
           const versionPromise = instance.getVersion({})
-          const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Timeout on ${type}`)), 2000))
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout on ${type}`)), 2000)
+          )
           await Promise.race([versionPromise, timeoutPromise])
           console.log(`✅ Wallet version retrieved with ${type}`)
-          walletOutputs = await instance.listOutputs({ basket: button }) // Use button ID as basket
+          walletOutputs = await instance.listOutputs({ basket: paymentId }) // Use paymentId as basket
           console.log(`✅ Wallet connected with ${type} on ${WALLET_ORIGIN}`, walletOutputs)
           wallet.substrate = instance.substrate // Set successful substrate
           break
@@ -157,43 +167,68 @@ const PayButton = ({
         }
       }
       if (!walletOutputs) throw new Error('❌ All wallet connection attempts failed')
-
-      console.log('🔍 Wallet outputs for basket:', button, walletOutputs)
+      console.log('🔍 Wallet outputs for basket:', paymentId, walletOutputs)
       // Skip basket-specific check if empty, rely on createAction
       if (walletOutputs.outputs.length > 0 && walletOutputs.outputs[0].satoshis < effectiveAmount + 1) {
         throw new Error('❌ Insufficient funds in basket: need at least ' + (effectiveAmount + 1) + ' sats')
       }
       console.log('🔍 Wallet selected inputs:', walletOutputs)
-
       const resStatus = await authFetch.fetch(`${server}/api/getStatus`, {
         method: 'GET'
       })
       const status = await resStatus.json()
       if (status.status !== 'success') throw new Error('❌ Cannot reach server')
+      //*Convert sats to BSV for server request (reason: server expects BSV)
+      //*const amountInBSV = effectiveAmount / 100000000
+      //*const amountInBSV = effectiveAmount / 100000000
+      //*console.log('🔍 [Step 2] Converted amount to BSV:', amountInBSV)
 
-      // Convert sats to BSV for server request (reason: server expects BSV)
-      const amountInBSV = effectiveAmount / 100000000
-      console.log('🔍 [Step 2] Converted amount to BSV:', amountInBSV)
-
+      //Fetch additional data (optional, adjust if needed)
+      let fetchedPaymentId = paymentId // Default to paymentId
+      try {
+        const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`, {
+          headers: { Accept: 'application/json' }
+        })
+        if (!buttonCodeResponse.ok) throw new Error(`HTTP error! status: ${buttonCodeResponse.status}`)
+        const buttonCodeData = await buttonCodeResponse.json()
+        if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
+          fetchedPaymentId = buttonCodeData.payment_id
+          console.log('🔍 [client] Fetched paymentId:', fetchedPaymentId)
+        } else {
+          console.warn(
+            '🔍 [client] Failed to fetch paymentId, using provided paymentId:',
+            paymentId,
+            'Response:',
+            buttonCodeData
+          )
+        }
+      } catch (fetchError) {
+        console.error(
+          '❌ [client] Button code fetch error:',
+          fetchError,
+          'Status:',
+          fetchError instanceof Error && (fetchError as any).status
+        )
+      }
       // Send amount in BSV to server
       const resInv = await authFetch.fetch(`${server}/api/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           merchantId: merchant,
-          paymentButtonId: button,
+          paymentId: fetchedPaymentId,
           currency,
-          amount: amountInBSV // Amount in BSV
+          amount: effectiveAmount
         })
       })
       const invoice: InvoiceResponse = await resInv.json()
       if (invoice.status !== 'success') throw new Error(`❌ ${invoice.message ?? 'Invoice creation failed'}`)
-
       // Verify outputs match requested amount, with fallback for variable buttons
-      let outputsWithSats = invoice.outputs?.map(output => ({
-        ...output,
-        satoshis: Math.round(output.satoshis) // Ensure integer sats
-      })) || []
+      let outputsWithSats =
+        invoice.outputs?.map(output => ({
+          ...output,
+          satoshis: Math.round(output.satoshis)
+        })) || []
       if (variable && outputsWithSats.length && outputsWithSats[0].satoshis === 0) {
         console.log('🔍 Server returned zero satoshis for variable button, using effectiveAmount:', effectiveAmount)
         outputsWithSats[0].satoshis = effectiveAmount
@@ -202,23 +237,21 @@ const PayButton = ({
         console.warn('❌ Output satoshis mismatch:', outputsWithSats[0].satoshis, 'vs expected', effectiveAmount)
       }
       console.log('🔍 [Step 3] Client received outputs (sats):', outputsWithSats)
-
       const tx = await wallet.createAction({
-        description: button,
+        description: paymentId,
         outputs: outputsWithSats
       })
-      if ((tx.tx == null) || !Array.isArray(tx.tx)) {
+      if (tx.tx == null || !Array.isArray(tx.tx)) {
         throw new Error('❌ Invalid transaction: tx.tx is undefined or not an array')
       }
-
       // Log detailed transaction details before sending
       console.log('🔍 Transaction details before pay:', {
-        paymentId: invoice.paymentId,
+        paymentId: invoice.transaction_id,
         tx: tx.tx,
         outputs: outputsWithSats,
-        totalSatoshis: outputsWithSats.reduce((sum, output) => sum + (output.satoshis || 0), 0)
+        totalSatoshis: outputsWithSats.reduce((sum, output) => sum + (output.satoshis || 0), 0),
+        lockingScript: outputsWithSats[0]?.lockingScript // Include lockingScript for validation
       })
-
       let transaction, atomicBeefTx, txid
       try {
         transaction = Transaction.fromAtomicBEEF(tx.tx)
@@ -228,15 +261,15 @@ const PayButton = ({
         console.error('❌ Transaction serialization failed:', e)
         throw new Error('❌ Failed to serialize transaction')
       }
-
-      const payPayload = { paymentId: invoice.paymentId, transaction: { txid, atomicBeefTx } }
+      const payPayload = {
+        paymentId: invoice.transaction_id,
+        transaction: { txid, atomicBeefTx },
+        lockingScript: outputsWithSats[0]?.lockingScript // Add lockingScript to payload
+      }
       const resPay = await authFetch.fetch(`${server}/api/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentId: payPayload.paymentId,
-          transaction: payPayload.transaction
-        })
+        body: JSON.stringify(payPayload)
       })
       const pay: PayResponse = await resPay.json()
       if (pay.status !== 'success') throw new Error(`❌ ${pay.message ?? 'Payment processing failed'}`)
@@ -276,32 +309,42 @@ const PayButton = ({
             type="number"
             value={variableAmount}
             onChange={handleVariableAmountChange}
-            onClick={(e) => e.stopPropagation()} // Stop click bubbling
-            onMouseDown={(e) => e.stopPropagation()} // Stop mouse down bubbling
-            onKeyDown={(e) => e.stopPropagation()} // Stop key down bubbling
+            onClick={e => e.stopPropagation()} // Stop click bubbling
+            onMouseDown={e => e.stopPropagation()} // Stop mouse down bubbling
+            onKeyDown={e => e.stopPropagation()} // Stop key down bubbling
             min="1"
-            max="1000"
-            style={{ width: '60px', textAlign: 'center', margin: '0 6px', padding: '3px', border: '2px solid #4a90e2', borderRadius: '0.5em', background: '#f9f9f9', color: '#333', fontWeight: '500', verticalAlign: 'middle' }}
+            max={`${MAX_PAYMENT_SATS}`}
+            style={{
+              width: '60px',
+              textAlign: 'center',
+              margin: '0 6px',
+              padding: '3px',
+              border: '2px solid #4a90e2',
+              borderRadius: '0.5em',
+              background: '#f9f9f9',
+              color: '#333',
+              fontWeight: '500',
+              verticalAlign: 'middle'
+            }}
             disabled={loading}
           />
           {text.split('{amount}')[1] || 'Sats'}
         </div>
       )
     }
-    return <div ref={nodeTextRef} className="nodeText" onClick={handleClick}>{loading ? loadingtext : buttonLabel}</div>
+    return (
+      <div ref={nodeTextRef} className="nodeText" onClick={handleClick}>
+        {loading ? loadingtext : buttonLabel}
+      </div>
+    )
   }
-
   return (
     <div>
       Payment Submitted
       <br />
       TXID:{' '}
       <code>
-        <a
-          href={`https://whatsonchain.com/tx/${txid ?? ''}`}
-          target='_blank'
-          rel='noopener noreferrer'
-        >
+        <a href={`https://whatsonchain.com/tx/${txid ?? ''}`} target="_blank" rel="noopener noreferrer">
           {txid}
         </a>
       </code>

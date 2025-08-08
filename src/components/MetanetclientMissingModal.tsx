@@ -38,7 +38,7 @@ interface Props {
 const MetanetclientMissingModal: React.FC<Props> = ({ open }) => {
   const info = usePlatformDownloadInfo()
 
-  if (!open || (info == null)) return null
+  if (!open || info == null) return null
 
   return (
     <div
@@ -55,10 +55,7 @@ const MetanetclientMissingModal: React.FC<Props> = ({ open }) => {
         zIndex: 9999
       }}
     >
-      <MetanetclientModal
-        downloadURL={info.downloadURL}
-        platformLabel={info.platformLabel}
-      />
+      <MetanetclientModal downloadURL={info.downloadURL} platformLabel={info.platformLabel} />
     </div>
   )
 }

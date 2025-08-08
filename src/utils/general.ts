@@ -8,13 +8,28 @@
  */
 
 /**
- * Formats a numeric value (number or string) as a Bitcoin SV amount with 8 decimal places.
- *
- * Removes non-numeric characters (except '.') and parses the value to a float, defaulting to 0 if invalid.
- *
- * @param value - The number or string to format (e.g., "5", "5.123", "5 sats").
- * @returns A string representing the formatted value with 8 decimal places (e.g., "5.00000000").
+ * Formats an ID (e.g., transaction_id or button_id) as 'first5...last5' with ellipses.
+ * @param id The full ID string to format.
+ * @returns Formatted string (e.g., "abcde...fghij") or the original string if too short.
  */
-export const formatBSV = (value: number | string): string => {
-  return parseFloat(value.toString().replace(/[^0-9.]/g, '')).toFixed(8)
+export function formatId(id: string): string {
+  if (id.length < 10) return id // Fallback for short IDs
+  return `${id.slice(0, 5)}...${id.slice(-5)}`
+}
+
+/**
+ * Formats a timestamp string into a human-readable YYYY-MM-DD HH:MM:SS format.
+ * @param dateStr The timestamp string (e.g., ISO string or Unix timestamp).
+ * @returns Formatted date string or 'N/A' if invalid.
+ */
+export function formatTimestamp(dateStr: string | undefined): string {
+  if (!dateStr) {
+    return 'N/A'
+  }
+  try {
+    const date = new Date(dateStr)
+    return date.toISOString().replace('T', ' ').slice(0, 19)
+  } catch (error) {
+    return 'N/A'
+  }
 }

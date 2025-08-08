@@ -1,11 +1,17 @@
-assets by path [1m[32m*.html[39m[22m 4.34 KiB
+assets by path [1m[32m*.html[39m[22m 82.8 KiB
   asset [1m[32mbutton.html[39m[22m 2.61 KiB [1m[33m[compared for emit][39m[22m [from: public/button.html] [1m[32m[copied][39m[22m
-  asset [1m[32mpaybutton-tests.html[39m[22m 1.14 KiB [1m[33m[compared for emit][39m[22m [from: public/paybutton-tests.html] [1m[32m[copied][39m[22m
-  asset [1m[32mindex.html[39m[22m 601 bytes [1m[33m[compared for emit][39m[22m
-asset [1m[32mpay.js[39m[22m 2.69 MiB [1m[33m[compared for emit][39m[22m (name: main)
+  asset [1m[32mfixed64.html[39m[22m 1.82 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed64.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed49.html[39m[22m 1.79 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed49.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed52.html[39m[22m 1.78 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed52.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed26.html[39m[22m 1.29 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed26.html] [1m[32m[copied][39m[22m
+  asset [1m[32mvariable10.html[39m[22m 1.28 KiB [1m[33m[compared for emit][39m[22m [from: public/variable10.html] [1m[32m[copied][39m[22m
+  asset [1m[32mvariable8.html[39m[22m 1.26 KiB [1m[33m[compared for emit][39m[22m [from: public/variable8.html] [1m[32m[copied][39m[22m
+  + 63 assets
+asset [1m[32mpay.js[39m[22m 2.71 MiB [1m[33m[compared for emit][39m[22m (name: main)
 asset [1m[32mgatewaycash.svg[39m[22m 16.5 KiB [1m[33m[compared for emit][39m[22m [from: public/gatewaycash.svg] [1m[32m[copied][39m[22m
+asset [1m[32m.DS_Store[39m[22m 6 KiB [1m[33m[compared for emit][39m[22m [from: public/.DS_Store] [1m[32m[copied][39m[22m
 asset [1m[32mfavicon.ico[39m[22m 4.19 KiB [1m[33m[compared for emit][39m[22m [from: public/favicon.ico] [1m[32m[copied][39m[22m
 asset [1m[32mpay.js.LICENSE.txt[39m[22m 3.35 KiB [1m[33m[compared for emit][39m[22m [from: public/pay.js.LICENSE.txt] [1m[32m[copied][39m[22m
 asset [1m[32mmanifest.json[39m[22m 593 bytes [1m[33m[compared for emit][39m[22m [from: public/manifest.json] [1m[32m[copied][39m[22m
-216 modules
-webpack 5.100.2 compiled [1m[32msuccessfully[39m[22m in 730 ms
+218 modules
+webpack 5.101.0 compiled [1m[32msuccessfully[39m[22m in 729 ms

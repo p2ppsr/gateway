@@ -12,7 +12,6 @@
 import { Theme as MUITheme } from '@mui/material/styles'
 
 declare module '@mui/material/styles' {
-
   /**
    * Extends the MUI Theme interface to include additional layout and template fields.
    *

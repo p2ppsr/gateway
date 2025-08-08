@@ -8,16 +8,15 @@
  */
 
 exports.up = async function (knex) {
-  await knex.raw('SELECT 1'); // Debug: Confirm Knex connection
+  await knex.raw('SELECT 1') // Debug: Confirm Knex connection
   await knex('payment_buttons')
     .whereNull('description')
-    .update({ description: 'Payment to merchant with buttonId: abc123...' });
-  console.log('✅ Updated existing payment_buttons records with default description');
-};
+    .update({ description: 'Payment to merchant with buttonId: abc123...' })
+  console.log('✅ Updated existing payment_buttons records with default description')
+}
 
 exports.down = async function (knex) {
-  await knex.raw('SELECT 1'); // Debug: Confirm Knex connection
-  await knex('payment_buttons')
-    .update({ description: null });
-  console.log('✅ Reset description column in payment_buttons to null');
-};
+  await knex.raw('SELECT 1') // Debug: Confirm Knex connection
+  await knex('payment_buttons').update({ description: null })
+  console.log('✅ Reset description column in payment_buttons to null')
+}

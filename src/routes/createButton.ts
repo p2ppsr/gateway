@@ -1,29 +1,19 @@
 /**
  * @file src/routes/createButton.ts
  *
- * POST route to create a new payment button. This endpoint receives configuration
- * options such as amount, currency, multi-use status, accepted payment types,
- * validates the input, ensures the merchant exists, and inserts a new record
- * into the `payment_buttons` table.
+ * POST route to create a new payment button in the database.
+ * Validates the request, uses the provided paymentId as the primary identifier, and the provided buttonId as a secondary identifier, storing both with the provided details.
  *
- * - Requires authentication middleware to populate `req.auth.identityKey`.
- * - Ensures the merchant exists or inserts a new one if needed.
- * - Generates a unique `button_id` and initializes all button fields.
- * - Accepts `amount` in sats and converts to BSV decimal for storage.
- * - For variableAmount: true, allows amount: 0 or omitted, storing 0.0 in DB.
- * - Added input validation and sanitization with express-validator for description (max 80 chars).
+ * Used by the Gateway UI to create new payment buttons for merchants.
+ * - All amounts are handled as BSV decimals internally.
  *
- * Used by the "Create" page in the Gateway frontend to configure tipping buttons.
- *
- * Version: v1.8 (Updated 30Jul2025_1116 BST with Description Validation and Sanitization)
+ * Version: v2.6 (Updated 05Aug2025_0100 BST to use client-provided buttonId instead of generating a new one, ensuring consistency with HTML data-button)
  */
-
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
-import { randomBytes } from 'crypto'
 import type { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
-
+import { MAX_PAYMENT_SATS } from '../utils/constants'
 const db: Knex = knex(knexConfig)
 
 interface Merchant {
@@ -34,12 +24,15 @@ interface Merchant {
 }
 
 interface RequestBody {
-  amount?: number // Amount in sats (integer, optional for variable)
+  amount?: number
   currency: string
   variableAmount: boolean
   multiUse: boolean
   accepts: string
-  description: string // Custom spending description
+  description: string
+  customCSS?: string
+  paymentId: string // Primary identifier
+  buttonId: string // Secondary identifier from client
 }
 
 export default {
@@ -54,30 +47,37 @@ export default {
     body('currency').trim().isIn(['BSV', 'fiat', 'both']).withMessage('Currency must be BSV, fiat, or both'),
     body('variableAmount').isBoolean().withMessage('variableAmount must be a boolean'),
     body('multiUse').isBoolean().withMessage('multiUse must be a boolean'),
-    body('accepts').trim().isIn(['BSV', 'fiat', 'both']).withMessage('Accepts must be BSV, fiat, or both'),
+    body('accepts').trim().isIn(['BSV']).withMessage('Accepts must be SATS'),
     body('amount')
       .optional()
-      .isInt({ min: 0 })
-      .withMessage('Amount must be a non-negative integer')
+      .custom((value, { req }) => {
+        const { variableAmount } = req.body
+        if (variableAmount === false && (!Number.isInteger(value) || value < 1 || value > MAX_PAYMENT_SATS)) {
+          throw new Error(`Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons`)
+        }
+        return true
+      })
+      .withMessage(
+        `Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons, or 0 for variable`
+      ),
+    body('customCSS').optional().trim().isString().withMessage('customCSS must be a string'),
+    body('paymentId')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('paymentId must be a non-empty string')
+      .isLength({ min: 24, max: 24 })
+      .withMessage('paymentId must be exactly 24 characters'),
+    body('buttonId')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('buttonId must be a non-empty string')
+      .isLength({ min: 24, max: 24 })
+      .withMessage('buttonId must be exactly 24 characters')
   ],
-
-  /**
-   * Express route handler to create a new payment button.
-   *
-   * Validates the request body and inserts a new record into `payment_buttons`.
-   * Also ensures that the merchant is present in the `merchants` table,
-   * inserting a default record if not found. Converts amount from sats to BSV.
-   *
-   * @param req - Express request containing button config and auth context.
-   * @param req.body.amount - The payment amount in sats (integer, optional for variableAmount: true).
-   * @param req.body.currency - The currency string (e.g. "BSV").
-   * @param req.body.variableAmount - Whether the button allows flexible amounts.
-   * @param req.body.multiUse - Whether the button can be reused.
-   * @param req.body.accepts - What the button accepts ("BSV", "fiat", or "both").
-   * @param req.body.description - Custom description for Metanet spending window.
-   * @param res - Express response object to send success or error response.
-   * @returns {Promise<void>} Sends a 200 success response with `buttonId` or an error.
-   */
   func: async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
@@ -85,30 +85,41 @@ export default {
       res.status(400).json({ status: 'error', message: 'Invalid parameters', errors: errors.array() })
       return
     }
-
     const merchantId = (req as any).auth?.identityKey
-    const { amount = 0, currency, variableAmount, multiUse, accepts, description }: RequestBody = req.body
-    console.log('🔍 [Step 1] Create button request (sats):', { merchantId, amount, currency, variableAmount, multiUse, accepts, description })
-
+    const {
+      amount = 0,
+      currency,
+      variableAmount,
+      multiUse,
+      accepts,
+      description,
+      customCSS,
+      paymentId,
+      buttonId
+    }: RequestBody = req.body
+    console.log('🔍 [createButton] [Step 1] Create button request (sats):', {
+      merchantId,
+      amount,
+      currency,
+      variableAmount,
+      multiUse,
+      accepts,
+      description,
+      customCSS,
+      paymentId,
+      buttonId
+    })
     if (!merchantId) {
       console.log('❌ [createButton] Missing merchantId from auth context')
       res.status(401).json({ status: 'error', message: 'Unauthorized: Missing merchant identity' })
       return
     }
-
-    if (variableAmount === false && (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0)) {
-      console.log('❌ [createButton] Validation failed for fixed button: amount must be a positive integer', { amount })
-      res.status(400).json({ status: 'error', message: 'Invalid parameters: fixed buttons require a positive integer amount' })
-      return
-    }
-
     try {
-      console.log('🔍 [Step 2] Checking merchant existence for:', merchantId)
+      console.log('🔍 [createButton] [Step 2] Checking merchant existence for:', merchantId)
       const merchant: Merchant | undefined = await db('merchants').where({ merchant_id: merchantId }).first()
-      console.log('🔍 [Step 3] Merchant data:', merchant)
-
+      console.log('🔍 [createButton] [Step 3] Merchant data:', merchant)
       if (merchant === undefined) {
-        console.log('🔍 [Step 4] Inserting new merchant:', merchantId)
+        console.log('🔍 [createButton] [Step 4] Inserting new merchant:', merchantId)
         await db('merchants').insert({
           merchant_id: merchantId,
           custom_fee_rate: 0,
@@ -117,16 +128,12 @@ export default {
         })
         console.log('✅ [createButton] Inserted new merchant:', merchantId)
       }
+      const amountInBSV = variableAmount ? 0 : amount
+      //*const amountInBSV = variableAmount ? 0 : amount / 100000000;
+      console.log('🔍 [createButton] [Step 5] Converted amount to BSV:', amountInBSV)
 
-      // Convert sats to BSV for storage
-      const amountInBSV = variableAmount ? 0 : amount / 100000000
-      console.log('🔍 [Step 5] Converted amount to BSV:', amountInBSV)
-
-      // Generate unique button ID
-      const buttonId = randomBytes(12).toString('hex')
-      console.log('🔍 [Step 6] Generated button ID:', buttonId)
-
-      console.log('🔍 [Step 7] Inserting payment button:', {
+      console.log('🔍 [createButton] [Step 7] Inserting payment button:', {
+        payment_id: paymentId,
         button_id: buttonId,
         amount: amountInBSV,
         currency,
@@ -136,10 +143,12 @@ export default {
         used: false,
         total_paid: 0,
         accepts,
-        description
+        description,
+        customCSS
       })
       await db('payment_buttons').insert({
-        button_id: buttonId,
+        payment_id: paymentId, // Primary key
+        button_id: buttonId, // Matches data-button from HTML
         amount: amountInBSV,
         currency,
         variable_amount: variableAmount,
@@ -148,15 +157,16 @@ export default {
         used: false,
         total_paid: 0,
         accepts,
-        description
+        description,
+        customCSS,
+        created_at: db.fn.now()
       })
-
-      console.log('✅ [createButton] Inserted payment button:', buttonId)
-
+      console.log('✅ [createButton] Inserted payment button:', { paymentId, buttonId })
       res.status(200).json({
         status: 'success',
         message: 'Payment button created successfully',
-        buttonId
+        paymentId,
+        buttonId // Return the client-provided buttonId
       })
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
@@ -165,7 +175,7 @@ export default {
         stack: err instanceof Error ? err.stack : 'No stack trace',
         requestBody: req.body
       })
-      res.status(500).json({ status: 'error', message: 'Internal server error' })
+      res.status(500).json({ status: 'error', message: errorMessage })
     }
   }
 }

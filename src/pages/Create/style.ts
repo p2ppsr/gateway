@@ -98,7 +98,6 @@ export const ButtonStyled = styled(Button)(({ theme }) => ({
   borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
   '&:hover': {
     borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-    backgroundColor:
-      theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'
+    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)'
   }
 }))

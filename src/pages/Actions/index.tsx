@@ -38,12 +38,12 @@ const PaymentActionsList: React.FC = () => {
           color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
         }}
       >
-        <Typography variant='h2'>Payment Actions</Typography>
-        <Typography variant='subtitle1'>Manage the specialized payment actions you have created.</Typography>
+        <Typography variant="h2">Payment Actions</Typography>
+        <Typography variant="subtitle1">Manage the specialized payment actions you have created.</Typography>
       </Box>
       <Paper elevation={3}>
         <Box p={3}>
-          <Typography variant='body1'>
+          <Typography variant="body1">
             Here, you will be able to create actions that get triggered when one of your buttons receives a payment.
             Things like sending an email, hitting a webhook, or maybe even sending another payment somewhere else!
           </Typography>

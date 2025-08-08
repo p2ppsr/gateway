@@ -26,9 +26,10 @@ import { WalletClient, AuthFetch } from '@bsv/sdk'
 import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 import { CONFIG } from './utils/constants'
+import { logWithTimestamp } from './utils/logging'
 
 // AuthFetch – constructed once per session
-console.log('CONFIG:', CONFIG)
+logWithTimestamp(`CONFIG:${CONFIG}`)
 const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
@@ -85,11 +86,11 @@ const App: React.FC = () => {
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
-          <Route path='/' element={<Create />} />
-          <Route path='/buttons' element={<Buttons />} />
-          <Route path='/payments' element={<Payments />} />
-          <Route path='/actions' element={<Actions />} />
-          <Route path='/money' element={<Money />} />
+          <Route path="/" element={<Create />} />
+          <Route path="/buttons" element={<Buttons />} />
+          <Route path="/payments" element={<Payments />} />
+          <Route path="/actions" element={<Actions />} />
+          <Route path="/money" element={<Money />} />
         </Routes>
       </Router>
     </Theme>
