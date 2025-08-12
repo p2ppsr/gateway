@@ -48,7 +48,7 @@ export default {
       console.error('❌ Error in /getStatus:', err)
       res.status(500).json({
         status: 'error',
-        message: 'Internal server error'
+        message: '❌ Internal server error'
       })
     }
   }

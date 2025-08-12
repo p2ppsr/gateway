@@ -5,10 +5,12 @@
  * Registers route handlers from the aggregated routes in `src/routes/index.ts`.
  * Configures middleware and starts the server on the specified port.
  * Includes security enhancements with Helmet and rate limiting.
- * Updated to handle route handlers returning Promise<void | Response>.
+ * Updated to handle route handlers returning Promise<void | Response> and reflect new schema.
+ * Added security check for max payment allowed (10000 sats) in payment middleware.
  *
- * Version: v1.1 (Updated 05Aug2025_0335 BST to add request logging and fix routing debug)
+ * Version: v1.5 (Updated 11Aug2025_1737 BST to support merchantId as wallet identity key via routes)
  */
+const F = 'server'
 import dotenv from 'dotenv'
 import express, { Request, Response, NextFunction, Router } from 'express'
 import bodyParser from 'body-parser'
@@ -22,6 +24,10 @@ import { spawn } from 'child_process'
 import knexConfig from '../knexfile'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import { MAX_PAYMENT_SATS } from './utils/constants' // Import MAX_PAYMENT_SATS
+import { logWithTimestamp } from './utils/logging'
+import util from 'util';
+
 dotenv.config()
 
 interface Route {
@@ -49,10 +55,10 @@ app.use(
     legacyHeaders: false
   })
 )
-console.log('🔍 Rate limiting applied: 100 requests per 15 minutes per IP')
+logWithTimestamp(F, '🔍 Rate limiting applied: 100 requests per 15 minutes per IP')
 
 app.use(helmet())
-console.log('🔍 Helmet security headers applied')
+logWithTimestamp(F, '🔍 Helmet security headers applied')
 
 app.use(bodyParser.json({ limit: '1gb' }))
 
@@ -74,16 +80,17 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }
   next()
 })
+
 ;(async () => {
   try {
     await db.migrate.latest()
-    console.log('✅ Migrations applied successfully')
+    logWithTimestamp(F, '✅ Migrations applied successfully')
     const wallet = await Setup.createWalletClientNoEnv({
       rootKeyHex: process.env.SERVER_PRIVATE_KEY ?? '',
       storageUrl: WALLET_STORAGE_URL,
       chain: 'main'
     })
-    console.log('🔍 Wallet initialized:', wallet)
+    logWithTimestamp(F, '🔍 Wallet initialized:', util.inspect(wallet, { depth: 2, colors: true }))
     if (!process.env.SERVER_PRIVATE_KEY || process.env.SERVER_PRIVATE_KEY.length !== 64) {
       throw new Error('❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex characters)')
     }
@@ -93,14 +100,19 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         allowUnauthenticated: true
       })
     )
+    logWithTimestamp(F, '[initializeIds] Auth middleware applied, wallet attached to req:', { walletAttached: !!wallet })
     app.use(
       createPaymentMiddleware({
         wallet,
         calculateRequestPrice: (req: Request) => {
           if (req.url.includes('/payment')) {
-            return 0
+            const amount = parseInt(req.body?.amount as string) || 0; // Extract amount from request body
+            if (amount > MAX_PAYMENT_SATS) {
+              throw new Error(`❌ Payment amount (${amount} sats) exceeds maximum allowed (${MAX_PAYMENT_SATS} sats)`);
+            }
+            return 0; // Return price (0 for free in this case)
           }
-          return 0
+          return 0;
         }
       } as any)
     )
@@ -116,7 +128,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         if (typeof route?.type === 'string' && typeof route?.path === 'string' && typeof route?.func === 'function') {
           const method = route.type.toLowerCase() as 'get' | 'post'
           const fullPath = `${ROUTING_PREFIX}${route.path}`
-          console.log(`🔍 Registering route: ${method.toUpperCase()} ${fullPath}`)
+          logWithTimestamp(F, `🔍 Registering route: ${method.toUpperCase()} ${fullPath}`)
           const handler = route.func
           if (typeof apiRouter[method] === 'function') {
             apiRouter[method](route.path, (req: Request, res: Response, next: NextFunction) => {
@@ -125,39 +137,36 @@ app.use((req: Request, res: Response, next: NextFunction) => {
           }
         }
       })
-      console.log('✅ All routes registered successfully')
+      logWithTimestamp(F, '✅ All routes registered successfully')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       console.error('❌ Failed to register routes:', message)
       throw new Error(`❌ Failed to register routes: ${message}`)
     }
     app.use(ROUTING_PREFIX, apiRouter)
-
     // Catch-all middleware to log unhandled requests
     app.use((req: Request, res: Response, next: NextFunction) => {
-      console.log(`🔍 [server] Unhandled request: ${req.method} ${req.url}`)
+      logWithTimestamp(F, `🔍 [server] Unhandled request: ${req.method} ${req.url}`)
       res.status(404).send('Not Found')
     })
-
     app.use((err: any, req: Request, res: Response, next: NextFunction) => {
       if (err.code === 'ER_BAD_FIELD_ERROR') {
         console.error('❌ Database schema error:', err.message)
-        res.status(500).json({ status: 'error', message: 'Database schema issue, please run migrations' })
+        res.status(500).json({ status: 'error', message: 'Database schema mismatch, please update route handlers to use new schema (id instead of payment_id)' })
       } else {
         console.error('❌ Server error:', err)
-        res.status(500).json({ status: 'error', message: 'Internal server error' })
+        res.status(500).json({ status: 'error', message: '❌ Internal server error' })
       }
     })
-
     app.listen(HTTP_PORT, () => {
-      console.log('✅ Gateway Payment Server listening on', HTTP_PORT)
+      logWithTimestamp(F, '✅ Gateway Payment Server listening on', HTTP_PORT)
       if (SPAWN_NGINX === 'yes') {
         spawn('nginx', [], { stdio: 'inherit' })
       }
     })
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
+    const message = err instanceof Error ? err.message : '❌ Unknown error'
     console.error('❌ Failed to initialize server:', message)
     throw new Error(`❌ Failed to initialize server: ${message}`)
   }
-})()
+})();

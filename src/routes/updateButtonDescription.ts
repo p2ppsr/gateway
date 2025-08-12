@@ -23,19 +23,19 @@ export default async (req: Request, res: Response): Promise<void | Response> => 
 
   try {
     if (!buttonId || !description) {
-      return res.status(400).json({ status: 'error', message: 'buttonId and description are required' })
+      return res.status(400).json({ status: 'error', message: '❌ buttonId and description are required' })
     }
 
     // Update the payment_buttons table
     const result = await db('payment_buttons').where({ button_id: buttonId }).update({ description })
 
     if (result === 0) {
-      return res.status(404).json({ status: 'error', message: 'Button not found' })
+      return res.status(404).json({ status: 'error', message: '❌ Button not found' })
     }
 
     res.status(200).json({ status: 'success' })
   } catch (error) {
-    console.error('Error updating button description:', error)
-    res.status(500).json({ status: 'error', message: error instanceof Error ? error.message : 'Internal server error' })
+    console.error('❌ Error updating button description:', error)
+    res.status(500).json({ status: 'error', message: error instanceof Error ? error.message : '❌ Internal server error' })
   }
 }

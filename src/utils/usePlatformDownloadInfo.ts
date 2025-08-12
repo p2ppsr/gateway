@@ -4,10 +4,11 @@
  * A React hook that determines the current platform (iOS, Android, or Web) and provides
  * the appropriate download URL for the Metanet client, using the latest GitHub release info.
  */
-
+const F = 'utils/usePlatformDownloadInfo'
 import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
 import getLatestMetanetclientLinks, { MetanetclientLinks } from './getLatestMetanetclientLinks'
+import { logWithTimestamp } from './logging'
 
 /**
  * Represents platform-specific download information for the Metanet client.
@@ -56,8 +57,8 @@ const usePlatformDownloadInfo = (): DownloadInfo => {
     const fetchDownloadURL = async (): Promise<void> => {
       try {
         const links: MetanetclientLinks = await getLatestMetanetclientLinks()
-        console.log('🔍 Metanet client links:', links)
-        console.log('🔍 Platform:', Platform.OS)
+        logWithTimestamp(F, '🔍 Metanet client links:', links)
+        logWithTimestamp(F, '🔍 Platform:', Platform.OS)
 
         if (typeof Platform.OS === 'string' && (Platform.OS as string) === 'ios') {
           setInfo({
@@ -87,9 +88,9 @@ const usePlatformDownloadInfo = (): DownloadInfo => {
             downloadURL: links.macos ?? ''
           })
         }
-        console.log('✅ Set platform info:', info)
+        logWithTimestamp(F, '✅ Set platform info:', info)
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : 'Unknown error'
+        const message = error instanceof Error ? error.message : '❌ Unknown error'
         console.error('❌ Error fetching download URL:', message)
       }
     }

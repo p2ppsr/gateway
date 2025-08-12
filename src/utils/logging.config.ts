@@ -4,11 +4,18 @@ const defaultLogging = false
 // Specific file logging overrides
 const loggingConfig: { [file: string]: boolean } = {
   default: defaultLogging,
-  'pages/Create': false,
-  'pages/Buttons': false,
+  'pages/Create': true,
+  'pages/Buttons': true,
   'pages/Actions': false,
   'pages/Money': false,
-  'pages/Payments': false
+  'pages/Payments': true,
+  'routes/createButton': true,
+  'routes/buttonCode': true,
+  'routes/initializeIds': true,
+  'utils/initializeIds': true,
+  'index': true,
+  'inject': true,
+  'server': true
 }
 
 export default loggingConfig

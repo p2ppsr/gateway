@@ -77,7 +77,7 @@ import { Link } from 'react-router-dom'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { formatId, formatTimestamp } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
-import { MAX_PAYMENT_SATS } from '../../utils/constants'
+import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
 /**
  * Represents a payment received through a payment button
  */
@@ -117,7 +117,7 @@ const formatTime = (dateStr: string | undefined) => {
   }
   return new Date(dateStr).toISOString().replace('T', ' ').slice(0, 19)
 }
-const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN
 const wallet = new WalletClient('auto', WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
 const PaymentsList = () => {
@@ -235,8 +235,8 @@ const PaymentsList = () => {
         setTitle(data.title || 'Payments')
         logWithTimestamp(F, 'Initial payments length:', mappedPayments.length)
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        logWithTimestamp(F, 'Error fetching total payments:', message)
+        const message = err instanceof Error ? err.message : '❌ Unknown error'
+        logWithTimestamp(F, '❌ Error fetching total payments:', message)
         setError(message)
       } finally {
         setLoading(false)
@@ -392,7 +392,7 @@ const PaymentsList = () => {
       })
       if (!response.ok) {
         const errorText = await response.text()
-        logWithTimestamp(F, 'Acknowledgment failed with response:', errorText)
+        logWithTimestamp(F, '❌ Acknowledgment failed with response:', errorText)
         throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`)
       }
       const data: PaymentResponse = await response.json()
@@ -407,8 +407,8 @@ const PaymentsList = () => {
       setPayments(refreshData.data)
       setTotalRecords(refreshData.data.length)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      logWithTimestamp(F, 'Error acknowledging payment:', message)
+      const message = err instanceof Error ? err.message : '❌ Unknown error'
+      logWithTimestamp(F, '❌ Error acknowledging payment:', message)
       setError(message)
     }
   }
@@ -608,9 +608,7 @@ const PaymentsList = () => {
                           <Button
                             variant="contained"
                             color="primary"
-                            onClick={() =>
-                              acknowledgePayment(payment.payment_button_id || '').catch(() => {})
-                            }
+                            onClick={() => acknowledgePayment(payment.payment_button_id || '').catch(() => {})}
                           >
                             Acknowledge
                           </Button>

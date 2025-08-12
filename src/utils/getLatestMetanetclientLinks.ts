@@ -5,6 +5,8 @@
  * from the official GitHub repository, including placeholders for mobile app links.
  */
 
+import { logWithTimestamp } from "./logging"
+
 /**
  * Represents the download URLs for the Metanet client across supported platforms.
  *
@@ -15,6 +17,7 @@
  * @property {string | null} ios - App Store link for iOS or `null` if not available.
  * @property {string | null} android - Play Store link for Android or `null` if not available.
  */
+const F = 'utils/getLatestMetanetclientLinks'
 export interface MetanetclientLinks {
   macos: string | null
   windows: string | null
@@ -37,7 +40,7 @@ const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
   try {
     const response = await fetch('https://api.github.com/repos/bsv-blockchain/metanet-desktop/releases/latest')
     const data: GitHubRelease = await response.json()
-    console.log('🔍 GitHub release data:', data)
+    logWithTimestamp(F, '🔍 GitHub release data:', data.toString())
 
     const tag: string = data.tag_name // e.g. 'metanet-desktop-v0.5.1'
     const version: string = tag.replace(/^metanet-desktop-v/, '') // e.g. '0.5.1'
@@ -49,7 +52,7 @@ const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
       ios: 'https://apps.apple.com/app/metanet/id0000000000', // TODO: update with actual link
       android: 'https://play.google.com/store/apps/details?id=com.metanet.browser' // TODO: update with actual link
     }
-    console.log('✅ Successfully fetched Metanet client links:', links)
+    logWithTimestamp(F, '✅ Successfully fetched Metanet client links:', links.toString())
     return links
   } catch (error: unknown) {
     console.error('❌ Failed to fetch latest Metanet client release:', error)

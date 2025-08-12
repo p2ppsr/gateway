@@ -23,10 +23,12 @@
  * - 05Aug2025_0640 BST (v2.8): Added detailed logging of senderIdentityKey, senderPrivateKeyString, combined array, and derivedPublicKey to diagnose key derivation mismatch.
  * - 05Aug2025_0645 BST (v2.9): Updated to validate using client-provided lockingScript from invoice response, avoiding re-derivation issues.
  */
+const F = 'routes/pay'
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
 import { Hash, P2PKH, PrivateKey, PublicKey, Transaction, Utils } from '@bsv/sdk'
 import { Request, Response } from 'express'
+import { logWithTimestamp } from '../utils/logging'
 const db: Knex = knex(knexConfig)
 
 interface Payment {
@@ -150,26 +152,25 @@ export default {
       if (!lockingScript) {
         throw new Error('❌ Missing lockingScript in request')
       }
-      console.log('🔍 [pay] Using client-provided lockingScript:', lockingScript) // Explicit log
+      logWithTimestamp(F, '🔍 [pay] Using client-provided lockingScript:', lockingScript) // Explicit log
       const expectedAmount: number = payment.amount
-      //*const expectedAmount: number = Math.round(payment.amount * 100000000) // Convert BSV to satoshis
       // Enhanced debugging of transaction outputs
-      console.log('🔍 Expected locking script:', lockingScript)
-      console.log('🔍 Expected amount (sats):', expectedAmount)
+      logWithTimestamp(F, '🔍 Expected locking script:', lockingScript)
+      logWithTimestamp(F, '🔍 Expected amount (sats):', expectedAmount)
       let totalTransactionSatoshis = 0
       bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
-        console.log(`🔍 Transaction Output ${i} script:`, out.lockingScript.toHex())
-        console.log(`🔍 Transaction Output ${i} sats:`, out.satoshis)
+        logWithTimestamp(F, `🔍 Transaction Output ${i} script:`, out.lockingScript.toHex())
+        logWithTimestamp(F, `🔍 Transaction Output ${i} sats:`, out.satoshis)
         totalTransactionSatoshis += out.satoshis || 0
       })
-      console.log('🔍 Total transaction satoshis:', totalTransactionSatoshis)
+      logWithTimestamp(F, '🔍 Total transaction satoshis:', totalTransactionSatoshis.toString())
       // Explicitly check expected vs received tip amount
       const matchingOutput = bsvtx.outputs.find(
         (x: Transaction['outputs'][number]): boolean =>
           x.lockingScript.toHex() === lockingScript && x.satoshis === expectedAmount
       )
       if (matchingOutput) {
-        console.log('🔍 Verified: Expected amount', expectedAmount, 'matches received', matchingOutput.satoshis)
+        logWithTimestamp(F, '🔍 Verified: Expected amount', expectedAmount.toString(), 'matches received', matchingOutput.satoshis)
       } else {
         console.warn('❌ Mismatch: No output matches expected amount', expectedAmount)
       }
@@ -178,7 +179,7 @@ export default {
       if (totalTransactionSatoshis !== calculatedTotal) {
         console.warn('❌ Total satoshis mismatch: Logged', totalTransactionSatoshis, 'vs Calculated', calculatedTotal)
       } else {
-        console.log('🔍 Verified: Total satoshis', totalTransactionSatoshis, 'matches sum of outputs')
+        logWithTimestamp(F, '🔍 Verified: Total satoshis', totalTransactionSatoshis.toString(), 'matches sum of outputs')
       }
       // Check for exact match on tip amount (1 sat fee ignored as per requirement)
       if (matchingOutput == null) {
@@ -204,7 +205,7 @@ export default {
             total_paid: db.raw('?? + ?', ['total_paid', payment.amount])
           })
       })
-      console.log(`✅ Payment successful. TXID: ${txid}`)
+      logWithTimestamp(F, `✅ Payment successful. TXID: ${txid}`)
       res.status(200).json({
         status: 'success',
         message: 'Payment completed successfully',

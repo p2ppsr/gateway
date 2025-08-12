@@ -20,6 +20,7 @@
  * - 05Aug2025_0730 BST (v1.3): Strengthened amount fallback with explicit null/undefined checks and logging to debug invalid data.
  * - 05Aug2025_1815 BST (v1.4): Aligned field names (e.g., `CreatedAt` to `created_at`, `New` to `is_new`) with frontend expectations and added detailed logging for debugging.
  */
+const F = 'routes/listPayments'
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
 import { Request, Response } from 'express'
@@ -76,7 +77,7 @@ export default {
       }
       // Execute the query to get the list of payments
       const payments = await query
-      logWithTimestamp('routes/listPayments', 'Raw query result:', JSON.stringify(payments))
+      logWithTimestamp(F, 'routes/listPayments', 'Raw query result:', JSON.stringify(payments))
 
       // Respond with the list of payments including a title and handling undefined amounts
       const processedPayments = payments.map(x => {
@@ -87,14 +88,11 @@ export default {
             x.ID,
             'Setting to 0'
           )
-          //*logWithTimestamp('routes/listPayments', 'Warning: Found undefined/null amount for payment:', x.ID, 'Setting to 0.00000000')
           return { ...x, amount: '0' }
-          //*return { ...x, amount: '0.00000000' }
         }
         return { ...x, amount: x.amount }
-        //*return { ...x, amount: parseFloat(x.amount.toString()).toFixed(8) }
       })
-      logWithTimestamp('routes/listPayments', 'Processed payments:', JSON.stringify(processedPayments))
+      logWithTimestamp(F, 'routes/listPayments', 'Processed payments:', JSON.stringify(processedPayments))
 
       res.status(200).json({
         status: 'success',
@@ -103,10 +101,10 @@ export default {
         message: 'Payments fetched successfully'
       })
     } catch (error) {
-      logWithTimestamp('routes/listPayments', 'Error listing payments:', error)
+      logWithTimestamp(F, 'routes/listPayments', '❌ Error listing payments:', error)
       res.status(500).json({
         status: 'error',
-        message: 'Internal server error'
+        message: '❌ Internal server error'
       })
     }
   }

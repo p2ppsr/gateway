@@ -15,56 +15,60 @@
  * - Supports variable amount buttons with user input (data-variable="true").
  * - Prevents payment flow triggering on variable input field clicks with stopPropagation on multiple events.
  *
- * Version: v2.2 (Updated 05Aug2025_0645 BST to include lockingScript in pay request)
+ * Version: v2.4 (Updated 10Aug2025_0145 BST to use browser-compatible logging)
  * Change Log:
  * - 04Aug2025_2345 BST (v2.0): Initial version, using paymentId exclusively instead of buttonId, reflecting database schema change.
  * - 05Aug2025_0610 BST (v2.1): Fixed paymentId propagation in payPayload to ensure invoice.transaction_id is used correctly, resolving undefined paymentId issue in /api/pay requests.
  * - 05Aug2025_0645 BST (v2.2): Added lockingScript to payPayload to allow server validation without re-derivation, restoring pre-transaction_id change behavior.
+ * - 10Aug2025_0130 BST (v2.3): Added comprehensive logging to diagnose payment failures.
+ * - 10Aug2025_0145 BST (v2.4): Replaced logWithTimestamp with browser-compatible console.log for pay.js integration.
  */
-import React, { useState, useRef, useEffect, ReactElement } from 'react'
-import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
-import { MAX_PAYMENT_SATS } from '../../utils/constants'
+import React, { useState, useRef, useEffect, ReactElement } from 'react';
+import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk';
+import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants';
 
-// Define interfaces based on @bsv/sdk
+const F = 'components/PayButton';
+
 export interface ListOutputsResult {
-  totalOutputs: number
-  BEEF?: any
-  outputs: WalletOutput[]
+  totalOutputs: number;
+  BEEF?: any;
+  outputs: WalletOutput[];
 }
+
 interface WalletOutput {
-  satoshis: number
+  satoshis: number;
   // Add other WalletOutput properties as needed (e.g., script, txid) based on @bsv/sdk docs
 }
+
 interface ListOutputsArgs {
-  basket?: string
-  limit?: number
+  basket?: string;
+  limit?: number;
   // Add other ListOutputsArgs properties as needed based on @bsv/sdk docs
 }
 
-// Define props interface with paymentId as the primary identifier
 export interface PayButtonProps {
-  text?: string // Templated text with {amount} placeholder (default "Pay Now {amount} Sats")
-  amount: number // Amount in sats (integer, 0 for variable)
-  merchant: string
-  paymentId: string // Replaced button with paymentId as the primary identifier
-  currency?: string
-  server: string
-  loadingtext?: string
-  variable?: boolean // Optional flag for variable-amount buttons
-  [key: string]: string | number | boolean | undefined
+  text?: string; // Templated text with {amount} placeholder (default "Pay Now {amount} Sats")
+  amount: number; // Amount in sats (integer, 0 for variable)
+  merchant: string;
+  paymentId: string; // Replaced button with paymentId as the primary identifier
+  currency?: string;
+  server: string;
+  loadingtext?: string;
+  variable?: boolean; // Optional flag for variable-amount buttons
+  [key: string]: string | number | boolean | undefined;
 }
 
 interface InvoiceResponse {
-  status: string
-  message?: string
-  transaction_id: string // Updated to match invoice.ts v2.3 response
-  outputs: CreateActionOutput[] | undefined
+  status: string;
+  message?: string;
+  transaction_id: string; // Updated to match invoice.ts v2.3 response
+  outputs: CreateActionOutput[] | undefined;
 }
 
 interface PayResponse {
-  status: string
-  message?: string
-  txid: string
+  status: string;
+  message?: string;
+  txid: string;
 }
 
 /**
@@ -88,48 +92,51 @@ const PayButton = ({
   loadingtext = 'Loading, please wait…',
   variable = false
 }: PayButtonProps): ReactElement => {
-  const [loading, setLoading] = useState(false)
-  const [paid, setPaid] = useState(false)
-  const [txid, setTxid] = useState<string | null>(null)
-  const [variableAmount, setVariableAmount] = useState<string>('1') // Default to 1 for variable buttons
-  const nodeTextRef = useRef<HTMLDivElement>(null)
+  const [loading, setLoading] = useState(false);
+  const [paid, setPaid] = useState(false);
+  const [txid, setTxid] = useState<string | null>(null);
+  const [variableAmount, setVariableAmount] = useState<string>('1'); // Default to 1 for variable buttons
+  const nodeTextRef = useRef<HTMLDivElement>(null);
 
   // Construct dynamic button label for variable buttons
   const buttonLabel = variable
     ? `${text.split('{amount}')[0]}${variableAmount} ${text.split('{amount}')[1] || 'Sats'}`
-    : text.replace('{amount}', amount.toString())
-  console.log('🔍 Button label:', buttonLabel)
+    : text.replace('{amount}', amount.toString());
+  console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button label:`, buttonLabel);
 
   const handleVariableAmountChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
-    const input = event.target.value.replace(/[^0-9]/g, '') // Strip non-digits
-    const satValue = Math.max(1, Math.min(MAX_PAYMENT_SATS, Number(input) || 1))
-    setVariableAmount(satValue.toString())
-    console.log('🔍 Variable amount updated:', satValue)
-  }
+    const input = event.target.value.replace(/[^0-9]/g, ''); // Strip non-digits
+    const satValue = Math.max(1, Math.min(MAX_PAYMENT_SATS, Number(input) || 1));
+    setVariableAmount(satValue.toString());
+    console.log(`[${new Date().toISOString()}] [${F}] 🔍 Variable amount updated:`, satValue.toString());
+  };
 
   const handleClick = async (e: React.MouseEvent<HTMLDivElement>): Promise<void> => {
-    if (loading) return
+    if (loading) return;
     // Safely check if click originated from input field using nativeEvent
-    const target = e.nativeEvent.target as HTMLElement | null
+    const target = e.nativeEvent.target as HTMLElement | null;
     if (target && target.tagName === 'INPUT') {
-      console.log('🔍 Click on input field ignored')
-      return
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Click on input field ignored`);
+      return;
     }
-    console.log('🔍 Button click received, target:', target?.tagName || 'unknown')
-    setLoading(true)
+    console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button click received, target:`, target?.tagName || 'unknown');
+    setLoading(true);
+
     try {
       // Use variableAmount if variable, else props.amount
-      const effectiveAmount = variable ? Number(variableAmount) : amount
+      const effectiveAmount = variable ? Number(variableAmount) : amount;
       // Validate effectiveAmount
       if (!Number.isInteger(effectiveAmount) || effectiveAmount <= 0 || effectiveAmount > MAX_PAYMENT_SATS) {
-        throw new Error(`❌ Invalid amount: must be a positive integer between 1 and ${MAX_PAYMENT_SATS}`)
+        throw new Error(`❌ Invalid amount: must be a positive integer between 1 and ${MAX_PAYMENT_SATS}`);
       }
-      console.log('🔍 [Step 1] Client requested amount (sats):', effectiveAmount)
-      const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321' // Configurable port
-      const wallet = new WalletClient('auto', WALLET_ORIGIN)
-      const authFetch = new AuthFetch(wallet)
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 1] Client requested amount (sats):`, effectiveAmount);
+
+      const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN
+      const wallet = new WalletClient('auto', WALLET_ORIGIN);
+      const authFetch = new AuthFetch(wallet);
+
       // Debug wallet connection and funds with retry
-      let walletOutputs: ListOutputsResult | null = null
+      let walletOutputs: ListOutputsResult | null = null;
       const substrates = [
         { type: 'HTTPWalletJSON', substrate: 'json-api', skip: false },
         { type: 'HTTPWalletWire', substrate: 'Cicada', skip: false },
@@ -140,78 +147,68 @@ const PayButton = ({
         },
         { type: 'XDMSubstrate', substrate: 'XDM', skip: false },
         { type: 'ReactNativeWebView', substrate: 'react-native', skip: false }
-      ]
+      ];
       for (const { type, substrate, skip } of substrates) {
         if (skip) {
-          console.log(`🔍 Skipping ${type} substrate (not available)`)
-          continue
+          console.log(`[${new Date().toISOString()}] [${F}] 🔍 Skipping ${type} substrate (not available)`);
+          continue;
         }
         try {
-          console.log(`🔍 Attempting wallet connection with ${type} on ${WALLET_ORIGIN}`)
+          console.log(`[${new Date().toISOString()}] [${F}] 🔍 Attempting wallet connection with ${type} on ${WALLET_ORIGIN}`);
           const instance = new WalletClient(
             substrate as 'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api' | 'react-native',
             WALLET_ORIGIN
-          )
-          const versionPromise = instance.getVersion({})
+          );
+          const versionPromise = instance.getVersion({});
           const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout on ${type}`)), 2000)
-          )
-          await Promise.race([versionPromise, timeoutPromise])
-          console.log(`✅ Wallet version retrieved with ${type}`)
-          walletOutputs = await instance.listOutputs({ basket: paymentId }) // Use paymentId as basket
-          console.log(`✅ Wallet connected with ${type} on ${WALLET_ORIGIN}`, walletOutputs)
-          wallet.substrate = instance.substrate // Set successful substrate
-          break
+            setTimeout(() => reject(new Error(`❌ Timeout on ${type}`)), 2000)
+          );
+          await Promise.race([versionPromise, timeoutPromise]);
+          console.log(`[${new Date().toISOString()}] [${F}] ✅ Wallet version retrieved with ${type}`);
+          walletOutputs = await instance.listOutputs({ basket: paymentId }); // Use paymentId as basket
+          console.log(`[${new Date().toISOString()}] [${F}] ✅ Wallet connected with ${type} on ${WALLET_ORIGIN}`, walletOutputs);
+          wallet.substrate = instance.substrate; // Set successful substrate
+          break;
         } catch (walletErr) {
-          console.error(`❌ Wallet connection failed with ${type} on ${WALLET_ORIGIN}:`, walletErr)
+          console.error(`[${new Date().toISOString()}] [${F}] ❌ Wallet connection failed with ${type} on ${WALLET_ORIGIN}:`, walletErr);
         }
       }
-      if (!walletOutputs) throw new Error('❌ All wallet connection attempts failed')
-      console.log('🔍 Wallet outputs for basket:', paymentId, walletOutputs)
+      if (!walletOutputs) throw new Error('❌ All wallet connection attempts failed');
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet outputs for basket:`, paymentId, walletOutputs);
+
       // Skip basket-specific check if empty, rely on createAction
       if (walletOutputs.outputs.length > 0 && walletOutputs.outputs[0].satoshis < effectiveAmount + 1) {
-        throw new Error('❌ Insufficient funds in basket: need at least ' + (effectiveAmount + 1) + ' sats')
+        console.log(`[${new Date().toISOString()}] [${F}] ⚠️ Warning: Insufficient funds in basket:`, paymentId, 'Need:', effectiveAmount + 1, 'sats, Got:', walletOutputs.outputs[0].satoshis);
+        throw new Error(`❌ Insufficient funds in basket: need at least ${effectiveAmount + 1} sats`);
       }
-      console.log('🔍 Wallet selected inputs:', walletOutputs)
-      const resStatus = await authFetch.fetch(`${server}/api/getStatus`, {
-        method: 'GET'
-      })
-      const status = await resStatus.json()
-      if (status.status !== 'success') throw new Error('❌ Cannot reach server')
-      //*Convert sats to BSV for server request (reason: server expects BSV)
-      //*const amountInBSV = effectiveAmount / 100000000
-      //*const amountInBSV = effectiveAmount / 100000000
-      //*console.log('🔍 [Step 2] Converted amount to BSV:', amountInBSV)
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet selected inputs:`, walletOutputs);
 
-      //Fetch additional data (optional, adjust if needed)
-      let fetchedPaymentId = paymentId // Default to paymentId
+      const resStatus = await authFetch.fetch(`${server}/api/getStatus`, { method: 'GET' });
+      const status = await resStatus.json();
+      if (status.status !== 'success') throw new Error('❌ Cannot reach server');
+      console.log(`[${new Date().toISOString()}] [${F}] ✅ Server status checked:`, status);
+
+      // Fetch additional data (optional, adjust if needed)
+      let fetchedPaymentId = paymentId; // Default to paymentId
       try {
         const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`, {
           headers: { Accept: 'application/json' }
-        })
-        if (!buttonCodeResponse.ok) throw new Error(`HTTP error! status: ${buttonCodeResponse.status}`)
-        const buttonCodeData = await buttonCodeResponse.json()
+        });
+        if (!buttonCodeResponse.ok) throw new Error(`❌ HTTP error! status: ${buttonCodeResponse.status}`);
+        const buttonCodeData = await buttonCodeResponse.json();
         if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
-          fetchedPaymentId = buttonCodeData.payment_id
-          console.log('🔍 [client] Fetched paymentId:', fetchedPaymentId)
+          fetchedPaymentId = buttonCodeData.payment_id;
+          console.log(`[${new Date().toISOString()}] [${F}] 🔍 [client] Fetched paymentId:`, fetchedPaymentId);
         } else {
-          console.warn(
-            '🔍 [client] Failed to fetch paymentId, using provided paymentId:',
-            paymentId,
-            'Response:',
-            buttonCodeData
-          )
+          console.log(`[${new Date().toISOString()}] [${F}] 🔍 [client] Failed to fetch paymentId, using provided paymentId:`, paymentId, 'Response:', buttonCodeData);
         }
       } catch (fetchError) {
-        console.error(
-          '❌ [client] Button code fetch error:',
-          fetchError,
-          'Status:',
-          fetchError instanceof Error && (fetchError as any).status
-        )
+        console.error(`[${new Date().toISOString()}] [${F}] ❌ [client] Button code fetch error:`, fetchError, 'Status:', fetchError instanceof Error && (fetchError as any).status);
       }
+
       // Send amount in BSV to server
-      const resInv = await authFetch.fetch(`${server}/api/invoice`, {
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 2] Requesting invoice from server:`, server);
+      const resInv = await authFetch.fetch(`${server}/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -220,85 +217,100 @@ const PayButton = ({
           currency,
           amount: effectiveAmount
         })
-      })
-      const invoice: InvoiceResponse = await resInv.json()
-      if (invoice.status !== 'success') throw new Error(`❌ ${invoice.message ?? 'Invoice creation failed'}`)
+      });
+      const invoice: InvoiceResponse = await resInv.json();
+      if (invoice.status !== 'success') throw new Error(`❌ ${invoice.message ?? 'Invoice creation failed'}`);
+      console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 3] Invoice received:`, invoice);
+
       // Verify outputs match requested amount, with fallback for variable buttons
-      let outputsWithSats =
-        invoice.outputs?.map(output => ({
-          ...output,
-          satoshis: Math.round(output.satoshis)
-        })) || []
+      let outputsWithSats = invoice.outputs?.map(output => ({
+        ...output,
+        satoshis: Math.round(output.satoshis)
+      })) || [];
       if (variable && outputsWithSats.length && outputsWithSats[0].satoshis === 0) {
-        console.log('🔍 Server returned zero satoshis for variable button, using effectiveAmount:', effectiveAmount)
-        outputsWithSats[0].satoshis = effectiveAmount
+        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Server returned zero satoshis for variable button, using effectiveAmount:`, effectiveAmount);
+        outputsWithSats[0].satoshis = effectiveAmount;
       }
       if (outputsWithSats.length && outputsWithSats[0].satoshis !== effectiveAmount) {
-        console.warn('❌ Output satoshis mismatch:', outputsWithSats[0].satoshis, 'vs expected', effectiveAmount)
+        console.log(`[${new Date().toISOString()}] [${F}] ⚠️ Warning: Output satoshis mismatch:`, outputsWithSats[0].satoshis, 'vs expected:', effectiveAmount);
       }
-      console.log('🔍 [Step 3] Client received outputs (sats):', outputsWithSats)
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 4] Client received outputs (sats):`, outputsWithSats);
+
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 5] Creating action with wallet`);
       const tx = await wallet.createAction({
         description: paymentId,
         outputs: outputsWithSats
-      })
+      });
       if (tx.tx == null || !Array.isArray(tx.tx)) {
-        throw new Error('❌ Invalid transaction: tx.tx is undefined or not an array')
+        console.log(`[${new Date().toISOString()}] [${F}] ❌ Invalid transaction: tx.tx is undefined or not an array`);
+        throw new Error('❌ Invalid transaction: tx.tx is undefined or not an array');
       }
+      console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 6] Action created:`, tx);
+
       // Log detailed transaction details before sending
-      console.log('🔍 Transaction details before pay:', {
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Transaction details before pay:`, {
         paymentId: invoice.transaction_id,
         tx: tx.tx,
         outputs: outputsWithSats,
         totalSatoshis: outputsWithSats.reduce((sum, output) => sum + (output.satoshis || 0), 0),
         lockingScript: outputsWithSats[0]?.lockingScript // Include lockingScript for validation
-      })
-      let transaction, atomicBeefTx, txid
+      });
+
+      let transaction, atomicBeefTx, txid;
       try {
-        transaction = Transaction.fromAtomicBEEF(tx.tx)
-        txid = transaction.id('hex')
-        atomicBeefTx = Utils.toHex(tx.tx)
+        console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 7] Serializing transaction`);
+        transaction = Transaction.fromAtomicBEEF(tx.tx);
+        txid = transaction.id('hex');
+        atomicBeefTx = Utils.toHex(tx.tx);
+        console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 8] Transaction serialized:`, { txid, atomicBeefTx });
       } catch (e) {
-        console.error('❌ Transaction serialization failed:', e)
-        throw new Error('❌ Failed to serialize transaction')
+        console.error(`[${new Date().toISOString()}] [${F}] ❌ Transaction serialization failed:`, e);
+        throw new Error('❌ Failed to serialize transaction');
       }
+
       const payPayload = {
         paymentId: invoice.transaction_id,
         transaction: { txid, atomicBeefTx },
         lockingScript: outputsWithSats[0]?.lockingScript // Add lockingScript to payload
-      }
-      const resPay = await authFetch.fetch(`${server}/api/pay`, {
+      };
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`, server, payPayload);
+      const resPay = await authFetch.fetch(`${server}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payPayload)
-      })
-      const pay: PayResponse = await resPay.json()
-      if (pay.status !== 'success') throw new Error(`❌ ${pay.message ?? 'Payment processing failed'}`)
-      setPaid(true)
-      setTxid(pay.txid)
-      console.log('✅ Payment successful:', pay)
+      });
+      const pay: PayResponse = await resPay.json();
+      if (pay.status !== 'success') throw new Error(`❌ ${pay.message ?? 'Payment processing failed'}`);
+      console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 10] Payment processed by server:`, pay);
+
+      setPaid(true);
+      setTxid(pay.txid);
+      console.log(`[${new Date().toISOString()}] [${F}] ✅ Payment successful:`, pay);
     } catch (err: unknown) {
-      console.error('❌ Payment flow error:', {
-        message: err instanceof Error ? err.message : 'Unexpected error',
-        stack: err instanceof Error ? err.stack : 'No stack trace'
-      })
-      const message = err instanceof Error ? err.message : 'Unexpected error'
-      alert(message)
+      const errorMessage = err instanceof Error ? err.message : '❌ Unexpected error';
+      console.error(`[${new Date().toISOString()}] [${F}] ❌ Payment flow error:`, {
+        message: errorMessage,
+        stack: err instanceof Error ? err.stack : '❌ No stack trace',
+        details: err
+      });
+      alert(`❌ ${errorMessage}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Payment flow completed, loading set to false`);
     }
-  }
+  };
 
   useEffect(() => {
-    const container = nodeTextRef.current?.parentElement
+    const container = nodeTextRef.current?.parentElement;
     if (container) {
-      container.style.display = 'flex'
-      container.style.justifyContent = 'center'
-      container.style.alignItems = 'center'
-      container.style.width = 'fit-content'
-      container.setAttribute('data-disabled', loading.toString())
-      console.log('🔍 Applied container styles and events')
+      container.style.display = 'flex';
+      container.style.justifyContent = 'center';
+      container.style.alignItems = 'center';
+      container.style.width = 'fit-content';
+      container.setAttribute('data-disabled', loading.toString());
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Applied container styles and events`);
     }
-  }, [loading, paid]) // Re-apply on state changes
+  }, [loading, paid]); // Re-apply on state changes
 
   if (!paid) {
     if (variable) {
@@ -330,13 +342,13 @@ const PayButton = ({
           />
           {text.split('{amount}')[1] || 'Sats'}
         </div>
-      )
+      );
     }
     return (
       <div ref={nodeTextRef} className="nodeText" onClick={handleClick}>
         {loading ? loadingtext : buttonLabel}
       </div>
-    )
+    );
   }
   return (
     <div>
@@ -349,7 +361,7 @@ const PayButton = ({
         </a>
       </code>
     </div>
-  )
-}
+  );
+};
 
-export default PayButton
+export default PayButton;

@@ -50,7 +50,7 @@ export default {
     if (!errors.isEmpty()) {
       res.status(400).json({
         status: 'error',
-        message: 'Invalid parameters',
+        message: '❌ Invalid parameters',
         errors: errors.array() // Now matches ValidationError[]
       })
       return
@@ -58,7 +58,7 @@ export default {
 
     const merchantId = req.auth?.identityKey
     if (!merchantId) {
-      res.status(401).json({ status: 'error', message: 'Unauthorized: Missing merchant identity' })
+      res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing merchant identity' })
       return
     }
 
@@ -110,13 +110,13 @@ export default {
         total: Number(total)
       })
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      const errorMessage = err instanceof Error ? err.message : '❌ Unknown error'
       console.error('❌ [listButtons] Error fetching buttons:', {
         message: errorMessage,
-        stack: err instanceof Error ? err.stack : 'No stack trace',
+        stack: err instanceof Error ? err.stack : '❌ No stack trace',
         queryParams: req.query
       })
-      res.status(500).json({ status: 'error', message: 'Internal server error' })
+      res.status(500).json({ status: 'error', message: '❌ Internal server error' })
     }
   }
 }
