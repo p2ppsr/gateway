@@ -17,10 +17,11 @@
  * - Added check for buttons with customCSS in database and logs discrepancy, with tracing for empty HTML code (03Aug2025_1425 BST)
  * - Updated to reflect successful customCSS storage in database (03Aug2025_1459 BST)
  * - Added default sorting by timestamp (most recent first) (04Aug2025_1101 BST)
+ * - Aligned with Payments page pattern and fixed type errors (13Aug2025_2045 BST)
  *
  * Used by the Gateway UI to manage user-created payment buttons. For local testing, delays are attributed to server or application logic,
  * not external connections or hardware constraints (MacBook Pro M4 Max, 128GB RAM, 2TB SSD), guiding optimization efforts
- * Version: v3.65 (Updated 13Aug2025_1500 BST to include Payment Id column with correct data)
+ * Version: v3.72 (Updated 13Aug2025_2045 BST to align with Payments page)
  */
 const F = 'pages/Buttons';
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
@@ -54,40 +55,60 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { formatId, formatTimestamp } from '../../utils/general';
 import { logWithTimestamp } from '../../utils/logging';
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants';
-
 const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN;
 const wallet = new WalletClient('auto', WALLET_ORIGIN);
 const authFetch = new AuthFetch(wallet);
 
+/**
+ * Represents a payment button created by the user
+ */
+interface Button {
+  id: string | null; // Unique identifier for the button
+  button_id: string | null; // Pre-created ID for the button
+  amount: number | null; // Configured payment amount
+  currency: string | null; // Currency type (e.g., BSV)
+  variable_amount: boolean | null; // Whether the amount is variable
+  multi_use: boolean | null; // Whether the button can be used multiple times
+  used: boolean | null; // Whether the button has been used
+  accepts: string | null; // Accepted payment types (e.g., BSV)
+  total_paid: number | null; // Total amount paid through the button
+  description: string | null; // Custom description for the button
+  customCSS: string | null; // Custom CSS/HTML code for the button
+  timestamp: string | null; // Creation timestamp
+  created_at: string | null; // Alternative creation timestamp
+  payment_id: string | null; // Associated payment ID
+}
+
 interface ButtonResponse {
   status: string;
   message: string;
+  title?: string; // Optional title from API
   data: {
     id?: string;
-    button_id: string;
-    amount: number | string;
-    currency: string;
-    variable_amount: boolean;
-    multi_use: boolean;
-    used: boolean;
-    accepts: string;
-    total_paid: number | string;
-    description: string;
-    customCSS?: string;
-    timestamp?: string;
-    created_at?: string;
-    payment_id?: string; // Ensured to be included from API
+    buttonId?: string | null;
+    amount?: string | number | null;
+    currency?: string | null;
+    variable?: number | null;
+    multiUse?: number | null;
+    used?: number | null;
+    accepts?: string | null;
+    totalPaid?: string | number | null;
+    description?: string | null;
+    htmlCode?: string | null;
+    timestamp?: string | null;
+    created_at?: string | null;
+    paymentId?: string | null;
   }[];
   total?: number;
 }
 
 interface SortConfig {
-  key: keyof ButtonResponse['data'][number] | null;
+  key: keyof Button | null;
   direction: 'asc' | 'desc';
 }
 
 const PaymentButtonsList = () => {
-  const [buttons, setButtons] = useState<ButtonResponse['data']>([]);
+  const [buttons, setButtons] = useState<Button[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [page, setPage] = useState(0);
@@ -95,15 +116,17 @@ const PaymentButtonsList = () => {
   const [customRowsPerPage, setCustomRowsPerPage] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all');
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'timestamp', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
   const [customOptions, setCustomOptions] = useState<number[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [title, setTitle] = useState<string>('Payment Buttons'); // Default title
   const theme = useTheme();
+  const fetchTimeout = useRef<number | null>(null);
   const [hoveredValue, setHoveredValue] = useState<string | null>(null);
   const [clickedValue, setClickedValue] = useState<string | null>(null);
-  const [isClicked, setIsClicked] = useState(false);
-  const [exitDirection, setExitDirection] = useState<string | null>(null);
-  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null);
+  const [isClicked, setIsClicked] = useState(false); // New state to disable hover after click
+  const [exitDirection, setExitDirection] = useState<string | null>(null); // Track exit direction
+  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null); // Track last clicked column
   const tableRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     'Button Id': null,
@@ -116,13 +139,10 @@ const PaymentButtonsList = () => {
     if (!isClicked) {
       setHoveredValue(fullValue);
       const columnCell = document.querySelector(
-        `tr:nth-child(${rowIndex}) td:nth-child(${['Button Id', 'Payment Id', 'HTML Code'].indexOf(columnName) + 2})`
+        `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Button Id', 'Payment Id', 'HTML Code'].indexOf(columnName) + 2})`
       ) as HTMLTableCellElement | null;
       if (columnCell) {
         columnRefs.current[columnName] = columnCell;
-        logWithTimestamp(F, `Assigned ${columnName} ref to row ${rowIndex}`);
-      } else {
-        logWithTimestamp(F, `Failed to find ${columnName} cell for row ${rowIndex}`);
       }
     }
   };
@@ -154,64 +174,75 @@ const PaymentButtonsList = () => {
 
   const handleClick = (fullValue: string, columnName: string) => {
     logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName);
-    setHoveredValue(null);
-    setIsClicked(true);
+    setHoveredValue(null); // Clear hover state
+    setIsClicked(true); // Disable further hover events
     setClickedValue(fullValue);
-    setLastClickedColumn(columnName);
+    setLastClickedColumn(columnName); // Track the clicked column
     navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
   };
 
   const handleReset = () => {
     logWithTimestamp(F, 'Reset click');
     setClickedValue(null);
-    setIsClicked(false);
-    setHoveredValue(null);
+    setIsClicked(false); // Re-enable hover events
+    setHoveredValue(null); // Clear hover on reset
     setExitDirection(null);
-    setLastClickedColumn(null);
+    setLastClickedColumn(null); // Clear last clicked column
+  };
+
+  const fetchButtons = async () => {
+    setLoading(true);
+    setButtons([]); // Clear state to force refresh
+    try {
+      const url = `${location.protocol}//${location.host}/api/listButtons?limit=${MAX_PAYMENT_SATS}`;
+      logWithTimestamp(F, 'Fetching total buttons with URL:', url);
+      const response = await authFetch.fetch(url, { method: 'GET' });
+      const data: ButtonResponse = await response.json();
+      logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total buttons'}`);
+      // Map API response to Button interface
+      const mappedButtons = data.data.map(button => ({
+        id: button.id || null,
+        button_id: button.buttonId || null,
+        amount: typeof button.amount === 'string' ? parseFloat(button.amount) : button.amount || null,
+        currency: button.currency || null,
+        variable_amount: button.variable === 1 || false,
+        multi_use: button.multiUse === 1 || false,
+        used: button.used === 1 || false,
+        accepts: button.accepts || null,
+        total_paid: typeof button.totalPaid === 'string' ? parseFloat(button.totalPaid) : button.totalPaid || null,
+        description: button.description || null,
+        customCSS: button.htmlCode || null,
+        timestamp: button.timestamp || null,
+        created_at: button.created_at || null,
+        payment_id: button.paymentId || null,
+      }));
+      logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons));
+      setTotalRecords(data.total || mappedButtons.length);
+      setButtons(mappedButtons);
+      setTitle(data.title || 'Payment Buttons');
+      logWithTimestamp(F, 'Initial buttons length:', mappedButtons.length);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '❌ Unknown error';
+      logWithTimestamp(F, '❌ Error fetching total buttons:', message);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    const fetchTotal = async () => {
-      setLoading(true);
-      try {
-        const url = `${location.protocol}//${location.host}/api/listButtons?limit=500`;
-        logWithTimestamp(F, 'Fetching total buttons with URL:', url);
-        const response = await authFetch.fetch(url, { method: 'GET' });
-        const data: ButtonResponse = await response.json();
-        logWithTimestamp(F, 'API response:', JSON.stringify(data));
-        if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total buttons'}`);
-        const sortedButtons = [...data.data].sort((a, b) => {
-          const aTime = new Date(a.timestamp || a.created_at || new Date().toISOString()).getTime();
-          const bTime = new Date(b.timestamp || b.created_at || new Date().toISOString()).getTime();
-          return bTime - aTime; // Descending order
-        });
-        const mappedButtons = sortedButtons.map(button => ({
-          ...button,
-          variable_amount: button.variable_amount === true, // Explicit boolean assignment
-          multi_use: button.multi_use === true,            // Explicit boolean assignment
-          used: button.used === true,                      // Explicit boolean assignment
-          button_id: button.id || '',
-          payment_id: button.payment_id || undefined,
-        }));
-        setTotalRecords(data.data.length);
-        setButtons(mappedButtons);
-        logWithTimestamp(F, 'Initial buttons length:', mappedButtons.length);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : '❌ Unknown error';
-        logWithTimestamp(F, '❌ Error fetching total buttons:', message);
-        setError(message);
-      } finally {
-        setLoading(false);
-      }
+    fetchButtons(); // Initial fetch on mount
+    return () => {
+      if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
     };
-    fetchTotal();
-  }, []);
+  }, []); // Empty dependency array ensures this runs only on mount
 
   useEffect(() => {
     setPage(0);
   }, [usedFilter]);
 
-  const requestSort = (key: keyof ButtonResponse['data'][number]) => {
+  const requestSort = (key: keyof Button) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
@@ -286,39 +317,59 @@ const PaymentButtonsList = () => {
   const filteredButtons =
     usedFilter === 'all'
       ? buttons
-      : buttons.filter(button => (usedFilter === 'used' && button.used) || (usedFilter === 'unused' && !button.used));
-
+      : buttons.filter(
+          button => (usedFilter === 'used' && button.used === true) || (usedFilter === 'unused' && button.used === false)
+        );
   const sortedButtons = sortConfig.key
     ? [...filteredButtons].sort((a, b) => {
-        if (!sortConfig.key) return 0;
-        let aValue: string | number = a[sortConfig.key]?.toString() ?? '';
-        let bValue: string | number = b[sortConfig.key]?.toString() ?? '';
+        if (!sortConfig.key) return 0; // Default to no change if key is null
+        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key];
+        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key];
+        // Handle null/undefined values by placing them at the end
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+        // Convert to comparable types
         if (sortConfig.key === 'amount' || sortConfig.key === 'total_paid') {
-          aValue = parseInt(aValue as string) || 0;
-          bValue = parseInt(bValue as string) || 0;
+          aValue = (aValue as number) || 0;
+          bValue = (bValue as number) || 0;
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
             : (bValue as number) - (aValue as number);
         } else if (sortConfig.key === 'variable_amount' || sortConfig.key === 'multi_use' || sortConfig.key === 'used') {
-          aValue = a[sortConfig.key] ? 1 : 0; // Direct boolean to number conversion
-          bValue = b[sortConfig.key] ? 1 : 0; // Direct boolean to number conversion
+          aValue = (aValue as boolean) ? 1 : 0;
+          bValue = (bValue as boolean) ? 1 : 0;
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);        } else if (sortConfig.key === 'timestamp') {
-          const aTime = new Date(a.timestamp || a.created_at || new Date().toISOString()).getTime();
-          const bTime = new Date(b.timestamp || b.created_at || new Date().toISOString()).getTime();
-          return sortConfig.direction === 'asc' ? aTime - bTime : bTime - aTime;
+            : (bValue as number) - (aValue as number);
+        } else if (sortConfig.key === 'timestamp' || sortConfig.key === 'created_at') {
+          aValue = new Date(aValue as string || '');
+          bValue = new Date(bValue as string || '');
+          return sortConfig.direction === 'asc'
+            ? (aValue as Date).getTime() - (bValue as Date).getTime()
+            : (bValue as Date).getTime() - (aValue as Date).getTime();
         } else {
-          if (typeof aValue === 'string' && typeof bValue === 'string') {
-            logWithTimestamp(F, `Sorting ${sortConfig.key}: aValue=${aValue}, bValue=${bValue}`);
-            return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
-          }
-          return 0;
+          aValue = (aValue as string) || '';
+          bValue = (bValue as string) || '';
+          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
         }
       })
     : filteredButtons;
-
   const paginatedButtons = sortedButtons.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  logWithTimestamp(
+    F,
+    'Paginated buttons length:',
+    paginatedButtons.length,
+    'Total buttons length:',
+    buttons.length,
+    'Filtered length:',
+    filteredButtons.length,
+    'Sorted length:',
+    sortedButtons.length,
+    'Page:',
+    page,
+    'Offset:',
+    page * rowsPerPage
+  );
 
   useLayoutEffect(() => {
     paginatedButtons.forEach((button, index) => {
@@ -376,7 +427,6 @@ const PaymentButtonsList = () => {
       </Box>
     );
   }
-
   return (
     <Container>
       <Box
@@ -387,10 +437,10 @@ const PaymentButtonsList = () => {
           color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
         }}
       >
-        <Typography variant="h2">Payment Buttons</Typography>
+        <Typography variant="h2">{title}</Typography>
         <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
       </Box>
-      {buttons.length === 0 ? (
+      {filteredButtons.length === 0 ? (
         <Card
           sx={{
             maxWidth: 600,
@@ -434,11 +484,11 @@ const PaymentButtonsList = () => {
                       href="#"
                       onClick={e => {
                         e.preventDefault();
-                        requestSort('timestamp');
+                        requestSort('created_at');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
-                      Timestamp {sortConfig.key === 'timestamp' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      Timestamp {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -561,250 +611,181 @@ const PaymentButtonsList = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {paginatedButtons.length > 0 ? (
-                  paginatedButtons.map((button, index) => {
-                    logWithTimestamp(F, 'Pagination button:', button, 'index:', index);
-                    const fullButtonId = button.button_id || '';
-                    const fullPaymentId = button.payment_id || 'N/A';
-                    const fullHtmlCode = button.customCSS || 'N/A';
-                    return (
-                      <TableRow key={button.id || index}>
-                        <TableCell>
-                          {formatTimestamp(button.timestamp || button.created_at || new Date().toISOString())}
-                        </TableCell>
-                        <TableCell
-                          ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Button Id'] = el)}
-                          onMouseEnter={e => { e.stopPropagation(); handleMouseEnter(fullButtonId, 'Button Id', index + 1); }}
-                          onMouseLeave={handleMouseLeave}
-                          onClick={e => { e.stopPropagation(); handleClick(fullButtonId, 'Button Id'); }}
-                        >
-                          {formatId(button.button_id)}
-                        </TableCell>
-                        <TableCell
-                          ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Payment Id'] = el)}
-                          onMouseEnter={e => { e.stopPropagation(); handleMouseEnter(fullPaymentId, 'Payment Id', index + 1); }}
-                          onMouseLeave={handleMouseLeave}
-                          onClick={e => { e.stopPropagation(); handleClick(fullPaymentId, 'Payment Id'); }}
-                        >
-                          {formatId(button.payment_id || 'N/A')}
-                        </TableCell>
-                        <TableCell>{button.amount}</TableCell>
-                        <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>{button.total_paid}</TableCell>
-                        <TableCell>{button.description}</TableCell>
-                        <TableCell
-                          ref={(el: HTMLTableCellElement | null) => (columnRefs.current['HTML Code'] = el)}
-                          onMouseEnter={e => { e.stopPropagation(); handleMouseEnter(fullHtmlCode, 'HTML Code', index + 1); }}
-                          onMouseLeave={handleMouseLeave}
-                          onClick={e => { e.stopPropagation(); handleClick(fullHtmlCode, 'HTML Code'); }}
-                        >
-                          {button.customCSS
-                            ? `${button.customCSS.substring(0, 16)}...${button.customCSS.slice(-16)}`
-                            : 'N/A'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={10} align="center">
-                      <Typography>
-                        {buttons.length === 0
-                          ? 'No payment buttons found in database'
-                          : 'No buttons match the current filter'}
-                      </Typography>
-                      {buttons.length > 0 && !paginatedButtons.some(b => b.customCSS) && (
-                        <Typography color="warning">
-                          Note: No buttons have HTML code defined, despite creating a fixed button. Tracing logs above
-                          may indicate the issue.
-                        </Typography>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )}
-</TableBody>
+                {paginatedButtons.map((button, index) => {
+                  const fullButtonId = button.button_id || '';
+                  const fullPaymentId = button.payment_id || '';
+                  const fullHtmlCode = button.customCSS || 'N/A';
+                  return (
+                    <TableRow key={button.id || index}>
+                      <TableCell>{formatTimestamp(button.created_at || button.timestamp || new Date().toISOString())}</TableCell>
+                      <TableCell
+                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Button Id'] = el)}
+                        onMouseEnter={() => handleMouseEnter(fullButtonId, 'Button Id', index + 1)}
+                        onMouseLeave={handleMouseLeave}
+                        onClick={() => handleClick(fullButtonId, 'Button Id')}
+                      >
+                        {formatId(button.button_id || '')}
+                      </TableCell>
+                      <TableCell
+                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Payment Id'] = el)}
+                        onMouseEnter={() => handleMouseEnter(fullPaymentId, 'Payment Id', index + 1)}
+                        onMouseLeave={handleMouseLeave}
+                        onClick={() => handleClick(fullPaymentId, 'Payment Id')}
+                      >
+                        {formatId(button.payment_id || '')}
+                      </TableCell>
+                      <TableCell>{button.amount !== null ? button.amount : 'N/A'}</TableCell>
+                      <TableCell>{button.variable_amount !== null ? (button.variable_amount ? 'Yes' : 'No') : 'N/A'}</TableCell>
+                      <TableCell>{button.multi_use !== null ? (button.multi_use ? 'Yes' : 'No') : 'N/A'}</TableCell>
+                      <TableCell>{button.used !== null ? (button.used ? 'Yes' : 'No') : 'N/A'}</TableCell>
+                      <TableCell>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
+                      <TableCell>{button.description || 'N/A'}</TableCell>
+                      <TableCell
+                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['HTML Code'] = el)}
+                        onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index + 1)}
+                        onMouseLeave={handleMouseLeave}
+                        onClick={() => handleClick(fullHtmlCode, 'HTML Code')}
+                      >
+                        {button.customCSS
+                          ? `${button.customCSS.substring(0, 16)}...${button.customCSS.slice(-16)}`
+                          : 'N/A'}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
             </Table>
           </TableContainer>
-          <div
-            style={{
-              marginTop: '0.5em',
+          <Box
+            sx={{
               display: 'flex',
-              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 0.25,
+              justifyContent: 'flex-end',
               width: '100%',
-              position: 'relative',
-              alignItems: 'flex-start'
+              boxSizing: 'border-box',
+              padding: '4px 0'
             }}
           >
-            <Box sx={{ flex: '0 0 auto', paddingRight: '10px' }}>
-              {(hoveredValue || clickedValue) && tableRef.current && (
-                <Box
-                  sx={{
-                    position: 'relative',
-                    width: '100%',
-                    backgroundColor: theme.palette.background.paper,
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    zIndex: 1000,
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    overflowWrap: 'break-word',
-                    minHeight: '40px',
-                    maxHeight: 'none',
-                    overflowY: 'auto',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <Tooltip
-                    title={
-                      (hoveredValue && exitDirection === 'bottom') || clickedValue
-                        ? 'click to reset'
-                        : hoveredValue
-                          ? 'click table field'
-                          : ''
-                    }
-                  >
-                    <Typography
-                      onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
-                      sx={{
-                        marginRight: '8px',
-                        fontFamily: 'monospace',
-                        cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
-                      }}
-                    >
-                      {clickedValue && lastClickedColumn === 'Txid' ? (
-                        <a
-                          href={`https://whatsonchain.com/tx/${clickedValue}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {clickedValue}
-                        </a>
-                      ) : (
-                        hoveredValue || clickedValue
-                      )}
-                    </Typography>
-                  </Tooltip>
-                  {hoveredValue && (
-                    <Tooltip title="click table field to enable copy">
-                      <span>
-                        <IconButton size="small" disabled>
-                          <ContentCopyIcon />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  )}
-                  {clickedValue && (
-                    <Tooltip title="copy field">
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          navigator.clipboard
-                            .writeText(clickedValue)
-                            .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
-                          setClickedValue(null);
-                          setIsClicked(false);
-                        }}
-                      >
-                        <ContentCopyIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Box>
-              )}
-            </Box>
-            <Box sx={{ flex: 1, backgroundColor: theme.palette.background.default }} /> {/* Middle padding column */}
-            <Box sx={{ flex: '0 0 auto', paddingLeft: '1em' }}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start', // Align pagination to the top
-                  gap: 0, // Remove extra vertical gap
-                  justifyContent: 'flex-start', // Ensure top alignment
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  padding: '0' // Remove padding to avoid extra space
-                }}
+            <IconButton onClick={() => setPage(0)} disabled={page === 0} color="inherit" size="small" sx={{ mr: 0.5 }}>
+              <FirstPage />
+            </IconButton>
+            <IconButton onClick={() => setPage(page - 1)} disabled={page === 0} color="inherit" size="small">
+              {/* "Previous" handled by TablePagination context */}
+            </IconButton>
+            <TablePagination
+              component="div"
+              count={filteredButtons.length}
+              page={page}
+              onPageChange={(e, newPage) => {
+                setPage(newPage);
+                logWithTimestamp(
+                  F,
+                  'Page changed to:',
+                  newPage,
+                  'Rows:',
+                  paginatedButtons,
+                  'filteredButtons.length:',
+                  filteredButtons.length
+                );
+                setHoveredValue(null);
+                setClickedValue(null);
+                setIsClicked(false);
+                setExitDirection(null);
+                setLastClickedColumn(null);
+              }}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleRowsPerPageChange}
+              rowsPerPageOptions={rowsPerPageOptions}
+              sx={{ mx: 0, flexShrink: 1 }}
+            />
+            <IconButton
+              onClick={() => setPage(page + 1)}
+              disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
+              color="inherit"
+              size="small"
+            >
+              {/* "Next" handled by TablePagination context */}
+            </IconButton>
+            <IconButton
+              onClick={() => setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)}
+              disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
+              color="inherit"
+              size="small"
+              sx={{ ml: 0.5 }}
+            >
+              <LastPage />
+            </IconButton>
+          </Box>
+          {(hoveredValue || clickedValue) && tableRef.current && (
+            <Box
+              sx={{
+                position: 'fixed',
+                left: `${tableRef.current.getBoundingClientRect().left}px`,
+                top: `${tableRef.current.getBoundingClientRect().bottom + 10}px`,
+                backgroundColor: theme.palette.background.paper,
+                padding: '4px 8px',
+                borderRadius: '4px',
+                zIndex: 1000,
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                maxWidth: '100%'
+              }}
+            >
+              <Tooltip
+                title={
+                  hoveredValue && exitDirection === 'bottom'
+                    ? 'click to reset'
+                    : clickedValue
+                      ? 'click to reset'
+                      : hoveredValue
+                        ? 'click table field'
+                        : ''
+                }
               >
-                <Box
+                <Typography
+                  onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
                   sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.25,
-                    justifyContent: 'flex-end', // Align to right side
-                    width: '100%',
-                    boxSizing: 'border-box'
+                    marginRight: '8px',
+                    fontFamily: 'monospace',
+                    cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
                   }}
                 >
+                  {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '') ? (
+                    clickedValue
+                  ) : (
+                    hoveredValue || clickedValue
+                  )}
+                </Typography>
+              </Tooltip>
+              {hoveredValue && (
+                <Tooltip title="click table field to enable copy">
+                  <span>
+                    <IconButton size="small" disabled>
+                      <ContentCopyIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+              {clickedValue && (
+                <Tooltip title="copy field">
                   <IconButton
-                    onClick={() => setPage(0)}
-                    disabled={page === 0}
-                    color="inherit"
                     size="small"
-                    sx={{ mr: 0.5 }}
-                  >
-                    <FirstPage />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => setPage(page - 1)}
-                    disabled={page === 0}
-                    color="inherit"
-                    size="small"
-                  >
-                    {/* "Previous" handled by TablePagination context */}
-                  </IconButton>
-                  <TablePagination
-                    component="div"
-                    count={filteredButtons.length}
-                    page={page}
-                    onPageChange={(e, newPage) => {
-                      setPage(newPage);
-                      logWithTimestamp(
-                        F,
-                        'Page changed to:',
-                        newPage,
-                        'Rows:',
-                        paginatedButtons,
-                        'filteredButtons.length:',
-                        filteredButtons.length
-                      );
-                      // Clear full text div states on page change
-                      setHoveredValue(null);
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(clickedValue)
+                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
                       setClickedValue(null);
                       setIsClicked(false);
-                      setExitDirection(null);
-                      setLastClickedColumn(null);
                     }}
-                    rowsPerPage={rowsPerPage}
-                    onRowsPerPageChange={handleRowsPerPageChange}
-                    rowsPerPageOptions={rowsPerPageOptions}
-                    sx={{ mx: 0, flexShrink: 1 }}
-                  />
-                  <IconButton
-                    onClick={() => setPage(page + 1)}
-                    disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
-                    color="inherit"
-                    size="small"
                   >
-                    {/* "Next" handled by TablePagination context */}
+                    <ContentCopyIcon />
                   </IconButton>
-                  <IconButton
-                    onClick={() => setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)}
-                    disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
-                    color="inherit"
-                    size="small"
-                    sx={{ ml: 0.5 }}
-                  >
-                    <LastPage />
-                  </IconButton>
-                </Box>
-              </Box>
+                </Tooltip>
+              )}
             </Box>
-          </div>
+          )}
           {showCustomInput && (
             <Box sx={{ mb: 2, textAlign: 'right' }}>
               <TextField
@@ -826,5 +807,4 @@ const PaymentButtonsList = () => {
     </Container>
   );
 };
-
 export default PaymentButtonsList;

@@ -11,7 +11,7 @@
  * - All amounts are handled as BSV decimals internally.
  * - IDs are client-generated 12-character Base58-encoded strings, pre-validated by initializeIds.
  *
- * Version: v2.34 (Updated 12Aug2025_2000 BST to add duplicate check and prevent re-insertion)
+ * Version: v2.36 (Updated 13Aug2025_1740 BST to fix TypeScript type mismatch TS2367)
  * Change Log:
  * - 09Aug2025_2350 BST (v2.23): Return generated ID in response.
  * - 10Aug2025_1155 BST (v2.24): Aligned path to /api/createButton and added middleware logging for diagnostics.
@@ -21,6 +21,9 @@
  * - 10Aug2025_1215 BST (v2.28): Returned generated id for client use and improved integration.
  * - 10Aug2025_1735 BST (v2.29): Integrated client-provided IDs and initializeIds logic during button creation.
  * - 12Aug2025_0015 BST (v2.30): Aligned with initializeIds, removed redundant merchant logic, and clarified response fields.
+ * - 12Aug2025_2000 BST (v2.34): Added duplicate check and prevent re-insertion.
+ * - 13Aug2025_1720 BST (v2.35): Added dynamic ID initialization if not pre-existing.
+ * - 13Aug2025_1740 BST (v2.36): Fixed TypeScript type mismatch (TS2367) in variableAmount and multiUse.
  */
 const F = 'routes/createButton';
 import knex, { Knex } from 'knex';
@@ -30,17 +33,19 @@ import { body, validationResult } from 'express-validator';
 import { MAX_PAYMENT_SATS } from '../utils/constants';
 import { logWithTimestamp } from '../utils/logging';
 const db: Knex = knex(knexConfig);
+
 interface RequestBody {
   amount?: number;
   currency: string;
-  variableAmount?: boolean;
-  multiUse?: boolean;
+  variableAmount: boolean; // Explicitly typed as boolean after validation
+  multiUse: boolean;       // Explicitly typed as boolean after validation
   accepts?: string;
   description: string;
   customCSS?: string;
   paymentId: string; // Client-provided payment ID, pre-initialized
-  buttonId: string; // Client-provided button ID, pre-initialized
+  buttonId: string;  // Client-provided button ID, pre-initialized
 }
+
 export default {
   type: 'post',
   path: '/createButton', // Handled by ROUTING_PREFIX in server.ts
@@ -57,7 +62,7 @@ export default {
     body('amount')
       .optional()
       .custom((value, { req }) => {
-        const { variableAmount = false } = req.body; // Default to false if undefined
+        const { variableAmount = false } = req.body as Partial<RequestBody>; // Type assertion
         if (!variableAmount && (!Number.isInteger(value) || value < 1 || value > MAX_PAYMENT_SATS)) {
           throw new Error(`❌ Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons`);
         }
@@ -102,7 +107,7 @@ export default {
       customCSS = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
       paymentId,
       buttonId,
-    }: RequestBody = req.body;
+    }: RequestBody = req.body as RequestBody; // Type assertion to match validated structure
     logWithTimestamp(F, '🔍 [createButton] [Step 1] Create button request (sats):', {
       merchantId,
       amount,
@@ -116,14 +121,19 @@ export default {
       buttonId,
     });
     try {
-      // Verify IDs exist in ids table
-      const idExists = await db('ids').where({ id: paymentId, type: 'payment' }).first();
-      const buttonExists = await db('ids').where({ id: buttonId, type: 'button' }).first();
-      if (!idExists || !buttonExists) {
-        logWithTimestamp(F, '❌ [createButton] ID not pre-initialized in ids table:', { paymentId, buttonId });
-        res.status(400).json({ status: 'error', message: '❌ Payment or button ID not pre-initialized' });
-        return;
-      }
+      // Verify or initialize IDs in ids table
+      const initializeId = async (id: string, type: 'payment' | 'button') => {
+        const exists = await db('ids').where({ id, type }).first();
+        if (!exists) {
+          await db('ids').insert({ id, merchant_id: merchantId, timestamp: db.fn.now(), type });
+          logWithTimestamp(F, `✅ [createButton] Initialized ${type} ID:`, { id, merchantId });
+        }
+        return true;
+      };
+
+      await initializeId(paymentId, 'payment');
+      await initializeId(buttonId, 'button');
+
       // Check for existing payment button to avoid duplicates
       logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId });
       const existingButton = await db('payment_buttons').where({ id: paymentId }).first();
@@ -161,8 +171,8 @@ export default {
       res.status(201).json({
         status: 'success',
         message: 'Payment button created successfully',
-        paymentId, // Return client-provided paymentId
-        buttonId, // Return client-provided buttonId
+        paymentId,
+        buttonId,
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '❌ Unknown error';
