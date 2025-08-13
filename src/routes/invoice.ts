@@ -12,7 +12,7 @@
  * - All amounts are handled as BSV decimals internally (to match current DB schema).
  * - Added input validation and sanitization with express-validator.
  *
- * Version: v2.6 (Updated 12Aug2025_2120 BST to fix payments table schema reference and enhance debugging)
+ * Version: v2.14 (Updated 13Aug2025_1130 BST to fix transactionIdNew scoping per ChatGPT suggestion)
  * Change Log:
  * - 05Aug2025_0420 BST (v2.1): Standardized route path and fixed prefix duplication by removing /api.
  * - 05Aug2025_0500 BST (v2.2): Initial attempt to update to use transaction_id (incomplete, rolled back).
@@ -21,6 +21,14 @@
  * - 10Aug2025_0215 BST (v2.4): Clarified logging usage (server-side only) to avoid client-side confusion.
  * - 12Aug2025_2100 BST (v2.5): Fixed id column reference from payment_id to id and enhanced query logging.
  * - 12Aug2025_2120 BST (v2.6): Fixed payments table schema reference from payment_button_id to payment_id and added schema debugging.
+ * - 13Aug2025_0430 BST (v2.7): Updated to use payer_id instead of from to match schema.
+ * - 13Aug2025_0945 BST (v2.8): Used payment_id as primary key, added button_id, and required buttonId in request.
+ * - 13Aug2025_0955 BST (v2.9): Updated PaymentButton interface with id and button_id to match schema.
+ * - 13Aug2025_1010 BST (v2.10): Restored transaction_id for locking script validation.
+ * - 13Aug2025_1030 BST (v2.11): Required transaction_id in pay request to align with P2PKH validation.
+ * - 13Aug2025_1035 BST (v2.12): Removed transaction_id from client response, using it server-side only.
+ * - 13Aug2025_1040 BST (v2.13): Updated transaction_id generation to use randomBytes(12).toString('hex').slice(0, 12).
+ * - 13Aug2025_1130 BST (v2.14): Fixed transactionIdNew scoping per ChatGPT suggestion with let declaration outside try.
  */
 const F = 'routes/invoice';
 import knex, { Knex } from 'knex';
@@ -32,8 +40,12 @@ import { body, validationResult } from 'express-validator';
 import { logWithTimestamp } from '../utils/logging';
 import { generateBase58 } from '../utils/general';
 const db: Knex = knex(knexConfig);
+
+let transactionIdNew: string; // Declare transactionIdNew outside try block for broader scope
+
 interface PaymentButton {
-  id: string; // Updated from payment_id to match the current schema
+  id: string; // Renamed from payment_id to match schema
+  button_id: string; // Added to match the foreign key in payment_buttons
   merchant_id: string;
   multi_use: boolean;
   used: boolean;
@@ -43,17 +55,21 @@ interface PaymentButton {
   created_at?: string; // Optional timestamp
   description: string; // Custom spending description
 }
+
 interface RequestBody {
   paymentId: string; // Changed from paymentButtonId to align with new identifier
+  buttonId: string;  // Required parameter
   merchantId: string;
   currency: string;
   amount: number;
 }
+
 export default {
   type: 'post',
   path: '/invoice', // Standardized route path
   middlewares: [
     body('paymentId').trim().escape().isString().notEmpty().withMessage('paymentId must be a non-empty string'),
+    body('buttonId').trim().escape().isString().notEmpty().withMessage('buttonId must be a non-empty string'), // Validation
     body('merchantId').trim().escape().isString().notEmpty().withMessage('merchantId must be a non-empty string'),
     body('currency').trim().isIn(['BSV']).withMessage('Currency must be Sats'),
     body('amount').isFloat({ min: 0 }).withMessage('Amount must be a non-negative number')
@@ -69,10 +85,10 @@ export default {
    * (or a hardcoded key for pre-v1.2 buttons if created_at is missing or indicates an old button) and the
    * merchant's public key with an invoice number. Amounts are in Sats for output.
    *
-   * @param req - Express request with `paymentId`, `merchantId`, `currency`, and `amount` in Sats in body.
+   * @param req - Express request with `paymentId`, `buttonId`, `merchantId`, `currency`, and `amount` in Sats in body.
    * Auth middleware must populate `req.auth.identityKey`.
    * @param res - Express response object for sending success or error responses.
-   * @returns {Promise<void>} Sends a 200 success response with `transaction_id` and derived outputs including merchantId and custom description.
+   * @returns {Promise<void>} Sends a 200 success response with derived outputs including merchantId and custom description.
    */
   func: async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req);
@@ -87,8 +103,8 @@ export default {
       res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing sender identity' });
       return;
     }
-    const { paymentId, merchantId, currency, amount }: RequestBody = req.body;
-    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, merchantId, currency, amount });
+    const { paymentId, buttonId, merchantId, currency, amount }: RequestBody = req.body;
+    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, buttonId, merchantId, currency, amount });
     try {
       // Verify the payment button exists and belongs to the specified merchant
       logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', { paymentId, merchantId });
@@ -107,6 +123,15 @@ export default {
         res.status(404).json({
           status: 'error',
           message: 'Payment button not found for the specified merchant'
+        });
+        return;
+      }
+      // Verify the button_id matches the payment button
+      if (button.button_id !== buttonId) {
+        logWithTimestamp(F, '❌ [invoice] Button ID mismatch:', { buttonId, expected: button.button_id });
+        res.status(400).json({
+          status: 'error',
+          message: 'Button ID does not match the payment button'
         });
         return;
       }
@@ -134,7 +159,7 @@ export default {
         return;
       }
       // Create a new payment with completed=false
-      const transactionIdNew = generateBase58(12); // Use 12-character Base58 ID to match schema
+      transactionIdNew = randomBytes(12).toString('hex').slice(0, 12); // Assign within try block
       logWithTimestamp(F, '🔍 [invoice] [Step 5] Generating transaction ID:', transactionIdNew);
       // Debug the payments table schema
       const paymentsSchema = await db('information_schema.columns')
@@ -142,17 +167,18 @@ export default {
         .select('column_name');
       logWithTimestamp(F, '🔍 [invoice] [Step 5] Payments table schema:', paymentsSchema.map(col => col.column_name));
       await db('payments').insert({
-        transaction_id: transactionIdNew,
-        payment_id: paymentId, // Changed from payment_button_id to payment_id to match schema
-        from: senderIdentityKey,
+        transaction_id: transactionIdNew, // Stored server-side for validation
+        payment_id: paymentId, // Client-passed value
+        button_id: buttonId,
+        payer_id: senderIdentityKey,
         merchant_id: merchantId,
         completed: false,
-        transaction_info: '',
+        blockchain_transaction: '',
         amount,
         currency,
         exchange_rate: 1
       });
-      logWithTimestamp(F, '✅ [invoice] [Step 6] Payment invoice created:', { transactionId: transactionIdNew });
+      logWithTimestamp(F, '✅ [invoice] [Step 6] Payment invoice created:', { paymentId, buttonId, transactionId: transactionIdNew });
       // Determine sender private key based on button creation context
       let senderPrivateKey: PrivateKey;
       try {
@@ -171,7 +197,7 @@ export default {
         senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
       }
       const recipientPublicKey = PublicKey.fromString(button.merchant_id);
-      const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`;
+      const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`; // Restored to use transactionIdNew
       const combined = Utils.toArray(
         `${senderPrivateKey.toString()}${recipientPublicKey.toString()}${invoiceNumber}`,
         'utf8'
@@ -201,7 +227,7 @@ export default {
       res.status(200).json({
         status: 'success',
         message: 'Invoice created successfully',
-        transaction_id: transactionIdNew,
+        // transaction_id: transactionIdNew, // Removed from response
         outputs
       });
     } catch (error: unknown) {
@@ -210,11 +236,12 @@ export default {
         message,
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
-        errorDetails: error
+        errorDetails: error,
+        transaction_id: transactionIdNew ? transactionIdNew : 'N/A' // Use optional check
       });
       res.status(500).json({
         status: 'error',
-        message: '❌ Internal server error'
+        message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`
       });
     }
   }

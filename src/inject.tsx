@@ -220,6 +220,7 @@ const bootstrapPayButtons = async (): Promise<void> => {
       merchant: props.merchant || '',
       server: props.server || 'http://localhost:3000',
       variable: props.variable || false,
+      buttonId: props.buttonId || '',
       paymentId: props.paymentId || '',
     };
     window.PayButton.render(buttonID, finalProps);

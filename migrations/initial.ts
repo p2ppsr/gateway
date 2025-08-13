@@ -60,24 +60,24 @@ export async function up(knex: Knex): Promise<void> {
         table.foreign('id').references('id').inTable('ids').onDelete('CASCADE');
       })
       .transacting(trx);
-    await knex.schema
-      .createTable('payments', (table: any) => {
-        table.string('transaction_id', 64).notNullable().primary();
-        table.string('payment_id', 12).notNullable();
-        table.string('from', 255).nullable();
-        table.string('merchant_id', 255).nullable().references('merchant_id').inTable('merchants').onDelete('CASCADE');
-        table.tinyint('completed').defaultTo(0);
-        table.tinyint('is_new').defaultTo(0);
-        table.text('transaction_info', 'longtext').nullable();
-        table.bigInteger('amount').unsigned().nullable();
-        table.string('currency', 255).nullable();
-        table.decimal('exchange_rate', 24, 10).nullable();
-        table.timestamp('created_at').defaultTo(knex.fn.now());
-        table.timestamp('updated_at').defaultTo(knex.fn.now());
-        table.foreign('payment_id').references('id').inTable('ids').onDelete('CASCADE');
-      })
-      .transacting(trx);
-    await knex.schema
+await knex.schema.createTable('payments', (table) => {
+    table.string('payment_id', 12).notNullable().primary().references('id').inTable('ids').onDelete('CASCADE');
+    table.string('transaction_id', 12).notNullable(); // Added as store for P2PKH validation
+    table.string('button_id', 12).notNullable().references('id').inTable('ids').onDelete('CASCADE');
+    table.string('payer_id', 66).nullable();
+    table.string('merchant_id', 66).notNullable().references('merchant_id').inTable('merchants').onDelete('CASCADE');
+    table.string('txid', 64).nullable(); // Changed to nullable to allow initial insert without value
+    table.boolean('completed').defaultTo(false);
+    table.boolean('is_new').defaultTo(true);
+    table.text('blockchain_transaction', 'longtext').nullable();
+    table.decimal('amount', 24, 10).notNullable();
+    table.string('currency', 3).notNullable();
+    table.decimal('exchange_rate', 24, 10).nullable();
+    table.timestamp('created_at').defaultTo(knex.fn.now());
+    table.timestamp('updated_at').defaultTo(knex.fn.now());
+  })
+  .transacting(trx);
+  await knex.schema
       .createTable('server_settings', (table: any) => {
         table.increments('id').primary();
         table.string('stripe_api_key').nullable();

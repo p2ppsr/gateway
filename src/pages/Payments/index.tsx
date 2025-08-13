@@ -2,7 +2,7 @@
  * @file src/pages/Payments/index.tsx
  *
  * Displays a paginated table of received payments tied to user payment buttons
- * Each row represents a payment, showing transaction_id (as ID, formatted as first5...last5), button ID, amount, currency, completion status, new status, timestamp, and actions
+ * Each row represents a payment, showing Txid, Payment Id, Button Id, Payer Id, Amount, Complete status, New status, Timestamp, and Actions
  *
  * - Fetches payments from the backend using `authFetch` and the Metanet client with full data fetch
  * - Highlights and allows acknowledging of "new" payments
@@ -12,7 +12,7 @@
  * - Optimizes performance with single initial fetch
  *
  * Used by the Gateway UI to manage incoming payment activity
- * Version: v4.27 (Updated 05Aug2025_2352 BST to fix formatId error with undefined values)
+ * Version: v4.28 (Updated 13Aug2025_0340 BST to align with latest schema and display agreed columns)
  * Change Log:
  * - 01Aug2025_0335 BST (v3.3): Fixed Type Errors and Restored acknowledgePayment.
  * - 05Aug2025_0700 BST (v3.4): Updated to display transaction_id as ID (showing txid), integrated title "Transaction History" from API response, and aligned with listPayments v1.1 changes.
@@ -45,6 +45,7 @@
  * - 05Aug2025_2218 BST (v4.25): Fixed acknowledge button error with correct paymentId.
  * - 05Aug2025_2249 BST (v4.26): Fixed acknowledge button URL to port 3001.
  * - 05Aug2025_2352 BST (v4.27): Fixed formatId error with undefined values.
+ * - 13Aug2025_0340 BST (v4.28): Aligned with latest schema, updated to display Txid, Payment Id, Button Id, Payer Id, Amount, Complete, New, Timestamp, and Actions.
  */
 const F = 'pages/Payments'
 import React, { useState, useEffect, useRef } from 'react'
@@ -78,289 +79,295 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { formatId, formatTimestamp } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
+
 /**
  * Represents a payment received through a payment button
  */
 interface Payment {
-  payment_id: string | undefined // Key for acknowledgment, using payment_button_id, allow undefined
-  ID: string | undefined // transaction_id for display, allow undefined
-  payment_button_id: string | undefined
-  amount: number | string
-  currency: string
-  completed: boolean
-  is_new: boolean
-  transaction_info?: string
-  merchant_id?: string
-  created_at?: string // For Time column
+  payment_id: string | null; // Pre-created ID from ids with type='payment'
+  button_id: string | null; // Pre-created ID from ids with type='button'
+  payer_id: string | null; // Payer's identifier
+  txid: string | null; // Blockchain transaction ID
+  amount: number | null; // Actual paid amount
+  completed: boolean | null; // Completion status
+  is_new: boolean | null; // New payment status
+  created_at: string | null; // Timestamp of payment
 }
+
 interface PaymentResponse {
-  status: string
-  message: string
-  title?: string // Optional title from API
-  data: Payment[]
-  total?: number
+  status: string;
+  message: string;
+  title?: string; // Optional title from API
+  data: Payment[];
+  total?: number;
 }
+
 interface SortConfig {
-  key: keyof Payment | null
-  direction: 'asc' | 'desc'
+  key: keyof Payment | null;
+  direction: 'asc' | 'desc';
 }
+
 // Utility function to format txid as 'first5...last5'
-const formatTxid = (txid: string) => {
-  if (txid.length < 10) return txid // Fallback for short IDs
-  return `${txid.slice(0, 5)}...${txid.slice(-5)}`
-}
+const formatTxid = (txid: string | null) => {
+  if (!txid || txid.length < 10) return txid || 'N/A';
+  return `${txid.slice(0, 5)}...${txid.slice(-5)}`;
+};
+
 // Utility function to format date as YYYY-MM-DD HH:MM:SS
-const formatTime = (dateStr: string | undefined) => {
+const formatTime = (dateStr: string | null) => {
   if (!dateStr) {
-    logWithTimestamp(F, 'Warning: created_at is undefined for a payment, using N/A')
-    return 'N/A'
+    logWithTimestamp(F, 'Warning: created_at is undefined for a payment, using N/A');
+    return 'N/A';
   }
-  return new Date(dateStr).toISOString().replace('T', ' ').slice(0, 19)
-}
-const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN
-const wallet = new WalletClient('auto', WALLET_ORIGIN)
-const authFetch = new AuthFetch(wallet)
+  return new Date(dateStr).toISOString().replace('T', ' ').slice(0, 19);
+};
+
+const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN;
+const wallet = new WalletClient('auto', WALLET_ORIGIN);
+const authFetch = new AuthFetch(wallet);
+
 const PaymentsList = () => {
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string>('')
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(5)
-  const [customRowsPerPage, setCustomRowsPerPage] = useState('')
-  const [showCustomInput, setShowCustomInput] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'new'>('all')
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
-  const [customOptions, setCustomOptions] = useState<number[]>([])
-  const [totalRecords, setTotalRecords] = useState(0)
-  const [title, setTitle] = useState<string>('Payments') // Default title
-  const theme = useTheme()
-  const fetchTimeout = useRef<number | null>(null)
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null)
-  const [clickedValue, setClickedValue] = useState<string | null>(null)
-  const [isClicked, setIsClicked] = useState(false) // New state to disable hover after click
-  const [exitDirection, setExitDirection] = useState<string | null>(null) // Track exit direction
-  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null) // Track last clicked column
-  const tableRef = useRef<HTMLDivElement>(null)
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [customRowsPerPage, setCustomRowsPerPage] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'new'>('all');
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
+  const [customOptions, setCustomOptions] = useState<number[]>([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [title, setTitle] = useState<string>('Payments'); // Default title
+  const theme = useTheme();
+  const fetchTimeout = useRef<number | null>(null);
+  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
+  const [clickedValue, setClickedValue] = useState<string | null>(null);
+  const [isClicked, setIsClicked] = useState(false); // New state to disable hover after click
+  const [exitDirection, setExitDirection] = useState<string | null>(null); // Track exit direction
+  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null); // Track last clicked column
+  const tableRef = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     Txid: null,
-    'Payment Id': null
-  })
+    'Payment Id': null,
+    'Button Id': null,
+    'Payer Id': null,
+  });
 
   const handleMouseEnter = (fullValue: string, columnName: string, rowIndex: number) => {
-    logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex)
+    logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex);
     if (!isClicked) {
-      setHoveredValue(fullValue)
+      setHoveredValue(fullValue);
       const columnCell = document.querySelector(
-        `tr:nth-child(${rowIndex + 1}) td:nth-child(${columnName === 'Txid' ? 2 : 3})`
-      ) as HTMLTableCellElement | null
+        `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Txid', 'Payment Id', 'Button Id', 'Payer Id'].indexOf(columnName) + 2})`
+      ) as HTMLTableCellElement | null;
       if (columnCell) {
-        columnRefs.current[columnName] = columnCell
+        columnRefs.current[columnName] = columnCell;
       }
     }
-  }
+  };
 
   const handleMouseLeave = (e: React.MouseEvent) => {
-    logWithTimestamp(F, 'Mouse leave')
+    logWithTimestamp(F, 'Mouse leave');
     if (tableRef.current && hoveredValue && !isClicked) {
-      const tableRect = tableRef.current.getBoundingClientRect()
-      const mouseY = e.clientY
-      const mouseX = e.clientX
+      const tableRect = tableRef.current.getBoundingClientRect();
+      const mouseY = e.clientY;
+      const mouseX = e.clientX;
       const hoveredColumn = Object.keys(columnRefs.current).find(col =>
         columnRefs.current[col]?.contains(e.target as Node)
-      )
+      );
       if (hoveredColumn) {
-        const colRect = columnRefs.current[hoveredColumn]!.getBoundingClientRect()
-        const isBottomExit = mouseY > colRect.bottom && mouseX >= colRect.left && mouseX <= colRect.right
-        if (isBottomExit && (hoveredColumn === 'Txid' || hoveredColumn === 'Payment Id')) {
-          setExitDirection('bottom')
+        const colRect = columnRefs.current[hoveredColumn]!.getBoundingClientRect();
+        const isBottomExit = mouseY > colRect.bottom && mouseX >= colRect.left && mouseX <= colRect.right;
+        if (isBottomExit && (hoveredColumn === 'Txid' || hoveredColumn === 'Payment Id' || hoveredColumn === 'Button Id' || hoveredColumn === 'Payer Id')) {
+          setExitDirection('bottom');
         } else {
-          setHoveredValue(null)
-          setExitDirection(null)
+          setHoveredValue(null);
+          setExitDirection(null);
         }
       } else {
-        setHoveredValue(null)
-        setExitDirection(null)
+        setHoveredValue(null);
+        setExitDirection(null);
       }
     }
-  }
+  };
 
   const handleClick = (fullValue: string, columnName: string) => {
-    logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName)
-    setHoveredValue(null) // Clear hover state
-    setIsClicked(true) // Disable further hover events
-    setClickedValue(fullValue)
-    setLastClickedColumn(columnName) // Track the clicked column
-    navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
-  }
+    logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName);
+    setHoveredValue(null); // Clear hover state
+    setIsClicked(true); // Disable further hover events
+    setClickedValue(fullValue);
+    setLastClickedColumn(columnName); // Track the clicked column
+    navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
+  };
 
   const handleReset = () => {
-    logWithTimestamp(F, 'Reset click')
-    setClickedValue(null)
-    setIsClicked(false) // Re-enable hover events
-    setHoveredValue(null) // Clear hover on reset
-    setExitDirection(null)
-    setLastClickedColumn(null) // Clear last clicked column
-  }
+    logWithTimestamp(F, 'Reset click');
+    setClickedValue(null);
+    setIsClicked(false); // Re-enable hover events
+    setHoveredValue(null); // Clear hover on reset
+    setExitDirection(null);
+    setLastClickedColumn(null); // Clear last clicked column
+  };
 
   useEffect(() => {
     const fetchTotal = async () => {
-      setLoading(true)
-      setPayments([]) // Clear state to force refresh
+      setLoading(true);
+      setPayments([]); // Clear state to force refresh
       try {
-        const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`
-        logWithTimestamp(F, 'Fetching total payments with URL:', url)
-        const response = await authFetch.fetch(url, { method: 'GET' })
-        const data: PaymentResponse = await response.json()
-        logWithTimestamp(F, 'API response:', JSON.stringify(data)) // Debug API response
-        if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`)
-        // Map API response to Payment interface, using transaction_id as ID
-        const mappedPayments = data.data.map(payment => {
-          logWithTimestamp(F, `Mapping transaction_id: ${payment.ID}, payment_button_id: ${payment.payment_button_id}`)
-          return {
-            payment_id: payment.payment_id || 'N/A', // Preserve payment_id for acknowledgment
-            ID: payment.ID || '', // Use transaction_id as ID, fallback to empty string
-            payment_button_id: payment.payment_button_id || '',
-            amount: payment.amount || 0,
-            currency: payment.currency || 'BSV',
-            completed: !!payment.completed,
-            is_new: !!payment.is_new,
-            transaction_info: payment.transaction_info,
-            merchant_id: payment.merchant_id,
-            created_at: payment.created_at
-          }
-        })
-        logWithTimestamp(F, 'Mapped payments:', JSON.stringify(mappedPayments))
-        setTotalRecords(mappedPayments.length)
-        setPayments(mappedPayments)
-        setTitle(data.title || 'Payments')
-        logWithTimestamp(F, 'Initial payments length:', mappedPayments.length)
+        const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`;
+        logWithTimestamp(F, 'Fetching total payments with URL:', url);
+        const response = await authFetch.fetch(url, { method: 'GET' });
+        const data: PaymentResponse = await response.json();
+        logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
+        if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`);
+        // Map API response to Payment interface
+        const mappedPayments = data.data.map(payment => ({
+          payment_id: payment.payment_id || null,
+          button_id: payment.button_id || null,
+          payer_id: payment.payer_id || null,
+          txid: payment.txid || null,
+          amount: payment.amount || null,
+          completed: payment.completed || null,
+          is_new: payment.is_new || null,
+          created_at: payment.created_at || null,
+        }));
+        logWithTimestamp(F, 'Mapped payments:', JSON.stringify(mappedPayments));
+        setTotalRecords(data.total || mappedPayments.length);
+        setPayments(mappedPayments);
+        setTitle(data.title || 'Payments');
+        logWithTimestamp(F, 'Initial payments length:', mappedPayments.length);
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : '❌ Unknown error'
-        logWithTimestamp(F, '❌ Error fetching total payments:', message)
-        setError(message)
+        const message = err instanceof Error ? err.message : '❌ Unknown error';
+        logWithTimestamp(F, '❌ Error fetching total payments:', message);
+        setError(message);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    fetchTotal()
-  }, [])
+    };
+    fetchTotal();
+  }, []);
+
   useEffect(() => {
-    setPage(0)
-  }, [statusFilter])
+    setPage(0);
+  }, [statusFilter]);
+
   const requestSort = (key: keyof Payment) => {
-    let direction: 'asc' | 'desc' = 'asc'
+    let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc'
+      direction = 'desc';
     }
-    setSortConfig({ key, direction })
-  }
+    setSortConfig({ key, direction });
+  };
+
   const handleRowsPerPageChange = (event: React.ChangeEvent<{ value: unknown }>) => {
-    const value = event.target.value
+    const value = event.target.value;
     logWithTimestamp(
       F,
       'Rows per page change:',
       value,
       'Current options:',
       rowsPerPageOptions.map(opt => opt.value)
-    )
+    );
     if (typeof value === 'object' && value !== null && 'value' in value && value.value === 0) {
-      setShowCustomInput(true)
+      setShowCustomInput(true);
     } else {
-      const numValue = typeof value === 'number' ? value : (value as any)?.value || 5
-      const isValidOption = rowsPerPageOptions.some(option => option.value === numValue)
+      const numValue = typeof value === 'number' ? value : (value as any)?.value || 5;
+      const isValidOption = rowsPerPageOptions.some(option => option.value === numValue);
       if (isValidOption) {
-        setRowsPerPage(numValue)
-        setCustomRowsPerPage('')
-        setShowCustomInput(false)
-        setPage(0)
+        setRowsPerPage(numValue);
+        setCustomRowsPerPage('');
+        setShowCustomInput(false);
+        setPage(0);
       } else {
-        setRowsPerPage(5)
-        setPage(0)
+        setRowsPerPage(5);
+        setPage(0);
       }
     }
-  }
+  };
+
   const handleCustomRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value.replace(/[^0-9]/g, '')
-    setCustomRowsPerPage(value)
-  }
+    const value = event.target.value.replace(/[^0-9]/g, '');
+    setCustomRowsPerPage(value);
+  };
+
   const handleCustomInputComplete = (
     event: React.KeyboardEvent<HTMLDivElement> | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return
-    const numValue = parseInt(customRowsPerPage, 10)
-    logWithTimestamp(F, 'Custom rows on complete:', numValue)
+    if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return;
+    const numValue = parseInt(customRowsPerPage, 10);
+    logWithTimestamp(F, 'Custom rows on complete:', numValue);
     if (isNaN(numValue) || numValue <= 0 || numValue > 100) {
-      setRowsPerPage(5)
+      setRowsPerPage(5);
     } else {
-      setRowsPerPage(numValue)
+      setRowsPerPage(numValue);
       setCustomOptions(prev => {
         if (!prev.includes(numValue) && ![5, 10, 25].includes(numValue)) {
-          return [...prev, numValue].sort((a, b) => a - b).slice(-3)
+          return [...prev, numValue].sort((a, b) => a - b).slice(-3);
         }
-        return prev
-      })
+        return prev;
+      });
     }
-    setCustomRowsPerPage('')
-    setShowCustomInput(false)
-    setPage(0)
-  }
+    setCustomRowsPerPage('');
+    setShowCustomInput(false);
+    setPage(0);
+  };
+
   const baseOptions = [
     { value: 5, label: '5' },
     { value: 10, label: '10' },
     { value: 25, label: '25' }
-  ]
+  ];
   const rowsPerPageOptions = [
     { value: 0, label: 'set 1..100' },
     ...baseOptions,
     ...customOptions.map(value => ({ value, label: value.toString() }))
-  ]
+  ];
+
   const filteredPayments =
     statusFilter === 'all'
       ? payments
       : payments.filter(
-          payment => (statusFilter === 'completed' && payment.completed) || (statusFilter === 'new' && payment.is_new)
-        )
+          payment => (statusFilter === 'completed' && payment.completed === true) || (statusFilter === 'new' && payment.is_new === true)
+        );
+
   const sortedPayments = sortConfig.key
     ? [...filteredPayments].sort((a, b) => {
-        if (!sortConfig.key) return 0 // Default to no change if key is null
-        let aValue: string | number | Date | boolean | undefined = a[sortConfig.key]
-        let bValue: string | number | Date | boolean | undefined = b[sortConfig.key]
-        // Handle undefined values by placing them at the end
-        if (aValue === undefined && bValue === undefined) return 0
-        if (aValue === undefined) return 1
-        if (bValue === undefined) return -1
+        if (!sortConfig.key) return 0; // Default to no change if key is null
+        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key];
+        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key];
+        // Handle null/undefined values by placing them at the end
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
         // Convert to comparable types
         if (sortConfig.key === 'amount') {
-          aValue = parseInt(aValue.toString()) || 0
-          bValue = parseInt(bValue.toString()) || 0
+          aValue = (aValue as number) || 0;
+          bValue = (bValue as number) || 0;
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number)
+            : (bValue as number) - (aValue as number);
         } else if (sortConfig.key === 'completed' || sortConfig.key === 'is_new') {
-          aValue = a[sortConfig.key] ? 1 : 0
-          bValue = b[sortConfig.key] ? 1 : 0
+          aValue = (aValue as boolean) ? 1 : 0;
+          bValue = (bValue as boolean) ? 1 : 0;
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number)
+            : (bValue as number) - (aValue as number);
         } else if (sortConfig.key === 'created_at') {
-          aValue = new Date((aValue as string) || new Date().toISOString())
-          bValue = new Date((bValue as string) || new Date().toISOString())
+          aValue = new Date(aValue as string || '');
+          bValue = new Date(bValue as string || '');
           return sortConfig.direction === 'asc'
             ? (aValue as Date).getTime() - (bValue as Date).getTime()
-            : (bValue as Date).getTime() - (aValue as Date).getTime()
-        } else if (sortConfig.key === 'ID') {
-          aValue = a.ID || ''
-          bValue = b.ID || ''
-          logWithTimestamp(F, `Sorting ID: aValue=${aValue}, bValue=${bValue}`)
-          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+            : (bValue as Date).getTime() - (aValue as Date).getTime();
         } else {
-          aValue = aValue.toString()
-          bValue = bValue.toString()
-          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+          aValue = (aValue as string) || '';
+          bValue = (bValue as string) || '';
+          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
         }
       })
-    : filteredPayments
-  const paginatedPayments = sortedPayments.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+    : filteredPayments;
+
+  const paginatedPayments = sortedPayments.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+
   logWithTimestamp(
     F,
     'Paginated payments length:',
@@ -375,8 +382,13 @@ const PaymentsList = () => {
     page,
     'Offset:',
     page * rowsPerPage
-  )
-  const acknowledgePayment = async (paymentId: string) => {
+  );
+
+  const acknowledgePayment = async (paymentId: string | null) => {
+    if (!paymentId) {
+      logWithTimestamp(F, '❌ Attempted to acknowledge payment with null paymentId');
+      return;
+    }
     try {
       logWithTimestamp(
         F,
@@ -384,34 +396,35 @@ const PaymentsList = () => {
         paymentId,
         'URL:',
         `http://localhost:3001/api/acknowledgePayment`
-      )
+      );
       const response = await authFetch.fetch(`http://localhost:3001/api/acknowledgePayment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentId }) // Send paymentId as required
-      })
+      });
       if (!response.ok) {
-        const errorText = await response.text()
-        logWithTimestamp(F, '❌ Acknowledgment failed with response:', errorText)
-        throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`)
+        const errorText = await response.text();
+        logWithTimestamp(F, '❌ Acknowledgment failed with response:', errorText);
+        throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`);
       }
-      const data: PaymentResponse = await response.json()
-      logWithTimestamp(F, 'Acknowledgment response:', JSON.stringify(data))
-      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`)
-      logWithTimestamp(F, 'Successfully acknowledged payment:', paymentId)
+      const data: PaymentResponse = await response.json();
+      logWithTimestamp(F, 'Acknowledgment response:', JSON.stringify(data));
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`);
+      logWithTimestamp(F, 'Successfully acknowledged payment:', paymentId);
       // Refresh the payments list after acknowledgment
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`
-      const refreshResponse = await authFetch.fetch(url, { method: 'GET' })
-      const refreshData: PaymentResponse = await refreshResponse.json()
-      if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`)
-      setPayments(refreshData.data)
-      setTotalRecords(refreshData.data.length)
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`;
+      const refreshResponse = await authFetch.fetch(url, { method: 'GET' });
+      const refreshData: PaymentResponse = await refreshResponse.json();
+      if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`);
+      setPayments(refreshData.data);
+      setTotalRecords(refreshData.total || refreshData.data.length);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '❌ Unknown error'
-      logWithTimestamp(F, '❌ Error acknowledging payment:', message)
-      setError(message)
+      const message = err instanceof Error ? err.message : '❌ Unknown error';
+      logWithTimestamp(F, '❌ Error acknowledging payment:', message);
+      setError(message);
     }
-  }
+  };
+
   if (loading) {
     return (
       <Box
@@ -425,9 +438,9 @@ const PaymentsList = () => {
       >
         <CircularProgress />
       </Box>
-    )
+    );
   }
-  if (error !== '') return <Typography color="error">{error}</Typography>
+  if (error !== '') return <Typography color="error">{error}</Typography>;
   return (
     <Container>
       <Box
@@ -484,8 +497,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault()
-                        requestSort('created_at')
+                        e.preventDefault();
+                        requestSort('created_at');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -497,12 +510,12 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault()
-                        requestSort('ID')
+                        e.preventDefault();
+                        requestSort('txid');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
-                      Txid {sortConfig.key === 'ID' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      Txid {sortConfig.key === 'txid' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -510,13 +523,12 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault()
-                        requestSort('payment_button_id')
+                        e.preventDefault();
+                        requestSort('payment_id');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
-                      Payment Id{' '}
-                      {sortConfig.key === 'payment_button_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      Payment Id {sortConfig.key === 'payment_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -524,8 +536,34 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault()
-                        requestSort('amount')
+                        e.preventDefault();
+                        requestSort('button_id');
+                      }}
+                      sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
+                    >
+                      Button Id {sortConfig.key === 'button_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      component="a"
+                      href="#"
+                      onClick={e => {
+                        e.preventDefault();
+                        requestSort('payer_id');
+                      }}
+                      sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
+                    >
+                      Payer Id {sortConfig.key === 'payer_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      component="a"
+                      href="#"
+                      onClick={e => {
+                        e.preventDefault();
+                        requestSort('amount');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -537,8 +575,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault()
-                        requestSort('completed')
+                        e.preventDefault();
+                        requestSort('completed');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -550,8 +588,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault()
-                        requestSort('is_new')
+                        e.preventDefault();
+                        requestSort('is_new');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -563,44 +601,52 @@ const PaymentsList = () => {
               </TableHead>
               <TableBody>
                 {paginatedPayments.map((payment, index) => {
-                  const fullId = payment.ID || ''
-                  const fullPaymentButtonId = payment.payment_button_id || ''
-                  const isIdTruncated = fullId !== formatId(fullId)
-                  const isPaymentButtonIdTruncated = fullPaymentButtonId !== formatId(fullPaymentButtonId)
+                  const fullTxid = payment.txid || '';
+                  const fullPaymentId = payment.payment_id || '';
+                  const fullButtonId = payment.button_id || '';
+                  const fullPayerId = payment.payer_id || '';
+                  const isTxidTruncated = fullTxid !== formatId(fullTxid);
+                  const isPaymentIdTruncated = fullPaymentId !== formatId(fullPaymentId);
+                  const isButtonIdTruncated = fullButtonId !== formatId(fullButtonId);
+                  const isPayerIdTruncated = fullPayerId !== formatId(fullPayerId);
                   return (
-                    <TableRow key={payment.ID || payment.payment_button_id || 'default-key'}>
-                      <TableCell>{formatTimestamp(payment.created_at || new Date().toISOString())}</TableCell>
+                    <TableRow key={payment.payment_id || index}>
+                      <TableCell>{formatTime(payment.created_at)}</TableCell>
                       <TableCell
                         ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Txid'] = el)}
-                        onMouseEnter={() => {
-                          logWithTimestamp(F, 'Cell mouse enter, fullId:', fullId, 'index:', index)
-                          handleMouseEnter(fullId, 'Txid', index + 1)
-                        }}
+                        onMouseEnter={() => handleMouseEnter(fullTxid, 'Txid', index + 1)}
                         onMouseLeave={handleMouseLeave}
-                        onClick={() => handleClick(fullId, 'Txid')}
+                        onClick={() => handleClick(fullTxid, 'Txid')}
                       >
-                        {formatId(payment.ID!)}
+                        {formatTxid(payment.txid)}
                       </TableCell>
                       <TableCell
                         ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Payment Id'] = el)}
-                        onMouseEnter={() => {
-                          logWithTimestamp(
-                            F,
-                            'Cell mouse enter, fullPaymentButtonId:',
-                            fullPaymentButtonId,
-                            'index:',
-                            index
-                          )
-                          handleMouseEnter(fullPaymentButtonId, 'Payment Id', index + 1)
-                        }}
+                        onMouseEnter={() => handleMouseEnter(fullPaymentId, 'Payment Id', index + 1)}
                         onMouseLeave={handleMouseLeave}
-                        onClick={() => handleClick(fullPaymentButtonId, 'Payment Id')}
+                        onClick={() => handleClick(fullPaymentId, 'Payment Id')}
                       >
-                        {formatId(payment.payment_button_id!)}
+                        {formatId(payment.payment_id || '')}
                       </TableCell>
-                      <TableCell>{payment.amount}</TableCell>
-                      <TableCell>{payment.completed ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>{payment.is_new ? 'Yes' : 'No'}</TableCell>
+                      <TableCell
+                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Button Id'] = el)}
+                        onMouseEnter={() => handleMouseEnter(fullButtonId, 'Button Id', index + 1)}
+                        onMouseLeave={handleMouseLeave}
+                        onClick={() => handleClick(fullButtonId, 'Button Id')}
+                      >
+                        {formatId(payment.button_id || '')}
+                      </TableCell>
+                      <TableCell
+                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Payer Id'] = el)}
+                        onMouseEnter={() => handleMouseEnter(fullPayerId, 'Payer Id', index + 1)}
+                        onMouseLeave={handleMouseLeave}
+                        onClick={() => handleClick(fullPayerId, 'Payer Id')}
+                      >
+                        {formatId(payment.payer_id || '')}
+                      </TableCell>
+                      <TableCell>{payment.amount !== null ? payment.amount : 'N/A'}</TableCell>
+                      <TableCell>{payment.completed !== null ? (payment.completed ? 'Yes' : 'No') : 'N/A'}</TableCell>
+                      <TableCell>{payment.is_new !== null ? (payment.is_new ? 'Yes' : 'No') : 'N/A'}</TableCell>
                       <TableCell>
                         {!payment.is_new ? (
                           'confirmed'
@@ -608,14 +654,14 @@ const PaymentsList = () => {
                           <Button
                             variant="contained"
                             color="primary"
-                            onClick={() => acknowledgePayment(payment.payment_button_id || '').catch(() => {})}
+                            onClick={() => acknowledgePayment(payment.payment_id).catch(() => {})}
                           >
                             Acknowledge
                           </Button>
                         )}
                       </TableCell>
                     </TableRow>
-                  )
+                  );
                 })}
               </TableBody>
             </Table>
@@ -625,9 +671,9 @@ const PaymentsList = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 0.25,
-              justifyContent: 'flex-end', // Align to right side
-              width: '100%', // Match table container width
-              boxSizing: 'border-box', // Ensure padding doesn't extend width
+              justifyContent: 'flex-end',
+              width: '100%',
+              boxSizing: 'border-box',
               padding: '4px 0'
             }}
           >
@@ -642,7 +688,7 @@ const PaymentsList = () => {
               count={filteredPayments.length}
               page={page}
               onPageChange={(e, newPage) => {
-                setPage(newPage)
+                setPage(newPage);
                 logWithTimestamp(
                   F,
                   'Page changed to:',
@@ -651,13 +697,12 @@ const PaymentsList = () => {
                   paginatedPayments,
                   'filteredPayments.length:',
                   filteredPayments.length
-                )
-                // Clear full text div states on page change
-                setHoveredValue(null)
-                setClickedValue(null)
-                setIsClicked(false)
-                setExitDirection(null)
-                setLastClickedColumn(null)
+                );
+                setHoveredValue(null);
+                setClickedValue(null);
+                setIsClicked(false);
+                setExitDirection(null);
+                setLastClickedColumn(null);
               }}
               rowsPerPage={rowsPerPage}
               onRowsPerPageChange={handleRowsPerPageChange}
@@ -686,7 +731,7 @@ const PaymentsList = () => {
             <Box
               sx={{
                 position: 'fixed',
-                left: `${tableRef.current.getBoundingClientRect().left}px`, // Revert to left alignment
+                left: `${tableRef.current.getBoundingClientRect().left}px`,
                 top: `${tableRef.current.getBoundingClientRect().bottom + 10}px`,
                 backgroundColor: theme.palette.background.paper,
                 padding: '4px 8px',
@@ -695,7 +740,7 @@ const PaymentsList = () => {
                 whiteSpace: 'nowrap',
                 display: 'flex',
                 alignItems: 'center',
-                maxWidth: '100%' // Keep to constrain width if needed
+                maxWidth: '100%'
               }}
             >
               <Tooltip
@@ -717,10 +762,14 @@ const PaymentsList = () => {
                     cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
                   }}
                 >
-                  {clickedValue && lastClickedColumn === 'Txid' ? (
-                    <a href={`https://whatsonchain.com/tx/${clickedValue}`} target="_blank" rel="noopener noreferrer">
-                      {clickedValue}
-                    </a>
+                  {clickedValue && ['Txid', 'Payment Id', 'Button Id', 'Payer Id'].includes(lastClickedColumn || '') ? (
+                    lastClickedColumn === 'Txid' ? (
+                      <a href={`https://whatsonchain.com/tx/${clickedValue}`} target="_blank" rel="noopener noreferrer">
+                        {clickedValue}
+                      </a>
+                    ) : (
+                      clickedValue
+                    )
                   ) : (
                     hoveredValue || clickedValue
                   )}
@@ -742,9 +791,9 @@ const PaymentsList = () => {
                     onClick={() => {
                       navigator.clipboard
                         .writeText(clickedValue)
-                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
-                      setClickedValue(null)
-                      setIsClicked(false)
+                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
+                      setClickedValue(null);
+                      setIsClicked(false);
                     }}
                   >
                     <ContentCopyIcon />
@@ -772,6 +821,7 @@ const PaymentsList = () => {
         </>
       )}
     </Container>
-  )
-}
-export default PaymentsList
+  );
+};
+
+export default PaymentsList;
