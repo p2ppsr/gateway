@@ -262,7 +262,7 @@ export default {
           .update({
             completed: true,
             blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
-            is_new: false,
+            //is_new:, defaulted to true in DB
             txid: txid,
             amount: expectedAmount,
             transaction_id: paymentRec.transaction_id // Preserve transaction_id

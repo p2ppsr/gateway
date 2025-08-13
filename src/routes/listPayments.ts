@@ -7,7 +7,7 @@
  *
  * Used by the Gateway frontend to display the Payments page.
  *
- * Version: v2.0 (Updated 13Aug2025_0315 BST to fix TypeScript const reassignment errors)
+ * Version: v2.1 (Updated 13Aug2025_1240 BST to add completed filter, fix join logic, and enhance logging)
  * Change Log:
  * - 05Aug2025_0500 BST (v1.0): Initial creation with basic payment listing.
  * - 12Aug2025_2250 BST (v1.1): Added join with payment_buttons and ids, fixed 500 error, added query debugging.
@@ -20,22 +20,20 @@
  * - 13Aug2025_0135 BST (v1.8): Ensured payment_id and button_id reference ids.id consistently.
  * - 13Aug2025_0315 BST (v1.9): Updated Payment interface for latest schema, improved pagination handling and logging.
  * - 13Aug2025_0315 BST (v2.0): Fixed TypeScript const reassignment errors for limitNum and offsetNum.
+ * - 13Aug2025_1240 BST (v2.1): Added completed filter, fixed join logic, and enhanced logging.
  */
 const F = 'routes/listPayments';
 import knex, { Knex } from 'knex';
 import knexConfig from '../../knexfile';
 import { Request, Response } from 'express';
 import { logWithTimestamp } from '../utils/logging';
-
 // Extend Request type to include auth property
 interface AuthRequest extends Request {
   auth: {
     identityKey: string;
   };
 }
-
 const db: Knex = knex(knexConfig);
-
 interface Payment {
   payment_id: string;
   button_id: string;
@@ -51,7 +49,6 @@ interface Payment {
   created_at: string;
   updated_at: string;
 }
-
 interface PaymentButton {
   id: string;
   button_id: string;
@@ -68,7 +65,6 @@ interface PaymentButton {
   description: string;
   customCSS: string;
 }
-
 export default {
   type: 'get' as const,
   path: '/listPayments',
@@ -77,7 +73,6 @@ export default {
     const { limit = '10', offset = '0' } = req.query; // Default as strings to handle query params
     let limitNum = parseInt(limit as string, 10);
     let offsetNum = parseInt(offset as string, 10);
-
     // Validate pagination parameters
     if (isNaN(limitNum) || limitNum <= 0) {
       logWithTimestamp(F, '⚠️ [listPayments] Invalid limit parameter, using default 10:', { limit });
@@ -87,13 +82,12 @@ export default {
       logWithTimestamp(F, '⚠️ [listPayments] Invalid offset parameter, using default 0:', { offset });
       offsetNum = 0;
     }
-
     try {
-      const payments: Payment[] = await db('payments')
+      const sqlQuery = db('payments')
         .select(
-          'payments.payment_id as PaymentId', // Unique payment record ID, pre-created in ids
-          'payments.txid as Txid', // Blockchain transaction ID
-          'payments.payer_id as PayerId', // Added for completeness
+          'payments.payment_id as PaymentId',
+          'payments.txid as Txid',
+          'payments.payer_id as PayerId',
           'payments.amount',
           'payments.currency',
           'payments.completed',
@@ -102,15 +96,23 @@ export default {
           'payment_buttons.button_id as ButtonId',
           'payment_buttons.description as Button'
         )
-        .join('payment_buttons', 'payments.button_id', '=', 'payment_buttons.id')
+        .join('payment_buttons', 'payments.payment_id', '=', 'payment_buttons.id') // Fixed join to use payment_id
         .where('payments.merchant_id', req.auth.identityKey)
+        .where('payments.completed', 1) // Filter for completed payments
         .limit(limitNum)
         .offset(offsetNum);
-
+      logWithTimestamp(F, '🔍 [listPayments] Executing SQL query:', { sql: sqlQuery.toString() });
+      const payments: Payment[] = await sqlQuery;
       logWithTimestamp(F, '🔍 [listPayments] Query result:', { payments, limit: limitNum, offset: offsetNum });
-      const total = await db('payments').where('merchant_id', req.auth.identityKey).count('* as count').first();
+      if (payments.length === 0) {
+        logWithTimestamp(F, '⚠️ [listPayments] No payments found for merchant:', { merchantId: req.auth.identityKey });
+      }
+      const total = await db('payments')
+        .where('merchant_id', req.auth.identityKey)
+        .where('completed', 1)
+        .count('* as count')
+        .first();
       const totalCount = total ? parseInt(total.count as string, 10) : 0;
-
       logWithTimestamp(F, '✅ [listPayments] Payments fetched successfully:', { total: totalCount, returned: payments.length, limit: limitNum, offset: offsetNum });
       res.status(200).json({
         status: 'success',

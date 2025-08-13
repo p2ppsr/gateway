@@ -9,10 +9,10 @@
  * - Includes filters, sorting by all columns via clickable headers, and pagination with an empty state
  * - Utilizes `formatBSV` from `utils/general.ts` for consistent amount formatting
  * - Uses `logWithTimestamp` from `utils/logging.ts` with configuration from `logging.config.ts` to measure performance and color-code logs
- * - Optimizes performance with single initial fetch
+ * - Updates only on code changes via HMR
  *
  * Used by the Gateway UI to manage incoming payment activity
- * Version: v4.28 (Updated 13Aug2025_0340 BST to align with latest schema and display agreed columns)
+ * Version: v4.32 (Updated 13Aug2025_1325 BST to remove polling and fix Actions column display)
  * Change Log:
  * - 01Aug2025_0335 BST (v3.3): Fixed Type Errors and Restored acknowledgePayment.
  * - 05Aug2025_0700 BST (v3.4): Updated to display transaction_id as ID (showing txid), integrated title "Transaction History" from API response, and aligned with listPayments v1.1 changes.
@@ -46,6 +46,10 @@
  * - 05Aug2025_2249 BST (v4.26): Fixed acknowledge button URL to port 3001.
  * - 05Aug2025_2352 BST (v4.27): Fixed formatId error with undefined values.
  * - 13Aug2025_0340 BST (v4.28): Aligned with latest schema, updated to display Txid, Payment Id, Button Id, Payer Id, Amount, Complete, New, Timestamp, and Actions.
+ * - 13Aug2025_1300 BST (v4.29): Fixed API response mapping and enhanced logging.
+ * - 13Aug2025_1310 BST (v4.30): Added controlled polling and optimized useEffect.
+ * - 13Aug2025_1315 BST (v4.31): Fixed TypeScript error in API response mapping.
+ * - 13Aug2025_1325 BST (v4.32): Removed polling and fixed Actions column display.
  */
 const F = 'pages/Payments'
 import React, { useState, useEffect, useRef } from 'react'
@@ -98,7 +102,16 @@ interface PaymentResponse {
   status: string;
   message: string;
   title?: string; // Optional title from API
-  data: Payment[];
+  data: {
+    PaymentId: string | null;
+    Txid: string | null;
+    PayerId: string | null;
+    ButtonId: string | null;
+    amount: string | number | null;
+    completed: number | null;
+    is_new: number | null;
+    created_at: string | null;
+  }[];
   total?: number;
 }
 
@@ -210,43 +223,47 @@ const PaymentsList = () => {
     setLastClickedColumn(null); // Clear last clicked column
   };
 
+  const fetchPayments = async () => {
+    setLoading(true);
+    setPayments([]); // Clear state to force refresh
+    try {
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`;
+      logWithTimestamp(F, 'Fetching total payments with URL:', url);
+      const response = await authFetch.fetch(url, { method: 'GET' });
+      const data: PaymentResponse = await response.json();
+      logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`);
+      // Map API response to Payment interface
+      const mappedPayments = data.data.map(payment => ({
+        payment_id: payment.PaymentId || null,
+        button_id: payment.ButtonId || null,
+        payer_id: payment.PayerId || null,
+        txid: payment.Txid || null,
+        amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
+        completed: payment.completed === 1 || false,
+        is_new: payment.is_new === 1 || false,
+        created_at: payment.created_at || null,
+      }));
+      logWithTimestamp(F, 'Mapped payments:', JSON.stringify(mappedPayments));
+      setTotalRecords(data.total || mappedPayments.length);
+      setPayments(mappedPayments);
+      setTitle(data.title || 'Payments');
+      logWithTimestamp(F, 'Initial payments length:', mappedPayments.length);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '❌ Unknown error';
+      logWithTimestamp(F, '❌ Error fetching total payments:', message);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTotal = async () => {
-      setLoading(true);
-      setPayments([]); // Clear state to force refresh
-      try {
-        const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`;
-        logWithTimestamp(F, 'Fetching total payments with URL:', url);
-        const response = await authFetch.fetch(url, { method: 'GET' });
-        const data: PaymentResponse = await response.json();
-        logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
-        if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`);
-        // Map API response to Payment interface
-        const mappedPayments = data.data.map(payment => ({
-          payment_id: payment.payment_id || null,
-          button_id: payment.button_id || null,
-          payer_id: payment.payer_id || null,
-          txid: payment.txid || null,
-          amount: payment.amount || null,
-          completed: payment.completed || null,
-          is_new: payment.is_new || null,
-          created_at: payment.created_at || null,
-        }));
-        logWithTimestamp(F, 'Mapped payments:', JSON.stringify(mappedPayments));
-        setTotalRecords(data.total || mappedPayments.length);
-        setPayments(mappedPayments);
-        setTitle(data.title || 'Payments');
-        logWithTimestamp(F, 'Initial payments length:', mappedPayments.length);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : '❌ Unknown error';
-        logWithTimestamp(F, '❌ Error fetching total payments:', message);
-        setError(message);
-      } finally {
-        setLoading(false);
-      }
+    fetchPayments(); // Initial fetch on mount
+    return () => {
+      if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
     };
-    fetchTotal();
-  }, []);
+  }, []); // Empty dependency array ensures this runs only on mount
 
   useEffect(() => {
     setPage(0);
@@ -416,7 +433,16 @@ const PaymentsList = () => {
       const refreshResponse = await authFetch.fetch(url, { method: 'GET' });
       const refreshData: PaymentResponse = await refreshResponse.json();
       if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`);
-      setPayments(refreshData.data);
+      setPayments(refreshData.data.map(payment => ({
+        payment_id: payment.PaymentId || null,
+        button_id: payment.ButtonId || null,
+        payer_id: payment.PayerId || null,
+        txid: payment.Txid || null,
+        amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
+        completed: payment.completed === 1 || false,
+        is_new: payment.is_new === 1 || false,
+        created_at: payment.created_at || null,
+      })));
       setTotalRecords(refreshData.total || refreshData.data.length);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '❌ Unknown error';
@@ -648,9 +674,7 @@ const PaymentsList = () => {
                       <TableCell>{payment.completed !== null ? (payment.completed ? 'Yes' : 'No') : 'N/A'}</TableCell>
                       <TableCell>{payment.is_new !== null ? (payment.is_new ? 'Yes' : 'No') : 'N/A'}</TableCell>
                       <TableCell>
-                        {!payment.is_new ? (
-                          'confirmed'
-                        ) : (
+                        {payment.is_new ? (
                           <Button
                             variant="contained"
                             color="primary"
@@ -658,6 +682,8 @@ const PaymentsList = () => {
                           >
                             Acknowledge
                           </Button>
+                        ) : (
+                          'confirmed'
                         )}
                       </TableCell>
                     </TableRow>

@@ -1,20 +1,19 @@
-import path from 'path'
-import HtmlWebpackPlugin from 'html-webpack-plugin'
-import NodePolyfillPlugin from 'node-polyfill-webpack-plugin'
-import CopyWebpackPlugin from 'copy-webpack-plugin'
-import { Configuration } from 'webpack'
+import path from 'path';
+import HtmlWebpackPlugin from 'html-webpack-plugin';
+import NodePolyfillPlugin from 'node-polyfill-webpack-plugin';
+import CopyWebpackPlugin from 'copy-webpack-plugin';
+import { Configuration } from 'webpack';
 
 const common: Configuration = {
   output: {
     path: path.join(__dirname, '/build'),
-    filename: 'bundle.js',
-    publicPath: '/'
+    filename: '[name].js',
+    publicPath: '/',
   },
-
   plugins: [
     new HtmlWebpackPlugin({
       template: 'public/index.html',
-      inject: false
+      inject: false,
     }),
     new NodePolyfillPlugin(),
     new CopyWebpackPlugin({
@@ -22,72 +21,65 @@ const common: Configuration = {
         {
           from: 'public',
           globOptions: {
-            ignore: ['**/index.html']
-          }
-        }
-      ]
-    })
+            ignore: ['**/index.html'],
+          },
+        },
+      ],
+    }),
   ],
-
   module: {
     rules: [
       {
         test: /\.(ts|tsx|js|jsx)$/,
         exclude: /node_modules/,
         use: {
-          loader: 'babel-loader'
-        }
+          loader: 'babel-loader',
+        },
       },
-
       {
         test: /\.css$/,
-        use: ['style-loader', 'css-loader']
+        use: ['style-loader', 'css-loader'],
       },
-
       {
         test: /\.scss$/,
-        use: ['style-loader', 'css-loader', 'sass-loader']
+        use: ['style-loader', 'css-loader', 'sass-loader'],
       },
-
       {
         test: /\.(png|jpe?g|gif|svg|webp)$/,
         use: [
           {
             loader: 'url-loader',
-            options: { limit: false }
-          }
-        ]
+            options: { limit: false },
+          },
+        ],
       },
-
       {
         test: /\.(woff|woff2|eot|ttf)$/,
         use: {
           loader: 'file-loader',
           options: {
-            name: 'assets/Fonts/[name].[ext]'
-          }
-        }
+            name: 'assets/Fonts/[name].[ext]',
+          },
+        },
       },
-
       {
         test: /\.(mp3|wav|m4v|flac|aiff)$/,
         use: {
           loader: 'file-loader',
           options: {
-            name: 'assets/Music/[name].[ext]'
-          }
-        }
-      }
-    ]
+            name: 'assets/Music/[name].[ext]',
+          },
+        },
+      },
+    ],
   },
-
   resolve: {
     extensions: ['.web.tsx', '.web.ts', '.ts', '.tsx', '.js', '.jsx', '.json'],
     alias: {
       'react-native$': 'react-native-web',
-      fs: false
-    }
-  }
-}
+      fs: false,
+    },
+  },
+};
 
-export default common
+export default common;
