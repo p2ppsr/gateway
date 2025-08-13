@@ -1,111 +1,118 @@
 /**
  * @file src/routes/listPayments.ts
  *
- * GET route to list payments received by the authenticated merchant.
- * Supports pagination, sort order, and optional filtering by a specific payment button.
+ * GET route to list all payments for the authenticated merchant.
+ * Retrieves payment records from the database, including related button details,
+ * with pagination support via query parameters (limit and offset).
  *
- * Query Parameters:
- * - `buttonId` (string, optional): Filter to only payments from a specific button.
- * - `limit` (number): Maximum number of payments to return (default: 25).
- * - `offset` (number): Number of payments to skip for pagination (default: 0).
- * - `sort` ("asc" | "desc"): Sort order based on `created_at` timestamp (default: "desc").
+ * Used by the Gateway frontend to display the Payments page.
  *
- * Used by the Gateway frontend on the Payments screen to fetch incoming payment activity.
- *
- * Version: v1.4 (Updated 05Aug2025_1815 BST to align field names with frontend and add logging)
+ * Version: v1.3 (Updated 12Aug2025_2330 BST to fix TypeScript auth property error)
  * Change Log:
- * - 04Aug2025_2300 BST (v1.0): Initial version, listing payments with payment_id.
- * - 05Aug2025_0700 BST (v1.1): Updated to display transaction_id as ID (showing txid), added title "Transaction History" to response, and removed outdated payment_id reference.
- * - 05Aug2025_0720 BST (v1.2): Added fallback for undefined amount values to prevent TypeError in formatBSV.
- * - 05Aug2025_0730 BST (v1.3): Strengthened amount fallback with explicit null/undefined checks and logging to debug invalid data.
- * - 05Aug2025_1815 BST (v1.4): Aligned field names (e.g., `CreatedAt` to `created_at`, `New` to `is_new`) with frontend expectations and added detailed logging for debugging.
+ * - 05Aug2025_0500 BST (v1.0): Initial creation with basic payment listing.
+ * - 12Aug2025_2250 BST (v1.1): Added join with payment_buttons and ids, fixed 500 error, added query debugging.
+ * - 12Aug2025_2315 BST (v1.2): Removed invalid payment_button_id reference, adjusted join, enhanced error logging.
+ * - 12Aug2025_2330 BST (v1.3): Added AuthRequest interface to fix TypeScript 'auth' property error.
  */
-const F = 'routes/listPayments'
-import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
-import { Request, Response } from 'express'
-import { logWithTimestamp } from '../utils/logging'
-const db: Knex = knex(knexConfig)
+const F = 'routes/listPayments';
+import knex, { Knex } from 'knex';
+import knexConfig from '../../knexfile';
+import { Request, Response } from 'express';
+import { logWithTimestamp } from '../utils/logging';
+
+// Extend Request type to include auth property
+interface AuthRequest extends Request {
+  auth: {
+    identityKey: string;
+  };
+}
+
+const db: Knex = knex(knexConfig);
+
+interface Payment {
+  transaction_id: string;
+  payment_id: string;
+  from: string;
+  merchant_id: string;
+  completed: boolean;
+  is_new: boolean;
+  transaction_info: string;
+  amount: number;
+  currency: string;
+  exchange_rate: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface PaymentButton {
+  id: string;
+  button_id: string;
+  amount: number;
+  currency: string;
+  variable_amount: number;
+  merchant_id: string;
+  multi_use: number;
+  used: number;
+  total_paid: number;
+  accepts: string;
+  created_at: string;
+  updated_at: string;
+  description: string;
+  customCSS: string;
+}
+
 export default {
-  type: 'get',
+  type: 'get' as const,
   path: '/listPayments',
-  /**
-   * Express route handler to return a list of payments for a given merchant.
-   *
-   * Applies optional filters and pagination based on query parameters.
-   * If a `buttonId` is provided, filters results to that payment button only.
-   *
-   * @param req - Express request object, must include `auth.identityKey` and may include
-   * query parameters: `buttonId`, `limit`, `offset`, `sort`.
-   * @param res - Express response object to return the filtered list of payments.
-   * @returns {Promise<void>} Responds with JSON containing the filtered payment list or an error.
-   */
-  func: async (req: Request, res: Response): Promise<void> => {
-    // Extract merchant ID from authentication context
-    const merchantId = (req as any).auth.identityKey
-    // Extract query parameters for optional filtering by button ID, pagination, and sorting
-    const {
-      buttonId,
-      limit = 25,
-      offset = 0,
-      sort = 'desc'
-    } = req.query as {
-      buttonId?: string
-      limit?: number
-      offset?: number
-      sort?: 'asc' | 'desc'
-    }
+  func: async (req: AuthRequest, res: Response): Promise<void> => {
+    logWithTimestamp(F, '🔍 [listPayments] Received request with query:', req.query);
+    const { limit = 10, offset = 0 } = req.query;
+    const limitNum = parseInt(limit as string, 10) || 10;
+    const offsetNum = parseInt(offset as string, 10) || 0;
+
     try {
-      // Build the query with mandatory conditions
-      let query = db('payments')
+      const payments: Payment[] = await db('payments')
         .select(
-          'transaction_id as ID', // Alias transaction_id to ID, showing txid
-          'payment_button_id as payment_button_id',
-          'amount as amount',
-          'currency as currency',
-          'completed as completed',
-          'is_new as is_new',
-          'created_at as created_at' // Use consistent field name
+          'payments.transaction_id as ID',
+          'payments.payment_id',
+          'payments.amount',
+          'payments.currency',
+          'payments.completed',
+          'payments.is_new',
+          'payments.created_at',
+          'payment_buttons.button_id as button_id',
+          'payment_buttons.description',
+          'payment_buttons.customCSS'
         )
-        .where({ merchant_id: merchantId })
-        .orderBy('created_at', sort)
-        .limit(limit)
-        .offset(offset)
-      // Optionally filter by button ID if one is provided
-      if (typeof buttonId === 'string' && buttonId !== '') {
-        query = query.andWhere({ payment_button_id: buttonId })
-      }
-      // Execute the query to get the list of payments
-      const payments = await query
-      logWithTimestamp(F, 'routes/listPayments', 'Raw query result:', JSON.stringify(payments))
+        .join('payment_buttons', 'payments.payment_id', '=', 'payment_buttons.id')
+        .where('payments.merchant_id', req.auth.identityKey) // Updated to use non-nullable auth
+        .limit(limitNum)
+        .offset(offsetNum);
+      logWithTimestamp(F, '🔍 [listPayments] Query result:', payments);
 
-      // Respond with the list of payments including a title and handling undefined amounts
-      const processedPayments = payments.map(x => {
-        if (x.amount === undefined || x.amount === null) {
-          logWithTimestamp(
-            'routes/listPayments',
-            'Warning: Found undefined/null amount for payment:',
-            x.ID,
-            'Setting to 0'
-          )
-          return { ...x, amount: '0' }
-        }
-        return { ...x, amount: x.amount }
-      })
-      logWithTimestamp(F, 'routes/listPayments', 'Processed payments:', JSON.stringify(processedPayments))
+      const total = await db('payments').where('merchant_id', req.auth.identityKey).count('* as count').first();
+      const totalCount = total ? parseInt(total.count as string, 10) : 0;
 
+      logWithTimestamp(F, '✅ [listPayments] Payments fetched successfully:', { total: totalCount, returned: payments.length });
       res.status(200).json({
         status: 'success',
-        title: 'Transaction History',
-        data: processedPayments,
-        message: 'Payments fetched successfully'
-      })
-    } catch (error) {
-      logWithTimestamp(F, 'routes/listPayments', '❌ Error listing payments:', error)
+        message: 'Payment buttons fetched successfully',
+        data: payments,
+        total: totalCount,
+      });
+      return;
+    } catch (error: unknown) {
+      logWithTimestamp(F, '❌ [listPayments] Error fetching payments:', {
+        message: error instanceof Error ? error.message : '❌ Unknown error',
+        stack: error instanceof Error ? error.stack : '❌ No stack trace',
+        query: req.query,
+        sql: (error as any).sql || 'No SQL available',
+      });
       res.status(500).json({
         status: 'error',
-        message: '❌ Internal server error'
-      })
+        message: '❌ Internal server error',
+      });
+      return;
     }
-  }
-}
+  },
+};

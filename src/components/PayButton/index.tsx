@@ -21,8 +21,7 @@
  * - 05Aug2025_0610 BST (v2.1): Fixed paymentId propagation in payPayload to ensure invoice.transaction_id is used correctly, resolving undefined paymentId issue in /api/pay requests.
  * - 05Aug2025_0645 BST (v2.2): Added lockingScript to payPayload to allow server validation without re-derivation, restoring pre-transaction_id change behavior.
  * - 10Aug2025_0130 BST (v2.3): Added comprehensive logging to diagnose payment failures.
- * - 10Aug2025_0145 BST (v2.4): Replaced logWithTimestamp with browser-compatible console.log for pay.js integration.
- */
+  */
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
 import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk';
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants';
@@ -208,7 +207,9 @@ const PayButton = ({
 
       // Send amount in BSV to server
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 2] Requesting invoice from server:`, server);
-      const resInv = await authFetch.fetch(`${server}/invoice`, {
+      const invoiceUrl = `${server}/api/invoice`;
+      console.log('components/PayButton', '🔍 [Step 2] Sending invoice request to:', invoiceUrl, { paymentId, amount });
+      const resInv = await authFetch.fetch(`${server}/api/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -218,6 +219,17 @@ const PayButton = ({
           amount: effectiveAmount
         })
       });
+      console.log('components/PayButton', '🔍 [Step 2] Received invoice response:', { status: resInv.status, url: invoiceUrl });      
+      // const resInv = await authFetch.fetch(`${server}/invoice`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     merchantId: merchant,
+      //     paymentId: fetchedPaymentId,
+      //     currency,
+      //     amount: effectiveAmount
+      //   })
+      // });
       const invoice: InvoiceResponse = await resInv.json();
       if (invoice.status !== 'success') throw new Error(`❌ ${invoice.message ?? 'Invoice creation failed'}`);
       console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 3] Invoice received:`, invoice);
@@ -274,7 +286,7 @@ const PayButton = ({
         lockingScript: outputsWithSats[0]?.lockingScript // Add lockingScript to payload
       };
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`, server, payPayload);
-      const resPay = await authFetch.fetch(`${server}/pay`, {
+      const resPay = await authFetch.fetch(`${server}/api/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payPayload)

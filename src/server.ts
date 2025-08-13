@@ -158,6 +158,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         res.status(500).json({ status: 'error', message: '❌ Internal server error' })
       }
     })
+    
     app.listen(HTTP_PORT, () => {
       logWithTimestamp(F, '✅ Gateway Payment Server listening on', HTTP_PORT)
       if (SPAWN_NGINX === 'yes') {

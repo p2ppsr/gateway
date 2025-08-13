@@ -11,7 +11,7 @@
  * - All amounts are handled as BSV decimals internally.
  * - IDs are client-generated 12-character Base58-encoded strings, pre-validated by initializeIds.
  *
- * Version: v2.30 (Updated 12Aug2025_0015 BST to align with initializeIds and clarify response fields)
+ * Version: v2.34 (Updated 12Aug2025_2000 BST to add duplicate check and prevent re-insertion)
  * Change Log:
  * - 09Aug2025_2350 BST (v2.23): Return generated ID in response.
  * - 10Aug2025_1155 BST (v2.24): Aligned path to /api/createButton and added middleware logging for diagnostics.
@@ -29,9 +29,7 @@ import type { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { MAX_PAYMENT_SATS } from '../utils/constants';
 import { logWithTimestamp } from '../utils/logging';
-
 const db: Knex = knex(knexConfig);
-
 interface RequestBody {
   amount?: number;
   currency: string;
@@ -41,9 +39,8 @@ interface RequestBody {
   description: string;
   customCSS?: string;
   paymentId: string; // Client-provided payment ID, pre-initialized
-  buttonId: string;  // Client-provided button ID, pre-initialized
+  buttonId: string; // Client-provided button ID, pre-initialized
 }
-
 export default {
   type: 'post',
   path: '/createButton', // Handled by ROUTING_PREFIX in server.ts
@@ -94,7 +91,6 @@ export default {
       res.status(400).json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() });
       return;
     }
-
     const merchantId = (req as any).auth?.identityKey || 'unknown'; // Default to 'unknown' if not authenticated
     const {
       amount = 0,
@@ -107,7 +103,6 @@ export default {
       paymentId,
       buttonId,
     }: RequestBody = req.body;
-
     logWithTimestamp(F, '🔍 [createButton] [Step 1] Create button request (sats):', {
       merchantId,
       amount,
@@ -120,7 +115,6 @@ export default {
       paymentId,
       buttonId,
     });
-
     try {
       // Verify IDs exist in ids table
       const idExists = await db('ids').where({ id: paymentId, type: 'payment' }).first();
@@ -130,10 +124,22 @@ export default {
         res.status(400).json({ status: 'error', message: '❌ Payment or button ID not pre-initialized' });
         return;
       }
-
+      // Check for existing payment button to avoid duplicates
+      logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId });
+      const existingButton = await db('payment_buttons').where({ id: paymentId }).first();
+      if (existingButton) {
+        logWithTimestamp(F, '✅ [createButton] Button already exists, skipping insert:', { paymentId, buttonId, existingButton });
+        res.status(200).json({
+          status: 'success',
+          message: 'Button already exists',
+          paymentId,
+          buttonId,
+        });
+        return;
+      }
+      logWithTimestamp(F, '🔍 [createButton] [Step 4] No duplicate found, proceeding with insert:', { paymentId, buttonId });
       const amountInBSV = variableAmount ? 0 : amount;
       logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to BSV:', amountInBSV);
-
       // Insert into payment_buttons
       await db('payment_buttons').insert({
         id: paymentId,
@@ -156,7 +162,7 @@ export default {
         status: 'success',
         message: 'Payment button created successfully',
         paymentId, // Return client-provided paymentId
-        buttonId,  // Return client-provided buttonId
+        buttonId, // Return client-provided buttonId
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '❌ Unknown error';

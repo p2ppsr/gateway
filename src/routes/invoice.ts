@@ -12,13 +12,15 @@
  * - All amounts are handled as BSV decimals internally (to match current DB schema).
  * - Added input validation and sanitization with express-validator.
  *
- * Version: v2.4 (Updated 10Aug2025_0215 BST to handle schema change and improve logging)
+ * Version: v2.6 (Updated 12Aug2025_2120 BST to fix payments table schema reference and enhance debugging)
  * Change Log:
  * - 05Aug2025_0420 BST (v2.1): Standardized route path and fixed prefix duplication by removing /api.
  * - 05Aug2025_0500 BST (v2.2): Initial attempt to update to use transaction_id (incomplete, rolled back).
  * - 05Aug2025_0600 BST (v2.3): Completed update to use transaction_id instead of payment_id, aligning with schema change to VARCHAR(64) primary key. Added change log to track history. Ensured compatibility with trigger update_transaction_id.
  * - 10Aug2025_0145 BST (v2.4): Enhanced logging to diagnose schema-related payment failures, aligned transaction_id with 12-character Base58 format.
  * - 10Aug2025_0215 BST (v2.4): Clarified logging usage (server-side only) to avoid client-side confusion.
+ * - 12Aug2025_2100 BST (v2.5): Fixed id column reference from payment_id to id and enhanced query logging.
+ * - 12Aug2025_2120 BST (v2.6): Fixed payments table schema reference from payment_button_id to payment_id and added schema debugging.
  */
 const F = 'routes/invoice';
 import knex, { Knex } from 'knex';
@@ -29,11 +31,9 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { logWithTimestamp } from '../utils/logging';
 import { generateBase58 } from '../utils/general';
-
 const db: Knex = knex(knexConfig);
-
 interface PaymentButton {
-  payment_id: string; // Changed from button_id to match the new identifier
+  id: string; // Updated from payment_id to match the current schema
   merchant_id: string;
   multi_use: boolean;
   used: boolean;
@@ -43,14 +43,12 @@ interface PaymentButton {
   created_at?: string; // Optional timestamp
   description: string; // Custom spending description
 }
-
 interface RequestBody {
   paymentId: string; // Changed from paymentButtonId to align with new identifier
   merchantId: string;
   currency: string;
   amount: number;
 }
-
 export default {
   type: 'post',
   path: '/invoice', // Standardized route path
@@ -83,23 +81,20 @@ export default {
       res.status(400).json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() });
       return;
     }
-
     const senderIdentityKey = (req as any).auth?.identityKey;
     if (!senderIdentityKey) {
       logWithTimestamp(F, '❌ [invoice] Missing sender identity key from auth context');
       res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing sender identity' });
       return;
     }
-
     const { paymentId, merchantId, currency, amount }: RequestBody = req.body;
     logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, merchantId, currency, amount });
-
     try {
       // Verify the payment button exists and belongs to the specified merchant
-      logWithTimestamp(F, '🔍 [invoice] [Step 2] Querying payment button:', { paymentId, merchantId });
+      logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', { paymentId, merchantId });
       const button: PaymentButton | undefined = await db('payment_buttons')
         .where({
-          payment_id: paymentId,
+          id: paymentId, // Updated from payment_id to id
           merchant_id: merchantId
         })
         .first();
@@ -115,7 +110,6 @@ export default {
         });
         return;
       }
-
       // Verify the button has not already been used if it is a single-use button
       logWithTimestamp(F, '🔍 [invoice] [Step 3] Checking multi-use status:', { multi_use: button.multi_use, used: button.used });
       if (!button.multi_use && button.used) {
@@ -126,7 +120,6 @@ export default {
         });
         return;
       }
-
       // Verify the amount matches or the button is variable (all in BSV)
       logWithTimestamp(F, '🔍 [invoice] [Step 4] Validating amount:', { requested: amount, buttonAmount: button.amount, variable: button.variable_amount });
       if (!button.variable_amount && Math.abs(amount - button.amount) > 1) {
@@ -140,28 +133,31 @@ export default {
         });
         return;
       }
-
       // Create a new payment with completed=false
       const transactionIdNew = generateBase58(12); // Use 12-character Base58 ID to match schema
       logWithTimestamp(F, '🔍 [invoice] [Step 5] Generating transaction ID:', transactionIdNew);
+      // Debug the payments table schema
+      const paymentsSchema = await db('information_schema.columns')
+        .where({ table_name: 'payments' })
+        .select('column_name');
+      logWithTimestamp(F, '🔍 [invoice] [Step 5] Payments table schema:', paymentsSchema.map(col => col.column_name));
       await db('payments').insert({
         transaction_id: transactionIdNew,
+        payment_id: paymentId, // Changed from payment_button_id to payment_id to match schema
+        from: senderIdentityKey,
         merchant_id: merchantId,
         completed: false,
-        from: senderIdentityKey,
         transaction_info: '',
         amount,
         currency,
-        exchange_rate: 1,
-        payment_button_id: paymentId
+        exchange_rate: 1
       });
       logWithTimestamp(F, '✅ [invoice] [Step 6] Payment invoice created:', { transactionId: transactionIdNew });
-
       // Determine sender private key based on button creation context
       let senderPrivateKey: PrivateKey;
       try {
         const hasCreatedAt = (await db('information_schema.columns')
-          .where({ table_name: 'payment_buttons', column_name: 'created_at' })
+          .where({ table_name: 'payments', column_name: 'created_at' })
           .first()) !== undefined;
         if (!hasCreatedAt || !button.created_at || new Date(button.created_at) < new Date('2025-07-25T12:00:00Z')) {
           senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
@@ -174,7 +170,6 @@ export default {
         logWithTimestamp(F, '⚠️ [invoice] created_at column check failed, using hardcoded key as fallback:', err);
         senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
       }
-
       const recipientPublicKey = PublicKey.fromString(button.merchant_id);
       const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`;
       const combined = Utils.toArray(
@@ -187,15 +182,12 @@ export default {
       const pkh = new P2PKH();
       const derivedScript = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex();
       logWithTimestamp(F, '🔍 [invoice] [Step 7] Generated derived script:', derivedScript);
-
       // Use client-provided amount for variable buttons, button amount for fixed
       const satoshis = button.variable_amount ? amount : button.amount;
       logWithTimestamp(F, '🔍 [invoice] [Step 8] Calculated satoshis for output:', satoshis);
-
       // Use custom description from payment_buttons, fallback to dynamic default
       const outputDescription = button.description || `Payment to merchant with paymentId: ${paymentId}`;
       logWithTimestamp(F, '🔍 [invoice] [Step 9] Using output description:', outputDescription);
-
       // Respond with the payment ID and outputs including merchantId
       const outputs = [
         {
@@ -206,7 +198,6 @@ export default {
         }
       ];
       logWithTimestamp(F, '🔍 [invoice] [Step 10] Response outputs:', outputs);
-
       res.status(200).json({
         status: 'success',
         message: 'Invoice created successfully',

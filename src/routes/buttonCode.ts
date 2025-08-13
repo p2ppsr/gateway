@@ -7,11 +7,11 @@
  *
  * Used by the Gateway inject script to initialize PayButtons on a webpage.
  *
- * Version: v2.30 (Updated 10Aug2025_1635 BST to use data-button-id for original buttonId)
+ * Version: v2.30 (Updated 10Aug2025_1635 BST to use data-buttonId-id for original buttonId)
  * Change Log:
  * - ... (previous entries)
- * - 10Aug2025_1635 BST (v2.29): Preserved data-button as original buttonId, updated only payment-related attributes.
- * - 10Aug2025_1635 BST (v2.30): Introduced data-button-id to pass original buttonId, aligning id and data-paymentId with database ID.
+ * - 10Aug2025_1635 BST (v2.29): Preserved data-buttonId as original buttonId, updated only payment-related attributes.
+ * - 10Aug2025_1635 BST (v2.30): Introduced data-buttonId-id to pass original buttonId, aligning id and data-paymentId with database ID.
  */
 const F = 'routes/buttonCode';
 import knex, { Knex } from 'knex';
@@ -119,7 +119,7 @@ export default {
           .replace(new RegExp(`id="${button.original_button_id}"`, 'g'), `id="${button.id}"`) // Replace div ID
           .replace(new RegExp(`data-paymentId="${button.original_payment_id}"`, 'g'), `data-paymentId="${button.id}"`)
           .replace(new RegExp(`data-description="Payment using paymentId: ${button.original_payment_id}"`, 'g'), `data-description="Payment using paymentId: ${button.id}"`)
-          .replace(new RegExp(`data-button-id="${button.original_button_id}"`, 'g'), `data-button-id="${button.original_button_id}"`); // Preserve original buttonId
+          .replace(new RegExp(`data-buttonId-id="${button.original_button_id}"`, 'g'), `data-buttonId-id="${button.original_button_id}"`); // Preserve original buttonId
         logWithTimestamp(F, '🔍 [buttonCode] [Step 6b] Updated div block:', updatedDiv);
         modifiedCSS = modifiedCSS.replace(fullDiv, updatedDiv);
         const styleMatch = modifiedCSS.match(/<style>[\s\\S]*?<\/style>/i);
@@ -131,7 +131,7 @@ export default {
         const defaultText = `Pay Now ${button.amount || 0} Sats`;
         buttonCode = `
           ${styles}
-          <div id="${button.id}" class="gateway-paybutton" data-paymentId="${button.id}" data-button-id="${button.original_button_id}" data-amount="${button.amount || 0}" data-currency="${button.currency || 'BSV'}" data-variable="${button.variable_amount}" data-description="Payment using paymentId: ${button.id}" data-server="${req.protocol}://${req.get('host')}">
+          <div id="${button.id}" class="gateway-paybutton" data-paymentId="${button.id}" data-buttonId-id="${button.original_button_id}" data-amount="${button.amount || 0}" data-currency="${button.currency || 'BSV'}" data-variable="${button.variable_amount}" data-description="Payment using paymentId: ${button.id}" data-server="${req.protocol}://${req.get('host')}">
             ${defaultText}
           </div>
           <script src="${req.protocol}://${req.get('host')}/pay.js"></script>
