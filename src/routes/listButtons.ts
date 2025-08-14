@@ -10,7 +10,7 @@
  * - Includes left join with payments table to fetch payment_id.
  * - Orders by created_at with ascending or descending sort.
  *
- * Version: v2.22 (Updated 13Aug2025_1905 BST to fix TS2451 redeclaration error)
+ * Version: v2.27 (Updated 14Aug2025_0115 BST to refine join condition)
  * Change Log:
  * - 09Aug2025_2300 BST (v2.10): Initial implementation with pagination and filtering.
  * - 10Aug2025_1100 BST (v2.11): Added sort parameter and enhanced logging.
@@ -25,6 +25,11 @@
  * - 13Aug2025_1855 BST (v2.20): Improved usage type guard to resolve TS2367 in else if branch.
  * - 13Aug2025_1900 BST (v2.21): Applied ChatGPT-inspired fix for excludeSingleUse type mismatch.
  * - 13Aug2025_1905 BST (v2.22): Fixed TS2451 redeclaration error for excludeSingleUse.
+ * - 13Aug2025_2140 BST (v2.23): Updated to reflect schema change with button_id as primary key and adjusted payment_id handling.
+ * - 13Aug2025_2150 BST (v2.24): Updated to reflect schema changes with html_code and removal of currency/accepts.
+ * - 13Aug2025_2200 BST (v2.25): Updated to reflect schema changes with non-nullable amount, description, and html_code.
+ * - 13Aug2025_2235 BST (v2.26): Refined mapping and defaults for schema alignment.
+ * - 14Aug2025_0115 BST (v2.27): Refined join condition to use payment_id for consistency.
  */
 const F = 'routes/listButtons';
 import knex, { Knex } from 'knex';
@@ -70,39 +75,34 @@ export default {
       return;
     }
     const merchantId = (req as any).auth?.identityKey || 'unknown'; // Default to 'unknown' if not authenticated
-    const { limit = 500, offset = 0, sort = 'desc', usage, excludeSingleUse: excludeSingleUseRaw } = req.query;
-
+    const { limit = 500, offset = 0, sort = 'desc', usage, excludeSingleUseRaw } = req.query;
     // Type guard for excludeSingleUse using ChatGPT-inspired approach
-    const excludeSingleUse = typeof excludeSingleUseRaw === 'boolean' 
-      ? excludeSingleUseRaw 
+    const excludeSingleUse = typeof excludeSingleUseRaw === 'boolean'
+      ? excludeSingleUseRaw
       : String(excludeSingleUseRaw).toLowerCase() === 'true';
-
     // Type guard for usage
     const isUsageDefined = typeof usage === 'string';
     let usageValue: 'used' | 'unused' | undefined = undefined;
     if (isUsageDefined) {
       usageValue = usage as 'used' | 'unused'; // Narrow to valid values
     }
-
     logWithTimestamp(F, '🔍 [listButtons] Fetching buttons for merchant:', { merchantId, limit, offset, sort, usage: usageValue, excludeSingleUse });
-
     try {
       let buttonQuery = db('payment_buttons')
         .where('payment_buttons.merchant_id', merchantId)
         .select(
-          'payment_buttons.button_id as buttonId', // Use button_id for Button Id column
-          'payments.payment_id as paymentId',     // Fetch payment_id from payments table
-          'payment_buttons.amount',
+          'payment_buttons.button_id as buttonId', // Primary key
+          'payment_buttons.payment_id as paymentId', // Nullable foreign key
+          'payment_buttons.amount', // Non-nullable
           'payment_buttons.variable_amount as variable',
           'payment_buttons.multi_use as multiUse',
           'payment_buttons.used',
-          'payment_buttons.total_paid as totalPaid',
-          'payment_buttons.description',
-          'payment_buttons.customCSS as htmlCode',
+          'payment_buttons.total_paid as totalPaid', // Nullable
+          'payment_buttons.description', // Non-nullable
+          'payment_buttons.html_code as htmlCode', // Non-nullable
           'payment_buttons.created_at as timestamp'
         )
-        .leftJoin('payments', 'payment_buttons.button_id', 'payments.button_id'); // Corrected join condition
-
+        .leftJoin('payments', 'payment_buttons.payment_id', 'payments.payment_id'); // Updated join condition
       if (excludeSingleUse) {
         buttonQuery = buttonQuery.where('payment_buttons.multi_use', true);
       }
@@ -111,35 +111,36 @@ export default {
       } else if (usageValue === 'unused') {
         buttonQuery = buttonQuery.where('payment_buttons.used', false);
       }
-
       const totalQuery = db('payment_buttons')
         .where('payment_buttons.merchant_id', merchantId)
-        .count('* as total')
+        .count('button_id as total')
         .first();
       const buttons = await buttonQuery
-        .orderBy('timestamp', sort as 'asc' | 'desc')
+        .orderBy('payment_buttons.created_at', sort as 'asc' | 'desc')
         .limit(limit as number)
         .offset(offset as number);
       logWithTimestamp(F, '🔍 [listButtons] Raw query results:', buttons); // Debug log
       const { total } = (await totalQuery) || { total: 0 };
       const safeButtons = buttons.map(button => ({
         ...button,
-        amount: button.amount || 0,
-        paymentId: button.paymentId || 'N/A' // Default to N/A if no payment exists
+        amount: button.amount || 0, // Non-nullable default
+        description: button.description || 'No description', // Non-nullable default
+        htmlCode: button.htmlCode || '<div>Pay Now</div>', // Non-nullable default
+        paymentId: button.paymentId || null, // Nullable
       }));
       logWithTimestamp(F, '✅ [listButtons] Buttons fetched successfully:', { total, data: safeButtons });
       res.status(200).json({
         status: 'success',
         message: 'Payment buttons fetched successfully',
         data: safeButtons,
-        total: Number(total)
+        total: Number(total),
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '❌ Unknown error';
       logWithTimestamp(F, '❌ Error fetching buttons:', {
         message: errorMessage,
         stack: err instanceof Error ? err.stack : '❌ No stack trace',
-        queryParams: req.query
+        queryParams: req.query,
       });
       res.status(500).json({ status: 'error', message: `❌ ${errorMessage}` });
     }

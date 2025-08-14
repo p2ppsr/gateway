@@ -13,7 +13,7 @@
  *
  * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
  *
- * Version: v4.19 (Updated 13Aug2025_1220 BST to refine P2PKH validation and ensure payer_id consistency)
+ * Version: v4.20 (Updated 14Aug2025_0040 BST to use payment_id instead of id)
  * Change Log:
  * - 05Aug2025_0430 BST (v2.2): Fixed payment_button_id mapping and standardized route path.
  * - 05Aug2025_0600 BST (v2.3): Updated to use transaction_id in where clause (incomplete fix).
@@ -53,6 +53,7 @@
  * - 13Aug2025_1205 BST (v4.17): Used local non-undefined alias for payment per ChatGPT suggestion.
  * - 13Aug2025_1215 BST (v4.18): Fixed P2PKH derivation using payer_id to resolve 400 error.
  * - 13Aug2025_1220 BST (v4.19): Refined P2PKH validation and ensured payer_id consistency.
+ * - 14Aug2025_0040 BST (v4.20): Updated to use payment_id instead of id in payment button query.
  */
 const F = 'routes/pay';
 import knex, { Knex } from 'knex';
@@ -61,7 +62,6 @@ import { Hash, P2PKH, PrivateKey, PublicKey, Transaction, Utils } from '@bsv/sdk
 import { Request, Response } from 'express';
 import { logWithTimestamp } from '../utils/logging';
 const db: Knex = knex(knexConfig);
-
 let payment: Payment | undefined; // Declare payment outside try block for broader scope
 
 interface Payment {
@@ -72,16 +72,22 @@ interface Payment {
   amount: number;
   completed: boolean;
   transaction_id: string; // Added to reflect schema
-  txid: string;
+  txid: string | null;
 }
 
 interface PaymentButton {
-  id: string;
+  button_id: string; // Primary key
+  merchant_id: string;
+  payment_id: string | null; // Nullable foreign key
   multi_use: boolean;
   used: boolean;
-  merchant_id: string;
-  total_paid: number;
+  variable_amount: boolean;
   amount: number | null; // Optional to support variable buttons
+  description: string;
+  html_code: string;
+  total_paid: number | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface RequestBody {
@@ -153,7 +159,7 @@ export default {
         return;
       }
       const button: PaymentButton | undefined = await db('payment_buttons')
-        .where({ id: paymentId }) // Use paymentId to find the button
+        .where({ payment_id: paymentId }) // Use payment_id instead of id
         .first();
       logWithTimestamp(F, '🔍 [pay] Query result for button:', button || 'No matching button found');
       if (!button) {
@@ -193,7 +199,6 @@ export default {
         throw new Error('❌ Missing lockingScript in request');
       }
       logWithTimestamp(F, '🔍 [pay] Using client-provided lockingScript:', lockingScript);
-
       // Derive expected script and amount using P2PKH with payer_id
       const senderPrivateKey: PrivateKey = paymentRec.payer_id
         ? new PrivateKey(paymentRec.payer_id, 'hex')
@@ -221,14 +226,13 @@ export default {
         });
         res.status(400).json({
           status: 'error',
-          message: 'The transaction does not satisfy the invoice'
+          message: 'The transaction does not satisfy the invoice',
         });
         return;
       }
       const expectedAmount: number = matchingOutput.satoshis || 0; // Use actual amount from transaction
       logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript);
       logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount);
-
       // Verify amount and proceed
       if (expectedAmount <= 0) {
         logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount });
@@ -239,7 +243,6 @@ export default {
         return;
       }
       logWithTimestamp(F, '✅ [pay] Matching output found:', { script: matchingOutput.lockingScript.toHex(), satoshis: expectedAmount });
-
       let totalTransactionSatoshis = 0;
       bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number) => {
         logWithTimestamp(F, `🔍 Transaction Output ${i} script:`, out.lockingScript.toHex());
@@ -252,23 +255,21 @@ export default {
       } else {
         logWithTimestamp(F, '🔍 Verified: Total satoshis matches sum of outputs');
       }
-
       await db.transaction(async (trx: Knex.Transaction) => {
         await trx('payments')
           .where({
             payment_id: paymentId,
-            transaction_id: paymentRec.transaction_id // Ensure update targets the existing record
+            transaction_id: paymentRec.transaction_id, // Ensure update targets the existing record
           })
           .update({
             completed: true,
             blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
-            //is_new:, defaulted to true in DB
             txid: txid,
             amount: expectedAmount,
-            transaction_id: paymentRec.transaction_id // Preserve transaction_id
+            transaction_id: paymentRec.transaction_id, // Preserve transaction_id
           });
         await trx('payment_buttons')
-          .where({ id: paymentId })
+          .where({ payment_id: paymentId }) // Use payment_id instead of id
           .update({
             used: true,
             total_paid: db.raw('?? + ?', ['total_paid', expectedAmount]),
@@ -285,7 +286,7 @@ export default {
         message: error instanceof Error ? error.message : '❌ Unknown error',
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
-        transaction_id: transactionIdForLog
+        transaction_id: transactionIdForLog,
       });
       res.status(500).json({
         status: 'error',

@@ -9,10 +9,10 @@
  * from the merchant ID and sender's identity key.
  *
  * Used by the Gateway UI to initiate a payment flow after clicking a tipping button.
- * - All amounts are handled as BSV decimals internally (to match current DB schema).
+ * - All amounts are handled as BSV satoshis internally (to match current DB schema).
  * - Added input validation and sanitization with express-validator.
  *
- * Version: v2.14 (Updated 13Aug2025_1130 BST to fix transactionIdNew scoping per ChatGPT suggestion)
+ * Version: v2.18 (Updated 14Aug2025_0005 BST to remove currency column from schema and logic)
  * Change Log:
  * - 05Aug2025_0420 BST (v2.1): Standardized route path and fixed prefix duplication by removing /api.
  * - 05Aug2025_0500 BST (v2.2): Initial attempt to update to use transaction_id (incomplete, rolled back).
@@ -29,6 +29,10 @@
  * - 13Aug2025_1035 BST (v2.12): Removed transaction_id from client response, using it server-side only.
  * - 13Aug2025_1040 BST (v2.13): Updated transaction_id generation to use randomBytes(12).toString('hex').slice(0, 12).
  * - 13Aug2025_1130 BST (v2.14): Fixed transactionIdNew scoping per ChatGPT suggestion with let declaration outside try.
+ * - 13Aug2025_2345 BST (v2.15): Updated to use payment_id instead of id, removed currency, and aligned with schema changes.
+ * - 13Aug2025_2355 BST (v2.16): Removed currency from payments insertion to match schema, added fallback for schema mismatch.
+ * - 14Aug2025_0000 BST (v2.17): Added default currency 'BSV' to payments insertion for schema compatibility.
+ * - 14Aug2025_0005 BST (v2.18): Removed currency column from schema and logic after migration.
  */
 const F = 'routes/invoice';
 import knex, { Knex } from 'knex';
@@ -40,27 +44,27 @@ import { body, validationResult } from 'express-validator';
 import { logWithTimestamp } from '../utils/logging';
 import { generateBase58 } from '../utils/general';
 const db: Knex = knex(knexConfig);
-
 let transactionIdNew: string; // Declare transactionIdNew outside try block for broader scope
 
 interface PaymentButton {
-  id: string; // Renamed from payment_id to match schema
-  button_id: string; // Added to match the foreign key in payment_buttons
+  button_id: string; // Primary key
   merchant_id: string;
+  payment_id: string | null; // Nullable foreign key
   multi_use: boolean;
   used: boolean;
   variable_amount: boolean;
   amount: number;
-  currency: string;
-  created_at?: string; // Optional timestamp
-  description: string; // Custom spending description
+  description: string;
+  html_code: string; // Renamed from customCSS
+  total_paid: number | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface RequestBody {
   paymentId: string; // Changed from paymentButtonId to align with new identifier
-  buttonId: string;  // Required parameter
+  buttonId: string; // Required parameter
   merchantId: string;
-  currency: string;
   amount: number;
 }
 
@@ -68,11 +72,32 @@ export default {
   type: 'post',
   path: '/invoice', // Standardized route path
   middlewares: [
-    body('paymentId').trim().escape().isString().notEmpty().withMessage('paymentId must be a non-empty string'),
-    body('buttonId').trim().escape().isString().notEmpty().withMessage('buttonId must be a non-empty string'), // Validation
-    body('merchantId').trim().escape().isString().notEmpty().withMessage('merchantId must be a non-empty string'),
-    body('currency').trim().isIn(['BSV']).withMessage('Currency must be Sats'),
-    body('amount').isFloat({ min: 0 }).withMessage('Amount must be a non-negative number')
+    body('paymentId')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('paymentId must be a non-empty string')
+      .isLength({ min: 12, max: 24 })
+      .withMessage('paymentId must be between 12 and 24 characters'),
+    body('buttonId')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('buttonId must be a non-empty string')
+      .isLength({ min: 12, max: 24 })
+      .withMessage('buttonId must be between 12 and 24 characters'),
+    body('merchantId')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('merchantId must be a non-empty string'),
+    body('amount')
+      .isInt({ min: 0 })
+      .withMessage('Amount must be a non-negative integer')
+      .toInt(),
   ],
   /**
    * Express route handler to create a new invoice/payment entry.
@@ -83,9 +108,9 @@ export default {
    *
    * The locking script is deterministically generated using a hash of the sender's authenticated identity
    * (or a hardcoded key for pre-v1.2 buttons if created_at is missing or indicates an old button) and the
-   * merchant's public key with an invoice number. Amounts are in Sats for output.
+   * merchant's public key with an invoice number. Amounts are in satoshis for output.
    *
-   * @param req - Express request with `paymentId`, `buttonId`, `merchantId`, `currency`, and `amount` in Sats in body.
+   * @param req - Express request with `paymentId`, `buttonId`, `merchantId`, and `amount` in satoshis in body.
    * Auth middleware must populate `req.auth.identityKey`.
    * @param res - Express response object for sending success or error responses.
    * @returns {Promise<void>} Sends a 200 success response with derived outputs including merchantId and custom description.
@@ -103,26 +128,26 @@ export default {
       res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing sender identity' });
       return;
     }
-    const { paymentId, buttonId, merchantId, currency, amount }: RequestBody = req.body;
-    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, buttonId, merchantId, currency, amount });
+    const { paymentId, buttonId, merchantId, amount }: RequestBody = req.body;
+    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, buttonId, merchantId, amount });
     try {
       // Verify the payment button exists and belongs to the specified merchant
       logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', { paymentId, merchantId });
       const button: PaymentButton | undefined = await db('payment_buttons')
         .where({
-          id: paymentId, // Updated from payment_id to id
-          merchant_id: merchantId
+          payment_id: paymentId, // Use payment_id instead of id
+          merchant_id: merchantId,
         })
         .first();
       logWithTimestamp(F, '🔍 [invoice] [Step 2] Payment button data:', {
         ...button,
-        description: button?.description || 'Not set'
+        description: button?.description || 'Not set',
       });
       if (button === undefined) {
         logWithTimestamp(F, '❌ [invoice] Payment button not found for merchant:', { paymentId, merchantId });
         res.status(404).json({
           status: 'error',
-          message: 'Payment button not found for the specified merchant'
+          message: 'Payment button not found for the specified merchant',
         });
         return;
       }
@@ -131,7 +156,7 @@ export default {
         logWithTimestamp(F, '❌ [invoice] Button ID mismatch:', { buttonId, expected: button.button_id });
         res.status(400).json({
           status: 'error',
-          message: 'Button ID does not match the payment button'
+          message: 'Button ID does not match the payment button',
         });
         return;
       }
@@ -141,20 +166,20 @@ export default {
         logWithTimestamp(F, '❌ [invoice] Single-use button already used:', paymentId);
         res.status(400).json({
           status: 'error',
-          message: 'This single-use button has already been used'
+          message: 'This single-use button has already been used',
         });
         return;
       }
-      // Verify the amount matches or the button is variable (all in BSV)
+      // Verify the amount matches or the button is variable (all in satoshis)
       logWithTimestamp(F, '🔍 [invoice] [Step 4] Validating amount:', { requested: amount, buttonAmount: button.amount, variable: button.variable_amount });
       if (!button.variable_amount && Math.abs(amount - button.amount) > 1) {
         logWithTimestamp(F, '❌ [invoice] Amount mismatch for fixed-amount button:', {
           requested: amount,
-          expected: button.amount
+          expected: button.amount,
         });
         res.status(400).json({
           status: 'error',
-          message: 'Amount mismatch for fixed-amount button (expected BSV)'
+          message: 'Amount mismatch for fixed-amount button (expected satoshis)',
         });
         return;
       }
@@ -165,7 +190,7 @@ export default {
       const paymentsSchema = await db('information_schema.columns')
         .where({ table_name: 'payments' })
         .select('column_name');
-      logWithTimestamp(F, '🔍 [invoice] [Step 5] Payments table schema:', paymentsSchema.map(col => col.column_name));
+      logWithTimestamp(F, '🔍 [invoice] [Step 5] Payments table schema:', paymentsSchema.map((col) => col.column_name));
       await db('payments').insert({
         transaction_id: transactionIdNew, // Stored server-side for validation
         payment_id: paymentId, // Client-passed value
@@ -175,15 +200,14 @@ export default {
         completed: false,
         blockchain_transaction: '',
         amount,
-        currency,
-        exchange_rate: 1
+        exchange_rate: 1, // Default to 1 for satoshis
       });
       logWithTimestamp(F, '✅ [invoice] [Step 6] Payment invoice created:', { paymentId, buttonId, transactionId: transactionIdNew });
       // Determine sender private key based on button creation context
       let senderPrivateKey: PrivateKey;
       try {
         const hasCreatedAt = (await db('information_schema.columns')
-          .where({ table_name: 'payments', column_name: 'created_at' })
+          .where({ table_name: 'payment_buttons', column_name: 'created_at' })
           .first()) !== undefined;
         if (!hasCreatedAt || !button.created_at || new Date(button.created_at) < new Date('2025-07-25T12:00:00Z')) {
           senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
@@ -211,7 +235,7 @@ export default {
       // Use client-provided amount for variable buttons, button amount for fixed
       const satoshis = button.variable_amount ? amount : button.amount;
       logWithTimestamp(F, '🔍 [invoice] [Step 8] Calculated satoshis for output:', satoshis);
-      // Use custom description from payment_buttons, fallback to dynamic default
+      // Use custom description from payment_buttons
       const outputDescription = button.description || `Payment to merchant with paymentId: ${paymentId}`;
       logWithTimestamp(F, '🔍 [invoice] [Step 9] Using output description:', outputDescription);
       // Respond with the payment ID and outputs including merchantId
@@ -220,15 +244,15 @@ export default {
           lockingScript: derivedScript,
           satoshis,
           outputDescription,
-          merchantId
-        }
+          merchantId,
+        },
       ];
       logWithTimestamp(F, '🔍 [invoice] [Step 10] Response outputs:', outputs);
       res.status(200).json({
         status: 'success',
         message: 'Invoice created successfully',
         // transaction_id: transactionIdNew, // Removed from response
-        outputs
+        outputs,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '❌ Unknown error';
@@ -237,12 +261,12 @@ export default {
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
         errorDetails: error,
-        transaction_id: transactionIdNew ? transactionIdNew : 'N/A' // Use optional check
+        transaction_id: transactionIdNew ? transactionIdNew : 'N/A', // Use optional check
       });
       res.status(500).json({
         status: 'error',
-        message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`
+        message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`,
       });
     }
-  }
+  },
 };

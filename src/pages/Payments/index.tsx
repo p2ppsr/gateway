@@ -12,7 +12,7 @@
  * - Updates only on code changes via HMR
  *
  * Used by the Gateway UI to manage incoming payment activity
- * Version: v4.32 (Updated 13Aug2025_1325 BST to remove polling and fix Actions column display)
+ * Version: v4.33 (Updated 14Aug2025_0155 BST to fix API response mapping after schema update)
  * Change Log:
  * - 01Aug2025_0335 BST (v3.3): Fixed Type Errors and Restored acknowledgePayment.
  * - 05Aug2025_0700 BST (v3.4): Updated to display transaction_id as ID (showing txid), integrated title "Transaction History" from API response, and aligned with listPayments v1.1 changes.
@@ -50,6 +50,7 @@
  * - 13Aug2025_1310 BST (v4.30): Added controlled polling and optimized useEffect.
  * - 13Aug2025_1315 BST (v4.31): Fixed TypeScript error in API response mapping.
  * - 13Aug2025_1325 BST (v4.32): Removed polling and fixed Actions column display.
+ * - 14Aug2025_0155 BST (v4.33): Fixed API response mapping to use snake_case fields after schema update.
  */
 const F = 'pages/Payments'
 import React, { useState, useEffect, useRef } from 'react'
@@ -98,15 +99,18 @@ interface Payment {
   created_at: string | null; // Timestamp of payment
 }
 
+/**
+ * Represents the API response structure
+ */
 interface PaymentResponse {
   status: string;
   message: string;
   title?: string; // Optional title from API
   data: {
-    PaymentId: string | null;
-    Txid: string | null;
-    PayerId: string | null;
-    ButtonId: string | null;
+    payment_id: string | null;
+    txid: string | null;
+    payer_id: string | null;
+    button_id: string | null;
     amount: string | number | null;
     completed: number | null;
     is_new: number | null;
@@ -233,12 +237,12 @@ const PaymentsList = () => {
       const data: PaymentResponse = await response.json();
       logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
       if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`);
-      // Map API response to Payment interface
+      // Map API response to Payment interface with snake_case fields
       const mappedPayments = data.data.map(payment => ({
-        payment_id: payment.PaymentId || null,
-        button_id: payment.ButtonId || null,
-        payer_id: payment.PayerId || null,
-        txid: payment.Txid || null,
+        payment_id: payment.payment_id || null,
+        button_id: payment.button_id || null,
+        payer_id: payment.payer_id || null,
+        txid: payment.txid || null,
         amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
         completed: payment.completed === 1 || false,
         is_new: payment.is_new === 1 || false,
@@ -434,10 +438,10 @@ const PaymentsList = () => {
       const refreshData: PaymentResponse = await refreshResponse.json();
       if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`);
       setPayments(refreshData.data.map(payment => ({
-        payment_id: payment.PaymentId || null,
-        button_id: payment.ButtonId || null,
-        payer_id: payment.PayerId || null,
-        txid: payment.Txid || null,
+        payment_id: payment.payment_id || null,
+        button_id: payment.button_id || null,
+        payer_id: payment.payer_id || null,
+        txid: payment.txid || null,
         amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
         completed: payment.completed === 1 || false,
         is_new: payment.is_new === 1 || false,
@@ -467,6 +471,7 @@ const PaymentsList = () => {
     );
   }
   if (error !== '') return <Typography color="error">{error}</Typography>;
+
   return (
     <Container>
       <Box

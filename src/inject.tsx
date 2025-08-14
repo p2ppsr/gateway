@@ -36,8 +36,10 @@
  * - Suppressed 2352 warning with type assertion (12Aug2025_0940 BST).
  * - Reverted invalid Error cast and adopted toError helper to resolve overload mismatch (12Aug2025_0945 BST).
  * - Commented out validateIds calls to avoid 404 errors (12Aug2025_1838 BST).
+ * - Removed unused currency field from createButton request (13Aug2025_2350 BST).
+ * - Renamed DOM id to domElementId for clarity (14Aug2025_0050 BST).
  *
- * Version: v2.40.9 (Updated 12Aug2025_1838 BST to comment out validateIds calls)
+ * Version: v2.40.11 (Updated 14Aug2025_0050 BST to rename DOM id and improve clarity)
  */
 const F = 'inject';
 import React from 'react';
@@ -118,12 +120,10 @@ const createButton = async (props: Partial<PayButtonProps>, wallet: WalletClient
         body: JSON.stringify({
           merchantId: props.merchant || '0282f7effd932d9d2a3774c287eacb9ace3728a753a0339e2f16998153e5d65963',
           amount: props.variable ? undefined : props.amount,
-          currency: props.currency || 'BSV',
           variableAmount: props.variable || false,
           multiUse: true,
-          accepts: props.accepts || 'BSV',
           description: props.description || `Payment using paymentId: ${props.paymentId}`,
-          customCSS: `<style>${props.customCSS || '.gateway-paybutton { background: #8484FA; color: white; }'}</style><div>${props.text || 'Pay'}</div>`,
+          htmlCode: `<style>${props.customCSS || '.gateway-paybutton { background: #8484FA; color: white; }'}</style><div>${props.text || 'Pay'}</div>`,
           paymentId: props.paymentId || '',
           buttonId: props.buttonId || '', // Retained for API compatibility, not passed to PayButton
         }),
@@ -152,9 +152,9 @@ const bootstrapPayButtons = async (): Promise<void> => {
   for (let i = 0; i < buttons.length; i++) {
     const button = buttons.item(i);
     if (!button) continue;
-    const buttonID = `pay-${Math.floor(Math.random() * 100000)}`;
-    button.id = buttonID;
-    button.setAttribute('id', buttonID);
+    const domElementId = `pay-${Math.floor(Math.random() * 100000)}`; // Renamed from buttonID for clarity
+    button.id = domElementId;
+    button.setAttribute('id', domElementId);
     const props: Partial<PayButtonProps> = { amount: 0, merchant: '', server: '', variable: false, paymentId: '' };
     logWithTimestamp(F, '🔍 [inject] Initial props:', { ...props }); // Debug initial state
     if (button.hasAttributes()) {
@@ -184,6 +184,7 @@ const bootstrapPayButtons = async (): Promise<void> => {
     }
     // Validate existing IDs before deciding to initialize (commented out as requested)
     let shouldInitialize = false;
+    //*
     /*if (props.paymentId) {
       const validation = await validateIds(props.paymentId, '', wallet);
       if (validation.status === 'error' || !validation.valid) {
@@ -223,13 +224,14 @@ const bootstrapPayButtons = async (): Promise<void> => {
       buttonId: props.buttonId || '',
       paymentId: props.paymentId || '',
     };
-    window.PayButton.render(buttonID, finalProps);
+    window.PayButton.render(domElementId, finalProps);
   }
 };
 window.addEventListener('load', () => {
   bootstrapPayButtons().catch(err => {
     const e = toError(err);
     console.error('❌ Error bootstrapping pay buttons:', e);
+    logWithTimestamp(F, '❌ Error bootstrapping pay buttons:', e);
   });
 });
 export {};

@@ -11,17 +11,18 @@
  * - Displays confirmation and transaction ID if successful
  *
  * It integrates with the Metanet client's `AuthFetch` and `WalletClient` for secure, user-controlled signing.
- * - All amounts are handled as BSV decimals internally (to match current DB schema), converted from sats input.
+ * - All amounts are handled as BSV satoshis internally (to match current DB schema).
  * - Supports variable amount buttons with user input (data-variable="true").
  * - Prevents payment flow triggering on variable input field clicks with stopPropagation on multiple events.
  *
- * Version: v2.5 (Updated 13Aug2025_0240 BST to include buttonId in pay request)
+ * Version: v2.6 (Updated 14Aug2025_0015 BST to remove currency and align with schema changes)
  * Change Log:
  * - 04Aug2025_2345 BST (v2.0): Initial version, using paymentId exclusively instead of buttonId, reflecting database schema change.
  * - 05Aug2025_0610 BST (v2.1): Fixed paymentId propagation in payPayload to ensure invoice.transaction_id is used correctly, resolving undefined paymentId issue in /api/pay requests.
  * - 05Aug2025_0645 BST (v2.2): Added lockingScript to payPayload to allow server validation without re-derivation, restoring pre-transaction_id change behavior.
  * - 10Aug2025_0130 BST (v2.3): Added comprehensive logging to diagnose payment failures.
  * - 13Aug2025_0240 BST (v2.5): Added buttonId to pay request to align with server validation of pre-created IDs.
+ * - 14Aug2025_0015 BST (v2.6): Removed currency from props and invoice request, aligned with schema changes after currency removal.
  */
 import React, { useState, useRef, useEffect, ReactElement } from 'react';
 import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk';
@@ -47,11 +48,10 @@ interface ListOutputsArgs {
 
 export interface PayButtonProps {
   text?: string; // Templated text with {amount} placeholder (default "Pay Now {amount} Sats")
-  amount: number; // Amount in sats (integer, 0 for variable)
+  amount: number; // Amount in satoshis (integer, 0 for variable)
   merchant: string;
   paymentId: string; // Pre-created ID referencing ids.id with type='payment'
-  buttonId: string;  // Pre-created ID referencing ids.id with type='button'
-  currency?: string;
+  buttonId: string; // Pre-created ID referencing ids.id with type='button'
   server: string;
   loadingtext?: string;
   variable?: boolean; // Optional flag for variable-amount buttons
@@ -75,11 +75,10 @@ interface PayResponse {
  * Reusable payment component.
  *
  * @param text Button label template (default "Pay Now {amount} Sats")
- * @param amount Amount in sats (integer, 0 for variable)
+ * @param amount Amount in satoshis (integer, 0 for variable)
  * @param merchant Merchant identity key (string)
  * @param paymentId Pre-created payment ID (string, referencing ids.id with type='payment')
  * @param buttonId Pre-created button ID (string, referencing ids.id with type='button')
- * @param currency "BSV" | "USD" | … (used for display or server compatibility)
  * @param server Gateway back-end URL (e.g. "http://localhost:3000")
  * @param loadingtext Text while awaiting invoice / payment
  */
@@ -89,10 +88,9 @@ const PayButton = ({
   merchant,
   paymentId,
   buttonId,
-  currency = 'BSV',
   server,
   loadingtext = 'Loading, please wait…',
-  variable = false
+  variable = false,
 }: PayButtonProps): ReactElement => {
   const [loading, setLoading] = useState(false);
   const [paid, setPaid] = useState(false);
@@ -142,10 +140,10 @@ const PayButton = ({
         {
           type: 'WindowCWISubstrate',
           substrate: 'window.CWI',
-          skip: typeof window === 'undefined' || !(window as any).CWI
+          skip: typeof window === 'undefined' || !(window as any).CWI,
         },
         { type: 'XDMSubstrate', substrate: 'XDM', skip: false },
-        { type: 'ReactNativeWebView', substrate: 'react-native', skip: false }
+        { type: 'ReactNativeWebView', substrate: 'react-native', skip: false },
       ];
       for (const { type, substrate, skip } of substrates) {
         if (skip) {
@@ -188,7 +186,7 @@ const PayButton = ({
       let fetchedPaymentId = paymentId; // Default to paymentId
       try {
         const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`, {
-          headers: { Accept: 'application/json' }
+          headers: { Accept: 'application/json' },
         });
         if (!buttonCodeResponse.ok) throw new Error(`❌ HTTP error! status: ${buttonCodeResponse.status}`);
         const buttonCodeData = await buttonCodeResponse.json();
@@ -201,7 +199,7 @@ const PayButton = ({
       } catch (fetchError) {
         console.error(`[${new Date().toISOString()}] [${F}] ❌ [client] Button code fetch error:`, fetchError, 'Status:', fetchError instanceof Error && (fetchError as any).status);
       }
-      // Send amount in BSV to server
+      // Send amount in satoshis to server
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 2] Requesting invoice from server:`, server);
       const invoiceUrl = `${server}/api/invoice`;
       console.log('components/PayButton', '🔍 [Step 2] Sending invoice request to:', invoiceUrl, { paymentId: fetchedPaymentId, amount: effectiveAmount });
@@ -212,18 +210,17 @@ const PayButton = ({
           merchantId: merchant,
           buttonId, // Ensure this matches the payment_buttons table
           paymentId: fetchedPaymentId,
-          currency,
-          amount: effectiveAmount
-        })
+          amount: effectiveAmount,
+        }),
       });
       console.log('components/PayButton', '🔍 [Step 2] Received invoice response:', { status: resInv.status, url: invoiceUrl });
       const invoice: InvoiceResponse = await resInv.json();
       if (invoice.status !== 'success') throw new Error(`❌ ${invoice.message ?? 'Invoice creation failed'}`);
       console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 3] Invoice received:`, invoice);
       // Verify outputs match requested amount, with fallback for variable buttons
-      let outputsWithSats = invoice.outputs?.map(output => ({
+      let outputsWithSats = invoice.outputs?.map((output) => ({
         ...output,
-        satoshis: Math.round(output.satoshis)
+        satoshis: Math.round(output.satoshis),
       })) || [];
       if (variable && outputsWithSats.length && outputsWithSats[0].satoshis === 0) {
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 Server returned zero satoshis for variable button, using effectiveAmount:`, effectiveAmount);
@@ -236,7 +233,7 @@ const PayButton = ({
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 5] Creating action with wallet`);
       const tx = await wallet.createAction({
         description: paymentId,
-        outputs: outputsWithSats
+        outputs: outputsWithSats,
       });
       if (tx.tx == null || !Array.isArray(tx.tx)) {
         console.log(`[${new Date().toISOString()}] [${F}] ❌ Invalid transaction: tx.tx is undefined or not an array`);
@@ -250,7 +247,7 @@ const PayButton = ({
         tx: tx.tx,
         outputs: outputsWithSats,
         totalSatoshis: outputsWithSats.reduce((sum, output) => sum + (output.satoshis || 0), 0),
-        lockingScript: outputsWithSats[0]?.lockingScript // Include lockingScript for validation
+        lockingScript: outputsWithSats[0]?.lockingScript, // Include lockingScript for validation
       });
       let transaction, atomicBeefTx, txid;
       try {
@@ -267,13 +264,13 @@ const PayButton = ({
         paymentId,
         buttonId,
         transaction: { txid, atomicBeefTx },
-        lockingScript: outputsWithSats[0]?.lockingScript // Add lockingScript to payload
+        lockingScript: outputsWithSats[0]?.lockingScript, // Add lockingScript to payload
       };
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`, server, payPayload);
       const resPay = await authFetch.fetch(`${server}/api/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payPayload)
+        body: JSON.stringify(payPayload),
       });
       const pay: PayResponse = await resPay.json();
       if (pay.status !== 'success') throw new Error(`❌ ${pay.message ?? 'Payment processing failed'}`);
@@ -286,7 +283,7 @@ const PayButton = ({
       console.error(`[${new Date().toISOString()}] [${F}] ❌ Payment flow error:`, {
         message: errorMessage,
         stack: err instanceof Error ? err.stack : '❌ No stack trace',
-        details: err
+        details: err,
       });
       alert(`❌ ${errorMessage}`);
     } finally {
@@ -316,9 +313,9 @@ const PayButton = ({
             type="number"
             value={variableAmount}
             onChange={handleVariableAmountChange}
-            onClick={e => e.stopPropagation()} // Stop click bubbling
-            onMouseDown={e => e.stopPropagation()} // Stop mouse down bubbling
-            onKeyDown={e => e.stopPropagation()} // Stop key down bubbling
+            onClick={(e) => e.stopPropagation()} // Stop click bubbling
+            onMouseDown={(e) => e.stopPropagation()} // Stop mouse down bubbling
+            onKeyDown={(e) => e.stopPropagation()} // Stop key down bubbling
             min="1"
             max={`${MAX_PAYMENT_SATS}`}
             style={{
@@ -331,7 +328,7 @@ const PayButton = ({
               background: '#f9f9f9',
               color: '#333',
               fontWeight: '500',
-              verticalAlign: 'middle'
+              verticalAlign: 'middle',
             }}
             disabled={loading}
           />

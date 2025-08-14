@@ -8,10 +8,10 @@
  * in the next iteration.
  *
  * Used by the Gateway UI to create new payment buttons for merchants.
- * - All amounts are handled as BSV decimals internally.
+ * - All amounts are handled as BSV satoshis internally.
  * - IDs are client-generated 12-character Base58-encoded strings, pre-validated by initializeIds.
  *
- * Version: v2.36 (Updated 13Aug2025_1740 BST to fix TypeScript type mismatch TS2367)
+ * Version: v2.37 (Updated 13Aug2025_2315 BST to align with schema changes)
  * Change Log:
  * - 09Aug2025_2350 BST (v2.23): Return generated ID in response.
  * - 10Aug2025_1155 BST (v2.24): Aligned path to /api/createButton and added middleware logging for diagnostics.
@@ -24,6 +24,7 @@
  * - 12Aug2025_2000 BST (v2.34): Added duplicate check and prevent re-insertion.
  * - 13Aug2025_1720 BST (v2.35): Added dynamic ID initialization if not pre-existing.
  * - 13Aug2025_1740 BST (v2.36): Fixed TypeScript type mismatch (TS2367) in variableAmount and multiUse.
+ * - 13Aug2025_2315 BST (v2.37): Updated to align with schema changes (removed id, currency, accepts; renamed customCSS to html_code; adjusted nullability).
  */
 const F = 'routes/createButton';
 import knex, { Knex } from 'knex';
@@ -36,14 +37,12 @@ const db: Knex = knex(knexConfig);
 
 interface RequestBody {
   amount?: number;
-  currency: string;
   variableAmount: boolean; // Explicitly typed as boolean after validation
-  multiUse: boolean;       // Explicitly typed as boolean after validation
-  accepts?: string;
+  multiUse: boolean; // Explicitly typed as boolean after validation
   description: string;
-  customCSS?: string;
+  htmlCode?: string; // Renamed from customCSS
   paymentId: string; // Client-provided payment ID, pre-initialized
-  buttonId: string;  // Client-provided button ID, pre-initialized
+  buttonId: string; // Client-provided button ID, pre-initialized
 }
 
 export default {
@@ -55,10 +54,8 @@ export default {
       .escape()
       .isLength({ min: 1, max: 80 })
       .withMessage('Description must be a string between 1 and 80 characters'),
-    body('currency').trim().isIn(['BSV', 'fiat', 'both']).withMessage('Currency must be BSV, fiat, or both'),
     body('variableAmount').optional().isBoolean().withMessage('variableAmount must be a boolean'),
     body('multiUse').optional().isBoolean().withMessage('multiUse must be a boolean'),
-    body('accepts').optional().trim().isIn(['BSV']).withMessage('Accepts must be SATS'),
     body('amount')
       .optional()
       .custom((value, { req }) => {
@@ -71,7 +68,7 @@ export default {
       .withMessage(
         `Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons, or 0 for variable`
       ),
-    body('customCSS').optional().trim().isString().withMessage('customCSS must be a string'),
+    body('htmlCode').optional().trim().isString().withMessage('htmlCode must be a string'),
     body('paymentId')
       .trim()
       .escape()
@@ -99,24 +96,20 @@ export default {
     const merchantId = (req as any).auth?.identityKey || 'unknown'; // Default to 'unknown' if not authenticated
     const {
       amount = 0,
-      currency,
       variableAmount = false,
       multiUse = false,
-      accepts = 'BSV',
       description,
-      customCSS = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
+      htmlCode = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
       paymentId,
       buttonId,
     }: RequestBody = req.body as RequestBody; // Type assertion to match validated structure
     logWithTimestamp(F, '🔍 [createButton] [Step 1] Create button request (sats):', {
       merchantId,
       amount,
-      currency,
       variableAmount,
       multiUse,
-      accepts,
       description,
-      customCSS,
+      htmlCode,
       paymentId,
       buttonId,
     });
@@ -130,13 +123,14 @@ export default {
         }
         return true;
       };
-
       await initializeId(paymentId, 'payment');
       await initializeId(buttonId, 'button');
-
       // Check for existing payment button to avoid duplicates
-      logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId });
-      const existingButton = await db('payment_buttons').where({ id: paymentId }).first();
+      logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId, buttonId });
+      const existingButton = await db('payment_buttons')
+        .where({ button_id: buttonId })
+        .orWhere({ payment_id: paymentId })
+        .first();
       if (existingButton) {
         logWithTimestamp(F, '✅ [createButton] Button already exists, skipping insert:', { paymentId, buttonId, existingButton });
         res.status(200).json({
@@ -148,31 +142,31 @@ export default {
         return;
       }
       logWithTimestamp(F, '🔍 [createButton] [Step 4] No duplicate found, proceeding with insert:', { paymentId, buttonId });
-      const amountInBSV = variableAmount ? 0 : amount;
-      logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to BSV:', amountInBSV);
+      const amountInSats = variableAmount ? 0 : amount;
+      logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to sats:', amountInSats);
       // Insert into payment_buttons
-      await db('payment_buttons').insert({
-        id: paymentId,
-        button_id: buttonId,
-        merchant_id: merchantId,
-        amount: amountInBSV,
-        currency,
-        variable_amount: variableAmount,
-        multi_use: multiUse,
-        used: false,
-        total_paid: 0,
-        accepts,
-        description,
-        customCSS,
-        created_at: db.fn.now(),
-        updated_at: db.fn.now(),
-      });
-      logWithTimestamp(F, '✅ [createButton] Inserted payment button:', { paymentId, buttonId });
-      res.status(201).json({
-        status: 'success',
-        message: 'Payment button created successfully',
-        paymentId,
-        buttonId,
+      await db.transaction(async (trx) => {
+        await db('payment_buttons')
+          .transacting(trx)
+          .insert({
+            button_id: buttonId,
+            merchant_id: merchantId,
+            payment_id: paymentId || null,
+            amount: amountInSats,
+            description,
+            html_code: htmlCode,
+            variable_amount: variableAmount,
+            multi_use: multiUse,
+            used: false,
+            total_paid: null,
+          });
+        logWithTimestamp(F, '✅ [createButton] Inserted payment button:', { paymentId, buttonId });
+        res.status(201).json({
+          status: 'success',
+          message: 'Payment button created successfully',
+          paymentId,
+          buttonId,
+        });
       });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : '❌ Unknown error';

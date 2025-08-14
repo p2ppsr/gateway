@@ -32,8 +32,9 @@
  * - Updated to send pre-initialized buttonId and paymentId in createButton payload (12Aug2025_0030 BST).
  * - Restored original ID initialization flow with initializeIds (12Aug2025_0130 BST).
  * - Restored copySuccess state to fix TypeScript errors (12Aug2025_0135 BST).
+ * - Removed currency references and deprecated accepts/customCSS fields (14Aug2025_0135 BST).
  *
- * Version: v4.8.85 (Updated 12Aug2025_0135 BST to restore copySuccess state)
+ * Version: v4.8.86 (Updated 14Aug2025_0135 BST to remove currency and deprecated fields)
  */
 const F = 'pages/Create';
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
@@ -213,7 +214,6 @@ const Create: React.FC = () => {
   const isMounted = useRef(false);
   const [updateCounter, setUpdateCounter] = useState(0);
   const [isWalletReady, setIsWalletReady] = useState(!!wallet);
-
   const generatePreviewHtml = useCallback(
     (type: 'fixed' | 'variable', description: string) => {
       logWithTimestamp(
@@ -272,7 +272,6 @@ const Create: React.FC = () => {
       setPreviewVariableHtml,
     ]
   );
-
   const updatePreviewCodes = useCallback(() => {
     logWithTimestamp(
       F,
@@ -294,8 +293,8 @@ const Create: React.FC = () => {
     const variableDescription =
       spendingDescription_variable || `Payment using paymentId: ${paymentID}`;
     const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`;
-    const fixedCode = `<style>\n${validateCSS(extractCSS(customCSS_fixed)) ? extractCSS(customCSS_fixed).trim() : lastValidCSS_fixed.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-fixed"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-currency="BSV"\n data-text="${fixedText}"\n data-description="${fixedDescription}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${fixedText}</div>`;
-    const variableCode = `<style>\n${validateCSS(extractCSS(customCSS_variable)) ? extractCSS(customCSS_variable).trim() : lastValidCSS_variable.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-variable"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-currency="BSV"\n data-text="${buttonText_variable}"\n data-description="${variableDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
+    const fixedCode = `<style>\n${validateCSS(extractCSS(customCSS_fixed)) ? extractCSS(customCSS_fixed).trim() : lastValidCSS_fixed.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-fixed"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${fixedDescription}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${fixedText}</div>`;
+    const variableCode = `<style>\n${validateCSS(extractCSS(customCSS_variable)) ? extractCSS(customCSS_variable).trim() : lastValidCSS_variable.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-variable"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${variableDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
     logWithTimestamp(
       F,
       'updatePreviewCodes: Generated HTML code - fixed:',
@@ -354,7 +353,6 @@ const Create: React.FC = () => {
     setUpdateCounter,
     generatePreviewHtml,
   ]);
-
   useEffect(() => {
     logWithTimestamp(F, 'useEffect: Starting initialization process');
     (async () => {
@@ -363,7 +361,6 @@ const Create: React.FC = () => {
         setMerchant(identity.publicKey);
         setHasMetanet(true);
         logWithTimestamp(F, 'useEffect: Merchant identity fetched:', identity.publicKey);
-
         logWithTimestamp(F, 'useEffect: Attempting to initialize buttonID');
         await initializeIds('button', wallet, (id) => {
           setButtonID(id);
@@ -373,7 +370,6 @@ const Create: React.FC = () => {
         }, (err) => {
           logWithTimestamp(F, '❌ useEffect: Error initializing buttonID:', err);
         });
-
         logWithTimestamp(F, 'useEffect: Attempting to initialize paymentID');
         await initializeIds('payment', wallet, (id) => {
           setPaymentID(id);
@@ -386,7 +382,6 @@ const Create: React.FC = () => {
         }, (err) => {
           logWithTimestamp(F, '❌ useEffect: Error initializing paymentID:', err);
         });
-
         logWithTimestamp(F, 'useEffect: Initialization completed', { buttonID, paymentID });
       } catch (error) {
         logWithTimestamp(F, '❌ useEffect: Error during initialization:', error);
@@ -396,7 +391,6 @@ const Create: React.FC = () => {
       updatePreviewCodes();
     })();
   }, []);
-
   useLayoutEffect(() => {
     logWithTimestamp(F, 'useLayoutEffect: Running with hasMetanet:', hasMetanet, 'isMounted:', isMounted.current);
     if (isMounted.current && hasMetanet) {
@@ -411,7 +405,6 @@ const Create: React.FC = () => {
     isMounted.current = true;
     logWithTimestamp(F, 'useLayoutEffect: Completed, isMounted set to true');
   }, [hasMetanet]);
-
   useEffect(() => {
     logWithTimestamp(F, 'useEffect: Updating UI for paymentType:', paymentType, 'merchant:', merchant, 'renderKey:', renderKey);
     if (merchant || !hasMetanet) {
@@ -419,7 +412,6 @@ const Create: React.FC = () => {
       updatePreviewCodes();
     }
   }, [paymentType, merchant, hasMetanet, updatePreviewCodes, customCSS_fixed, customCSS_variable]);
-
   useEffect(() => {
     const newStyleElement = document.createElement('style');
     newStyleElement.id = 'custom-button-styles-fixed';
@@ -445,7 +437,6 @@ const Create: React.FC = () => {
       }
     };
   }, [customCSS_fixed, lastValidCSS_fixed, paymentID]);
-
   useEffect(() => {
     const newStyleElement = document.createElement('style');
     newStyleElement.id = 'custom-button-styles-variable';
@@ -473,7 +464,6 @@ const Create: React.FC = () => {
       }
     };
   }, [customCSS_variable, lastValidCSS_variable, paymentID]);
-
   useEffect(() => {
     if (copyIconRef.current && !buttonID) {
       copyIconRef.current.classList.add('preview-flash-copy');
@@ -489,7 +479,6 @@ const Create: React.FC = () => {
     updatePreviewCodes();
     logWithTimestamp(F, 'useEffect: Completed effect for buttonID and preview container updates');
   }, [buttonID, previewContainerRef, updatePreviewCodes]);
-
   useEffect(() => {
     logWithTimestamp(
       F,
@@ -503,7 +492,6 @@ const Create: React.FC = () => {
     updatePreviewCodes();
     logWithTimestamp(F, 'useEffect: Finished updating previews for description change');
   }, [spendingDescription_fixed, spendingDescription_variable, updatePreviewCodes]);
-
   const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const value = event.target.value;
     if (paymentType === 'fixed') {
@@ -527,7 +515,6 @@ const Create: React.FC = () => {
     setUpdateCounter(prev => prev + 1);
     logWithTimestamp(F, 'handleCustomCSSChange: Completed update for paymentType:', paymentType);
   };
-
   const validateCSSOnBlur = (value: string, type: 'fixed' | 'variable'): void => {
     if (!validateCSS(extractCSS(value))) {
       toast.warn('⚠️ Invalid CSS syntax. Using last valid CSS for generation.');
@@ -572,15 +559,12 @@ const Create: React.FC = () => {
     updatePreviewCodes();
     logWithTimestamp(F, 'validateCSSOnBlur: Completed validation for type:', type);
   };
-
   const debouncedValidateCSS = debounce(validateCSSOnBlur, 500);
-
   const handleCustomCSSBlur = (event: React.FocusEvent<HTMLInputElement>): void => {
     const value = event.target.value;
     debouncedValidateCSS(value, paymentType);
     logWithTimestamp(F, 'handleCustomCSSBlur: Triggered debounced validation for paymentType:', paymentType);
   };
-
   const handleButtonTextChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const { name, value } = event.target;
     if (name === 'buttonText') {
@@ -621,7 +605,6 @@ const Create: React.FC = () => {
     updatePreviewCodes();
     logWithTimestamp(F, 'handleButtonTextChange: Completed update for paymentType:', paymentType);
   };
-
   const handlePaymentTypeChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     logWithTimestamp(
       F,
@@ -637,7 +620,6 @@ const Create: React.FC = () => {
     updatePreviewCodes();
     logWithTimestamp(F, 'handlePaymentTypeChange: Completed update for new paymentType:', newType);
   };
-
   const handleFixedSatChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const input = event.target.value.replace(/[^0-9]/g, '');
     const satValue = Math.max(1, Math.min(MAX_PAYMENT_SATS, Number(input) || 5));
@@ -646,7 +628,6 @@ const Create: React.FC = () => {
     updatePreviewCodes();
     logWithTimestamp(F, 'handleFixedSatChange: Completed update for fixedSatAmount:', satValue);
   };
-
   const handleCopyCode = async (): Promise<void> => {
     const cssToUse =
       paymentType === 'fixed'
@@ -658,8 +639,8 @@ const Create: React.FC = () => {
           : lastValidCSS_variable;
     const codeToCopy =
       paymentType === 'fixed'
-        ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-fixed"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-currency="BSV"\n data-text="${buttonText_fixed} ${fixedSatAmount} Sats"\n data-description="${spendingDescription_fixed || `Payment using paymentId: ${paymentID}`}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${buttonText_fixed} ${fixedSatAmount} Sats</div>`
-        : `<style>\n${cssToUse.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-variable"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-currency="BSV"\n data-text="${buttonText_variable}"\n data-description="${spendingDescription_variable || `Payment using paymentId: ${paymentID}`}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
+        ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-fixed"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${buttonText_fixed} ${fixedSatAmount} Sats"\n data-description="${spendingDescription_fixed || `Payment using paymentId: ${paymentID}`}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${buttonText_fixed} ${fixedSatAmount} Sats</div>`
+        : `<style>\n${cssToUse.trim()}\n</style>\n<div\n class="gateway-paybutton gateway-paybutton-variable"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${spendingDescription_variable || `Payment using paymentId: ${paymentID}`}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
     const finalCode = `${codeToCopy}\n<script src="${location.protocol}//${location.host}/pay.js"></script>`;
     logWithTimestamp(F, 'handleCopyCode: Attempting to copy', paymentType, 'code:', finalCode.substring(0, 50) + '...');
     try {
@@ -675,7 +656,6 @@ const Create: React.FC = () => {
     }
     logWithTimestamp(F, 'handleCopyCode: Completed copy attempt for paymentType:', paymentType);
   };
-
   const handleGenerateButton = async () => {
     if (!merchant || !buttonID || !paymentID) {
       toast.error('❌ Merchant identity or IDs not available');
@@ -690,23 +670,18 @@ const Create: React.FC = () => {
         'handleGenerateButton: Preparing payload with description:',
         { description, htmlCode: htmlCode.substring(0, 50) + '...', buttonID, paymentID }
       );
-
       // Modify htmlCode to include id attribute set to buttonID
       htmlCode = htmlCode.replace(/<div/, `<div id="${buttonID}"`);
-
       const payload = {
-        currency: 'BSV',
         variableAmount: paymentType === 'variable',
         multiUse: true,
-        accepts: 'BSV',
         description,
-        customCSS: htmlCode,
+        htmlCode, // Use htmlCode directly instead of customCSS
         paymentId: paymentID, // Use confirmed paymentID from state
-        buttonId: buttonID,   // Use confirmed buttonID from state
+        buttonId: buttonID, // Use confirmed buttonID from state
         amount: paymentType === 'fixed' ? parseInt(fixedSatAmount) : undefined, // Optional amount for fixed payments
       };
       logWithTimestamp(F, 'handleGenerateButton: Sending payload:', payload);
-
       const response = await fetchWithTimeout(
         `${location.protocol}//${location.host}/api/createButton`,
         {
@@ -718,10 +693,8 @@ const Create: React.FC = () => {
       );
       const responseText = await response.text();
       logWithTimestamp(F, 'handleGenerateButton: Raw response text:', responseText);
-
-      const data: { status: string; message: string; paymentId: string; buttonId: string } = responseText ? JSON.parse(responseText) : {};
+      const data: ButtonResponse = responseText ? JSON.parse(responseText) : {};
       logWithTimestamp(F, 'handleGenerateButton: Parsed response data:', data);
-
       logWithTimestamp(F, 'handleGenerateButton: Checking condition - status:', data.status, 'paymentId:', data.paymentId, 'buttonId:', data.buttonId);
       if (data.status === 'success' && data.paymentId && data.buttonId) {
         logWithTimestamp(F, 'handleGenerateButton: Condition passed, updating state with buttonId:', data.buttonId, 'and paymentId:', data.paymentId);
@@ -733,7 +706,6 @@ const Create: React.FC = () => {
         setShowCode(true);
         toast.success('✅ Button created successfully');
         logWithTimestamp(F, 'handleGenerateButton: Button created with ID:', data.buttonId, 'and paymentId:', data.paymentId);
-
         // Trigger a buttonCode request with the new paymentId
         const buttonCodeResponse = await fetchWithTimeout(
           `${location.protocol}//${location.host}/api/buttonCode/${data.paymentId}`,
@@ -760,7 +732,6 @@ const Create: React.FC = () => {
     }
     logWithTimestamp(F, 'handleGenerateButton: Completed generation attempt for paymentType:', paymentType);
   };
-
   return (
     <Root>
       <Container maxWidth="lg" sx={{ ...(useTheme().templates?.page_wrap || {}) }}>
@@ -919,5 +890,4 @@ const Create: React.FC = () => {
     </Root>
   );
 };
-
 export default Create;

@@ -13,15 +13,15 @@
  * - Optimizes performance with single initial fetch
  * - Adjusted `useRef` type to `number | null` to align with browser `setTimeout` return type, correcting TS2322 error
  * - Added `description` column to the table for custom spending descriptions
- * - Added `customCSS` column to display truncated HTML code (first 16 chars, ellipsis, last 16 chars), renamed to HTML Code
- * - Added check for buttons with customCSS in database and logs discrepancy, with tracing for empty HTML code (03Aug2025_1425 BST)
- * - Updated to reflect successful customCSS storage in database (03Aug2025_1459 BST)
+ * - Added `html_code` column to display truncated HTML code (first 16 chars, ellipsis, last 16 chars), renamed from customCSS
+ * - Added check for buttons with html_code in database and logs discrepancy, with tracing for empty HTML code (03Aug2025_1425 BST)
+ * - Updated to reflect successful html_code storage in database (03Aug2025_1459 BST)
  * - Added default sorting by timestamp (most recent first) (04Aug2025_1101 BST)
- * - Aligned with Payments page pattern and fixed type errors (13Aug2025_2045 BST)
+ * - Aligned with Payments page pattern and updated schema changes (13Aug2025_2230 BST)
  *
  * Used by the Gateway UI to manage user-created payment buttons. For local testing, delays are attributed to server or application logic,
  * not external connections or hardware constraints (MacBook Pro M4 Max, 128GB RAM, 2TB SSD), guiding optimization efforts
- * Version: v3.72 (Updated 13Aug2025_2045 BST to align with Payments page)
+ * Version: v3.74 (Updated 13Aug2025_2230 BST to align with schema changes)
  */
 const F = 'pages/Buttons';
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
@@ -63,17 +63,15 @@ const authFetch = new AuthFetch(wallet);
  * Represents a payment button created by the user
  */
 interface Button {
-  id: string | null; // Unique identifier for the button
-  button_id: string | null; // Pre-created ID for the button
-  amount: number | null; // Configured payment amount
-  currency: string | null; // Currency type (e.g., BSV)
-  variable_amount: boolean | null; // Whether the amount is variable
-  multi_use: boolean | null; // Whether the button can be used multiple times
-  used: boolean | null; // Whether the button has been used
-  accepts: string | null; // Accepted payment types (e.g., BSV)
-  total_paid: number | null; // Total amount paid through the button
-  description: string | null; // Custom description for the button
-  customCSS: string | null; // Custom CSS/HTML code for the button
+  id: string | null; // Unique identifier for the button (optional, may be deprecated)
+  button_id: string | null; // Pre-created ID for the button (now primary key)
+  amount: number; // Configured payment amount, non-nullable with default 0
+  description: string; // Custom description for the button, non-nullable with default "No description"
+  html_code: string; // Custom HTML code for the button, non-nullable with default "<div>Pay Now</div>"
+  variable_amount: boolean; // Whether the amount is variable, non-nullable with default false
+  multi_use: boolean; // Whether the button can be used multiple times, non-nullable with default false
+  used: boolean; // Whether the button has been used, non-nullable with default false
+  total_paid: number | null; // Total amount paid through the button, nullable
   timestamp: string | null; // Creation timestamp
   created_at: string | null; // Alternative creation timestamp
   payment_id: string | null; // Associated payment ID
@@ -84,17 +82,15 @@ interface ButtonResponse {
   message: string;
   title?: string; // Optional title from API
   data: {
-    id?: string;
+    id?: string | null;
     buttonId?: string | null;
     amount?: string | number | null;
-    currency?: string | null;
+    description?: string | null;
+    htmlCode?: string | null;
     variable?: number | null;
     multiUse?: number | null;
     used?: number | null;
-    accepts?: string | null;
     totalPaid?: string | number | null;
-    description?: string | null;
-    htmlCode?: string | null;
     timestamp?: string | null;
     created_at?: string | null;
     paymentId?: string | null;
@@ -201,22 +197,23 @@ const PaymentButtonsList = () => {
       logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
       if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total buttons'}`);
       // Map API response to Button interface
-      const mappedButtons = data.data.map(button => ({
-        id: button.id || null,
-        button_id: button.buttonId || null,
-        amount: typeof button.amount === 'string' ? parseFloat(button.amount) : button.amount || null,
-        currency: button.currency || null,
-        variable_amount: button.variable === 1 || false,
-        multi_use: button.multiUse === 1 || false,
-        used: button.used === 1 || false,
-        accepts: button.accepts || null,
-        total_paid: typeof button.totalPaid === 'string' ? parseFloat(button.totalPaid) : button.totalPaid || null,
-        description: button.description || null,
-        customCSS: button.htmlCode || null,
-        timestamp: button.timestamp || null,
-        created_at: button.created_at || null,
-        payment_id: button.paymentId || null,
-      }));
+      const mappedButtons = data.data.map(button => {
+        const isVariable = button.variable === 1 || false;
+        return {
+          id: button.id || null,
+          button_id: button.buttonId || null,
+          amount: isVariable ? 0 : (typeof button.amount === 'string' ? parseFloat(button.amount) : button.amount || 0),
+          description: button.description || 'No description',
+          html_code: button.htmlCode || '<div>Pay Now</div>',
+          variable_amount: isVariable,
+          multi_use: button.multiUse === 1 || false,
+          used: button.used === 1 || false,
+          total_paid: typeof button.totalPaid === 'string' ? parseFloat(button.totalPaid) : button.totalPaid || null,
+          timestamp: button.timestamp || null,
+          created_at: button.created_at || null,
+          payment_id: button.paymentId || null,
+        };
+      });
       logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons));
       setTotalRecords(data.total || mappedButtons.length);
       setButtons(mappedButtons);
@@ -528,6 +525,9 @@ const PaymentButtonsList = () => {
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Amount(Sats) {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      <Tooltip title="For variable buttons, this is the initial value (0). Check payments for actual amounts paid.">
+                        <span> ℹ️</span>
+                      </Tooltip>
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -601,11 +601,11 @@ const PaymentButtonsList = () => {
                       href="#"
                       onClick={e => {
                         e.preventDefault();
-                        requestSort('customCSS');
+                        requestSort('html_code');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
-                      HTML Code {sortConfig.key === 'customCSS' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      HTML Code {sortConfig.key === 'html_code' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -614,9 +614,9 @@ const PaymentButtonsList = () => {
                 {paginatedButtons.map((button, index) => {
                   const fullButtonId = button.button_id || '';
                   const fullPaymentId = button.payment_id || '';
-                  const fullHtmlCode = button.customCSS || 'N/A';
+                  const fullHtmlCode = button.html_code || '<div>Pay Now</div>'; // Use default if null
                   return (
-                    <TableRow key={button.id || index}>
+                    <TableRow key={button.button_id || index}>
                       <TableCell>{formatTimestamp(button.created_at || button.timestamp || new Date().toISOString())}</TableCell>
                       <TableCell
                         ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Button Id'] = el)}
@@ -634,21 +634,21 @@ const PaymentButtonsList = () => {
                       >
                         {formatId(button.payment_id || '')}
                       </TableCell>
-                      <TableCell>{button.amount !== null ? button.amount : 'N/A'}</TableCell>
-                      <TableCell>{button.variable_amount !== null ? (button.variable_amount ? 'Yes' : 'No') : 'N/A'}</TableCell>
-                      <TableCell>{button.multi_use !== null ? (button.multi_use ? 'Yes' : 'No') : 'N/A'}</TableCell>
-                      <TableCell>{button.used !== null ? (button.used ? 'Yes' : 'No') : 'N/A'}</TableCell>
+                      <TableCell>{button.amount}</TableCell>
+                      <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
+                      <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
+                      <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
                       <TableCell>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
-                      <TableCell>{button.description || 'N/A'}</TableCell>
+                      <TableCell>{button.description}</TableCell>
                       <TableCell
                         ref={(el: HTMLTableCellElement | null) => (columnRefs.current['HTML Code'] = el)}
                         onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index + 1)}
                         onMouseLeave={handleMouseLeave}
                         onClick={() => handleClick(fullHtmlCode, 'HTML Code')}
                       >
-                        {button.customCSS
-                          ? `${button.customCSS.substring(0, 16)}...${button.customCSS.slice(-16)}`
-                          : 'N/A'}
+                        {button.html_code
+                          ? `${button.html_code.substring(0, 16)}...${button.html_code.slice(-16)}`
+                          : '<div>Pay Now</div>'}
                       </TableCell>
                     </TableRow>
                   );
