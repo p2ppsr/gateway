@@ -482,7 +482,7 @@ const PaymentsList = () => {
   if (error !== '') return <Typography color="error">{error}</Typography>
 
   return (
-    <Container>
+    <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
       <Box
         sx={{
           textAlign: 'center',

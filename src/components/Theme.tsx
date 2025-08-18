@@ -41,7 +41,7 @@ const lightThemeBase = createTheme({
   },
   palette: {
     mode: 'light',
-    primary: { main: '#7F5AF0' }, // UI teammate's purple accent
+    primary: { main: '#3f51b5', light: '#7986cb' }, // UI teammate's purple accent
     background: { default: '#ffffff', paper: '#ffffff' }, // Adjusted to light mode defaults
     text: { primary: '#424242', secondary: '#94A3B8' }, // UI teammate's text colors
     divider: '#3E3E42' // UI teammate's divider
@@ -65,7 +65,7 @@ const darkThemeBase = createTheme({
   },
   palette: {
     mode: 'dark',
-    primary: { main: '#7F5AF0' }, // UI teammate's purple accent
+    primary: { main: '#3f51b5', light: '#7986cb' }, // UI teammate's purple accent
     background: { default: '#1C1C1F', paper: '#2A2A2E' }, // UI teammate's dark mode
     text: { primary: '#F2F2F2', secondary: '#94A3B8' }, // UI teammate's text colors
     divider: '#3E3E42' // UI teammate's divider
@@ -111,7 +111,32 @@ const extendedTheme = (baseTheme: Theme): Theme => ({
         }
       }
     },
+    MuiCheckbox: {
+      styleOverrides: {
+        root: {
+          color: baseTheme.palette.mode === 'dark' ? '#fff' : undefined,
+          '&.Mui-checked': {
+            color: baseTheme.palette.mode === 'dark' ? '#fff' : undefined
+          }
+        }
+      }
+    },
+    MuiRadio: {
+      styleOverrides: {
+        root: {
+          color: baseTheme.palette.mode === 'dark' ? '#fff' : undefined,
+          '&.Mui-checked': {
+            color: baseTheme.palette.mode === 'dark' ? '#fff' : undefined
+          }
+        }
+      }
+    },
     MuiTextField: {
+      styleOverrides: {
+        root: {
+          marginTop: baseTheme.spacing(2)
+        }
+      },
       defaultProps: {
         variant: 'outlined' // All text fields will be the same style by default
       }
