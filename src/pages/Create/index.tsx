@@ -161,7 +161,7 @@ const [customCSS_fixed, setCustomCSS_fixed] = useState<string>(`<style>.gateway-
   border: none;
   padding: 0.7em 1em 0.7em 1em;
   min-width: 10em;
-  background: linear-gradient(145deg, #8484FA, #1C1C1F);
+  background: linear-gradient(145deg, #3F51B5, #1C1C1F);
   color: #ffffff;
   box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
   user-select: none;
@@ -172,7 +172,7 @@ const [customCSS_fixed, setCustomCSS_fixed] = useState<string>(`<style>.gateway-
 .gateway-paybutton-fixed:hover {
   cursor: pointer;
   box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(145deg, #ABABFF, #2A2A2E);
+  background: linear-gradient(145deg, #7986cb, #2A2A2E);
   color: #ffffff;
 }
 .gateway-paybutton-fixed.disabled {
@@ -186,7 +186,7 @@ const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.ga
   border: none;
   padding: 0.7em 1em 0.7em 1em;
   min-width: 10em;
-  background: linear-gradient(145deg, #FF6B6B, #1C1C1F);
+  background: linear-gradient(145deg, #3F51B5, #1C1C1F);
   color: #ffffff;
   box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
   user-select: none;
@@ -197,7 +197,7 @@ const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.ga
 .gateway-paybutton-variable:hover {
   cursor: pointer;
   box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(145deg, #FF8787, #1C1C1F);
+  background: linear-gradient(145deg, #7986cb, #1C1C1F);
   color: #ffffff;
 }
 .gateway-paybutton-variable.disabled {
@@ -550,7 +550,7 @@ const resetAll = async () => {
         border: none;
         padding: 0.7em 1em 0.7em 1em;
         min-width: 10em;
-        background: linear-gradient(145deg, #8484FA, #1C1C1F);
+        background: linear-gradient(145deg, #3F51B5, #1C1C1F);
         color: #ffffff;
         box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
         user-select: none;
@@ -561,7 +561,7 @@ const resetAll = async () => {
       .gateway-paybutton-fixed:hover {
         cursor: pointer;
         box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-        background: linear-gradient(145deg, #ABABFF, #2A2A2E);
+        background: linear-gradient(145deg, #7986cb, #2A2A2E);
         color: #ffffff;
       }</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`;
       const variableCSS = `<style>.gateway-paybutton-variable {
@@ -569,7 +569,7 @@ const resetAll = async () => {
         border: none;
         padding: 0.7em 1em 0.7em 1em;
         min-width: 10em;
-        background: linear-gradient(145deg, #FF6B6B, #1C1C1F);
+        background: linear-gradient(145deg, #3F51B5, #1C1C1F);
         color: #ffffff;
         box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
         user-select: none;
@@ -580,7 +580,7 @@ const resetAll = async () => {
       .gateway-paybutton-variable:hover {
         cursor: pointer;
         box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-        background: linear-gradient(145deg, #FF8787, #1C1C1F);
+        background: linear-gradient(145deg, #7986cb, #1C1C1F);
         color: #ffffff;
       }</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`;
       setCustomCSS_fixed(fixedCSS);
@@ -1398,7 +1398,7 @@ const handleCopyCode = async (): Promise<void> => {
 
 return (
   <Root>
-    <Container maxWidth="lg" sx={{ ...(useTheme().templates?.page_wrap || {}) }}>
+    <Container sx={{ ...(useTheme().templates?.page_wrap || {}) }}>
       <ContentWrap>
         <CenteredHeader>
           <Typography variant="h2">Create Your Payment Button</Typography>
@@ -1407,10 +1407,10 @@ return (
           </Typography>
         </CenteredHeader>
         <Grid container spacing={4}>
-          <Grid item xs={12} md={7}>
+          <Grid item xs={12} md={6}>
             <Stack spacing={3}>
               <Card>
-                <Typography variant="h3" gutterBottom>
+                <Typography variant="h3" sx={{ mb: 3 }}>
                   Button Details
                 </Typography>
                 <TextFieldStyled
@@ -1423,7 +1423,7 @@ return (
                 <RadioGroup
                   value={paymentType}
                   onChange={handlePaymentTypeChange}
-                  sx={{ mt: 2, display: 'flex', flexDirection: 'row' }}
+                  sx={{ display: 'flex', flexDirection: 'row' }}
                 >
                   <FormControlLabel value="fixed" control={<Radio />} label="Fixed Amount" />
                   <FormControlLabel value="variable" control={<Radio />} label="Variable Amount" />
@@ -1436,7 +1436,6 @@ return (
                     type="number"
                     fullWidth
                     InputProps={{ startAdornment: <InputAdornment position="start">sat</InputAdornment> }}
-                    sx={{ mt: 2 }}
                   />
                 )}
                 <TextFieldStyled
@@ -1445,7 +1444,6 @@ return (
                   value={paymentType === 'fixed' ? spendingDescription_fixed : spendingDescription_variable}
                   onChange={handleButtonTextChange}
                   fullWidth
-                  sx={{ mt: 2 }}
                 />
 <Tooltip title="Set single-use button, leave unchecked for multi-use (default)" arrow>
   <FormControlLabel
@@ -1468,7 +1466,7 @@ return (
               border: none;
               padding: 0.7em 1em 0.7em 1em;
               min-width: 10em;
-              background: linear-gradient(145deg, #8484FA, #1C1C1F);
+              background: linear-gradient(145deg, #3F51B5, #1C1C1F);
               color: #ffffff;
               box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
               user-select: none;
@@ -1479,7 +1477,7 @@ return (
             .gateway-paybutton-fixed:hover {
               cursor: pointer;
               box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-              background: linear-gradient(145deg, #ABABFF, #2A2A2E);
+              background: linear-gradient(145deg, #7986cb, #2A2A2E);
               color: #ffffff;
             }`;
             const variableBaseCSS = `<style>.gateway-paybutton-variable {
@@ -1487,7 +1485,7 @@ return (
               border: none;
               padding: 0.7em 1em 0.7em 1em;
               min-width: 10em;
-              background: linear-gradient(145deg, #FF6B6B, #1C1C1F);
+              background: linear-gradient(145deg, #3F51B5, #1C1C1F);
               color: #ffffff;
               box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
               user-select: none;
@@ -1498,7 +1496,7 @@ return (
             .gateway-paybutton-variable:hover {
               cursor: pointer;
               box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-              background: linear-gradient(145deg, #FF8787, #1C1C1F);
+              background: linear-gradient(145deg, #7986cb, #1C1C1F);
               color: #ffffff;
             }`;
             const fixedCSS = value ? `${fixedBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>` : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`;
@@ -1560,14 +1558,14 @@ return (
 </Tooltip>
                 <Box sx={{ mt: 2 }}>
                   <Tooltip title="Reset all fields to default values" arrow>
-                    <IconButton onClick={resetAll} sx={{ color: 'primary.main' }}>
+                    <IconButton onClick={resetAll} sx={{ color: 'primary.light' }}>
                       <Typography>Reset</Typography>
                     </IconButton>
                   </Tooltip>
                 </Box>
               </Card>
               <Card>
-                <Typography variant="h3" gutterBottom>
+                <Typography variant="h3" sx={{ mb: 3 }}>
                   Custom Styling
                 </Typography>
                 <TextFieldStyled
@@ -1581,13 +1579,17 @@ return (
               </Card>
             </Stack>
           </Grid>
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={6}>
             <Card>
               <Typography
                 variant="h3"
-                gutterBottom
                 component="div"
-                sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  mb: 3
+                }}
               >
                 Button Preview
                 <span
@@ -1628,7 +1630,7 @@ return (
                   code={paymentType === 'fixed' ? previewCode_fixed : previewCode_variable}
                 />
               </Box>
-              <Typography variant="h3" gutterBottom sx={{ mt: 2 }}>
+              <Typography variant="h3" sx={{ mt: 2, mb: 3 }}>
                 Script for Head Tag
               </Typography>
               <Box>

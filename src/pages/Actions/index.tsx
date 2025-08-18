@@ -29,9 +29,9 @@ const PaymentActionsList: React.FC = () => {
   const theme = useTheme()
 
   return (
-    <Container>
+    <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
       <Box
-        style={{
+        sx={{
           textAlign: 'center',
           marginBottom: theme.spacing(4),
           marginTop: theme.spacing(5),
@@ -41,13 +41,11 @@ const PaymentActionsList: React.FC = () => {
         <Typography variant="h2">Payment Actions</Typography>
         <Typography variant="subtitle1">Manage the specialized payment actions you have created.</Typography>
       </Box>
-      <Paper elevation={3}>
-        <Box p={3}>
-          <Typography variant="body1">
-            Here, you will be able to create actions that get triggered when one of your buttons receives a payment.
-            Things like sending an email, hitting a webhook, or maybe even sending another payment somewhere else!
-          </Typography>
-        </Box>
+      <Paper elevation={3} sx={{ p: 3 }}>
+        <Typography variant="body1">
+          Here, you will be able to create actions that get triggered when one of your buttons receives a payment.
+          Things like sending an email, hitting a webhook, or maybe even sending another payment somewhere else!
+        </Typography>
       </Paper>
     </Container>
   )

@@ -453,7 +453,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
     )
   }
   return (
-    <Container>
+    <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
       <Box
         sx={{
           textAlign: 'center',

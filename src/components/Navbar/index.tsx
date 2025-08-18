@@ -61,13 +61,23 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
   const getLinkStyle = (path: string): object =>
     location.pathname === path
       ? {
-          color: theme.palette.secondary.main,
+          color: theme.palette.primary.light,
           fontWeight: 'bold'
         }
       : {
           color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-          '&:hover': { color: theme.palette.secondary.main }
+          '&:hover': { color: theme.palette.primary.light }
         }
+
+  const paymentsButtonStyle = {
+    color: '#ffffff',
+    backgroundColor: theme.palette.primary.main,
+    padding: theme.spacing(0.5, 1),
+    borderRadius: theme.shape.borderRadius,
+    '&:hover': {
+      backgroundColor: theme.palette.primary.light
+    }
+  }
 
   return (
     <AppBar
@@ -135,27 +145,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
                 <Button
                   component={RouterLink}
                   to="/payments"
-                  sx={
-                    location.pathname === '/payments'
-                      ? {
-                          color: theme.palette.secondary.contrastText,
-                          backgroundColor: theme.palette.secondary.main,
-                          padding: theme.spacing(0.5, 1),
-                          borderRadius: theme.shape.borderRadius,
-                          '&:hover': {
-                            backgroundColor: theme.palette.secondary.light
-                          }
-                        }
-                      : {
-                          color: theme.palette.secondary.contrastText,
-                          backgroundColor: theme.palette.secondary.main,
-                          padding: theme.spacing(0.5, 1),
-                          borderRadius: theme.shape.borderRadius,
-                          '&:hover': {
-                            backgroundColor: theme.palette.secondary.light
-                          }
-                        }
-                  }
+                  sx={paymentsButtonStyle}
                   startIcon={<AccountBalanceWallet />}
                 >
                   Payments
