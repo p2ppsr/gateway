@@ -36,6 +36,8 @@ export default async (req: Request, res: Response): Promise<void | Response> => 
     res.status(200).json({ status: 'success' })
   } catch (error) {
     console.error('❌ Error updating button description:', error)
-    res.status(500).json({ status: 'error', message: error instanceof Error ? error.message : '❌ Internal server error' })
+    res
+      .status(500)
+      .json({ status: 'error', message: error instanceof Error ? error.message : '❌ Internal server error' })
   }
 }

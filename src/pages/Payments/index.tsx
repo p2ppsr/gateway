@@ -89,154 +89,159 @@ import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
  * Represents a payment received through a payment button
  */
 interface Payment {
-  payment_id: string | null; // Pre-created ID from ids with type='payment'
-  button_id: string | null; // Pre-created ID from ids with type='button'
-  payer_id: string | null; // Payer's identifier
-  txid: string | null; // Blockchain transaction ID
-  amount: number | null; // Actual paid amount
-  completed: boolean | null; // Completion status
-  is_new: boolean | null; // New payment status
-  created_at: string | null; // Timestamp of payment
+  payment_id: string | null // Pre-created ID from ids with type='payment'
+  button_id: string | null // Pre-created ID from ids with type='button'
+  payer_id: string | null // Payer's identifier
+  txid: string | null // Blockchain transaction ID
+  amount: number | null // Actual paid amount
+  completed: boolean | null // Completion status
+  is_new: boolean | null // New payment status
+  created_at: string | null // Timestamp of payment
 }
 
 /**
  * Represents the API response structure
  */
 interface PaymentResponse {
-  status: string;
-  message: string;
-  title?: string; // Optional title from API
+  status: string
+  message: string
+  title?: string // Optional title from API
   data: {
-    payment_id: string | null;
-    txid: string | null;
-    payer_id: string | null;
-    button_id: string | null;
-    amount: string | number | null;
-    completed: number | null;
-    is_new: number | null;
-    created_at: string | null;
-  }[];
-  total?: number;
+    payment_id: string | null
+    txid: string | null
+    payer_id: string | null
+    button_id: string | null
+    amount: string | number | null
+    completed: number | null
+    is_new: number | null
+    created_at: string | null
+  }[]
+  total?: number
 }
 
 interface SortConfig {
-  key: keyof Payment | null;
-  direction: 'asc' | 'desc';
+  key: keyof Payment | null
+  direction: 'asc' | 'desc'
 }
 
 // Utility function to format txid as 'first5...last5'
 const formatTxid = (txid: string | null) => {
-  if (!txid || txid.length < 10) return txid || 'N/A';
-  return `${txid.slice(0, 5)}...${txid.slice(-5)}`;
-};
+  if (!txid || txid.length < 10) return txid || 'N/A'
+  return `${txid.slice(0, 5)}...${txid.slice(-5)}`
+}
 
 // Utility function to format date as YYYY-MM-DD HH:MM:SS
 const formatTime = (dateStr: string | null) => {
   if (!dateStr) {
-    logWithTimestamp(F, 'Warning: created_at is undefined for a payment, using N/A');
-    return 'N/A';
+    logWithTimestamp(F, 'Warning: created_at is undefined for a payment, using N/A')
+    return 'N/A'
   }
-  return new Date(dateStr).toISOString().replace('T', ' ').slice(0, 19);
-};
+  return new Date(dateStr).toISOString().replace('T', ' ').slice(0, 19)
+}
 
-const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN;
-const wallet = new WalletClient('auto', WALLET_ORIGIN);
-const authFetch = new AuthFetch(wallet);
+const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
+const authFetch = new AuthFetch(wallet)
 
 const PaymentsList = () => {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [customRowsPerPage, setCustomRowsPerPage] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'new'>('all');
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
-  const [customOptions, setCustomOptions] = useState<number[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [title, setTitle] = useState<string>('Payments'); // Default title
-  const theme = useTheme();
-  const fetchTimeout = useRef<number | null>(null);
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
-  const [clickedValue, setClickedValue] = useState<string | null>(null);
-  const [isClicked, setIsClicked] = useState(false); // New state to disable hover after click
-  const [exitDirection, setExitDirection] = useState<string | null>(null); // Track exit direction
-  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null); // Track last clicked column
-  const tableRef = useRef<HTMLDivElement>(null);
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(5)
+  const [customRowsPerPage, setCustomRowsPerPage] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'new'>('all')
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
+  const [customOptions, setCustomOptions] = useState<number[]>([])
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [title, setTitle] = useState<string>('Payments') // Default title
+  const theme = useTheme()
+  const fetchTimeout = useRef<number | null>(null)
+  const [hoveredValue, setHoveredValue] = useState<string | null>(null)
+  const [clickedValue, setClickedValue] = useState<string | null>(null)
+  const [isClicked, setIsClicked] = useState(false) // New state to disable hover after click
+  const [exitDirection, setExitDirection] = useState<string | null>(null) // Track exit direction
+  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null) // Track last clicked column
+  const tableRef = useRef<HTMLDivElement>(null)
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     Txid: null,
     'Payment Id': null,
     'Button Id': null,
-    'Payer Id': null,
-  });
+    'Payer Id': null
+  })
 
   const handleMouseEnter = (fullValue: string, columnName: string, rowIndex: number) => {
-    logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex);
+    logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex)
     if (!isClicked) {
-      setHoveredValue(fullValue);
+      setHoveredValue(fullValue)
       const columnCell = document.querySelector(
         `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Txid', 'Payment Id', 'Button Id', 'Payer Id'].indexOf(columnName) + 2})`
-      ) as HTMLTableCellElement | null;
+      ) as HTMLTableCellElement | null
       if (columnCell) {
-        columnRefs.current[columnName] = columnCell;
+        columnRefs.current[columnName] = columnCell
       }
     }
-  };
+  }
 
   const handleMouseLeave = (e: React.MouseEvent) => {
-    logWithTimestamp(F, 'Mouse leave');
+    logWithTimestamp(F, 'Mouse leave')
     if (tableRef.current && hoveredValue && !isClicked) {
-      const tableRect = tableRef.current.getBoundingClientRect();
-      const mouseY = e.clientY;
-      const mouseX = e.clientX;
+      const tableRect = tableRef.current.getBoundingClientRect()
+      const mouseY = e.clientY
+      const mouseX = e.clientX
       const hoveredColumn = Object.keys(columnRefs.current).find(col =>
         columnRefs.current[col]?.contains(e.target as Node)
-      );
+      )
       if (hoveredColumn) {
-        const colRect = columnRefs.current[hoveredColumn]!.getBoundingClientRect();
-        const isBottomExit = mouseY > colRect.bottom && mouseX >= colRect.left && mouseX <= colRect.right;
-        if (isBottomExit && (hoveredColumn === 'Txid' || hoveredColumn === 'Payment Id' || hoveredColumn === 'Button Id' || hoveredColumn === 'Payer Id')) {
-          setExitDirection('bottom');
+        const colRect = columnRefs.current[hoveredColumn]!.getBoundingClientRect()
+        const isBottomExit = mouseY > colRect.bottom && mouseX >= colRect.left && mouseX <= colRect.right
+        if (
+          isBottomExit &&
+          (hoveredColumn === 'Txid' ||
+            hoveredColumn === 'Payment Id' ||
+            hoveredColumn === 'Button Id' ||
+            hoveredColumn === 'Payer Id')
+        ) {
+          setExitDirection('bottom')
         } else {
-          setHoveredValue(null);
-          setExitDirection(null);
+          setHoveredValue(null)
+          setExitDirection(null)
         }
       } else {
-        setHoveredValue(null);
-        setExitDirection(null);
+        setHoveredValue(null)
+        setExitDirection(null)
       }
     }
-  };
+  }
 
   const handleClick = (fullValue: string, columnName: string) => {
-    logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName);
-    setHoveredValue(null); // Clear hover state
-    setIsClicked(true); // Disable further hover events
-    setClickedValue(fullValue);
-    setLastClickedColumn(columnName); // Track the clicked column
-    navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
-  };
+    logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName)
+    setHoveredValue(null) // Clear hover state
+    setIsClicked(true) // Disable further hover events
+    setClickedValue(fullValue)
+    setLastClickedColumn(columnName) // Track the clicked column
+    navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+  }
 
   const handleReset = () => {
-    logWithTimestamp(F, 'Reset click');
-    setClickedValue(null);
-    setIsClicked(false); // Re-enable hover events
-    setHoveredValue(null); // Clear hover on reset
-    setExitDirection(null);
-    setLastClickedColumn(null); // Clear last clicked column
-  };
+    logWithTimestamp(F, 'Reset click')
+    setClickedValue(null)
+    setIsClicked(false) // Re-enable hover events
+    setHoveredValue(null) // Clear hover on reset
+    setExitDirection(null)
+    setLastClickedColumn(null) // Clear last clicked column
+  }
 
   const fetchPayments = async () => {
-    setLoading(true);
-    setPayments([]); // Clear state to force refresh
+    setLoading(true)
+    setPayments([]) // Clear state to force refresh
     try {
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`;
-      logWithTimestamp(F, 'Fetching total payments with URL:', url);
-      const response = await authFetch.fetch(url, { method: 'GET' });
-      const data: PaymentResponse = await response.json();
-      logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
-      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`);
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`
+      logWithTimestamp(F, 'Fetching total payments with URL:', url)
+      const response = await authFetch.fetch(url, { method: 'GET' })
+      const data: PaymentResponse = await response.json()
+      logWithTimestamp(F, 'API response:', JSON.stringify(data)) // Debug API response
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total payments'}`)
       // Map API response to Payment interface with snake_case fields
       const mappedPayments = data.data.map(payment => ({
         payment_id: payment.payment_id || null,
@@ -246,148 +251,150 @@ const PaymentsList = () => {
         amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
         completed: payment.completed === 1 || false,
         is_new: payment.is_new === 1 || false,
-        created_at: payment.created_at || null,
-      }));
-      logWithTimestamp(F, 'Mapped payments:', JSON.stringify(mappedPayments));
-      setTotalRecords(data.total || mappedPayments.length);
-      setPayments(mappedPayments);
-      setTitle(data.title || 'Payments');
-      logWithTimestamp(F, 'Initial payments length:', mappedPayments.length);
+        created_at: payment.created_at || null
+      }))
+      logWithTimestamp(F, 'Mapped payments:', JSON.stringify(mappedPayments))
+      setTotalRecords(data.total || mappedPayments.length)
+      setPayments(mappedPayments)
+      setTitle(data.title || 'Payments')
+      logWithTimestamp(F, 'Initial payments length:', mappedPayments.length)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '❌ Unknown error';
-      logWithTimestamp(F, '❌ Error fetching total payments:', message);
-      setError(message);
+      const message = err instanceof Error ? err.message : '❌ Unknown error'
+      logWithTimestamp(F, '❌ Error fetching total payments:', message)
+      setError(message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchPayments(); // Initial fetch on mount
+    fetchPayments() // Initial fetch on mount
     return () => {
-      if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
-    };
-  }, []); // Empty dependency array ensures this runs only on mount
+      if (fetchTimeout.current) clearTimeout(fetchTimeout.current)
+    }
+  }, []) // Empty dependency array ensures this runs only on mount
 
   useEffect(() => {
-    setPage(0);
-  }, [statusFilter]);
+    setPage(0)
+  }, [statusFilter])
 
   const requestSort = (key: keyof Payment) => {
-    let direction: 'asc' | 'desc' = 'asc';
+    let direction: 'asc' | 'desc' = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+      direction = 'desc'
     }
-    setSortConfig({ key, direction });
-  };
+    setSortConfig({ key, direction })
+  }
 
   const handleRowsPerPageChange = (event: React.ChangeEvent<{ value: unknown }>) => {
-    const value = event.target.value;
+    const value = event.target.value
     logWithTimestamp(
       F,
       'Rows per page change:',
       value,
       'Current options:',
       rowsPerPageOptions.map(opt => opt.value)
-    );
+    )
     if (typeof value === 'object' && value !== null && 'value' in value && value.value === 0) {
-      setShowCustomInput(true);
+      setShowCustomInput(true)
     } else {
-      const numValue = typeof value === 'number' ? value : (value as any)?.value || 5;
-      const isValidOption = rowsPerPageOptions.some(option => option.value === numValue);
+      const numValue = typeof value === 'number' ? value : (value as any)?.value || 5
+      const isValidOption = rowsPerPageOptions.some(option => option.value === numValue)
       if (isValidOption) {
-        setRowsPerPage(numValue);
-        setCustomRowsPerPage('');
-        setShowCustomInput(false);
-        setPage(0);
+        setRowsPerPage(numValue)
+        setCustomRowsPerPage('')
+        setShowCustomInput(false)
+        setPage(0)
       } else {
-        setRowsPerPage(5);
-        setPage(0);
+        setRowsPerPage(5)
+        setPage(0)
       }
     }
-  };
+  }
 
   const handleCustomRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value.replace(/[^0-9]/g, '');
-    setCustomRowsPerPage(value);
-  };
+    const value = event.target.value.replace(/[^0-9]/g, '')
+    setCustomRowsPerPage(value)
+  }
 
   const handleCustomInputComplete = (
     event: React.KeyboardEvent<HTMLDivElement> | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return;
-    const numValue = parseInt(customRowsPerPage, 10);
-    logWithTimestamp(F, 'Custom rows on complete:', numValue);
+    if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return
+    const numValue = parseInt(customRowsPerPage, 10)
+    logWithTimestamp(F, 'Custom rows on complete:', numValue)
     if (isNaN(numValue) || numValue <= 0 || numValue > 100) {
-      setRowsPerPage(5);
+      setRowsPerPage(5)
     } else {
-      setRowsPerPage(numValue);
+      setRowsPerPage(numValue)
       setCustomOptions(prev => {
         if (!prev.includes(numValue) && ![5, 10, 25].includes(numValue)) {
-          return [...prev, numValue].sort((a, b) => a - b).slice(-3);
+          return [...prev, numValue].sort((a, b) => a - b).slice(-3)
         }
-        return prev;
-      });
+        return prev
+      })
     }
-    setCustomRowsPerPage('');
-    setShowCustomInput(false);
-    setPage(0);
-  };
+    setCustomRowsPerPage('')
+    setShowCustomInput(false)
+    setPage(0)
+  }
 
   const baseOptions = [
     { value: 5, label: '5' },
     { value: 10, label: '10' },
     { value: 25, label: '25' }
-  ];
+  ]
   const rowsPerPageOptions = [
     { value: 0, label: 'set 1..100' },
     ...baseOptions,
     ...customOptions.map(value => ({ value, label: value.toString() }))
-  ];
+  ]
 
   const filteredPayments =
     statusFilter === 'all'
       ? payments
       : payments.filter(
-          payment => (statusFilter === 'completed' && payment.completed === true) || (statusFilter === 'new' && payment.is_new === true)
-        );
+          payment =>
+            (statusFilter === 'completed' && payment.completed === true) ||
+            (statusFilter === 'new' && payment.is_new === true)
+        )
 
   const sortedPayments = sortConfig.key
     ? [...filteredPayments].sort((a, b) => {
-        if (!sortConfig.key) return 0; // Default to no change if key is null
-        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key];
-        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key];
+        if (!sortConfig.key) return 0 // Default to no change if key is null
+        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key]
+        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key]
         // Handle null/undefined values by placing them at the end
-        if (aValue === null || aValue === undefined) return 1;
-        if (bValue === null || bValue === undefined) return -1;
+        if (aValue === null || aValue === undefined) return 1
+        if (bValue === null || bValue === undefined) return -1
         // Convert to comparable types
         if (sortConfig.key === 'amount') {
-          aValue = (aValue as number) || 0;
-          bValue = (bValue as number) || 0;
+          aValue = (aValue as number) || 0
+          bValue = (bValue as number) || 0
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
+            : (bValue as number) - (aValue as number)
         } else if (sortConfig.key === 'completed' || sortConfig.key === 'is_new') {
-          aValue = (aValue as boolean) ? 1 : 0;
-          bValue = (bValue as boolean) ? 1 : 0;
+          aValue = (aValue as boolean) ? 1 : 0
+          bValue = (bValue as boolean) ? 1 : 0
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
+            : (bValue as number) - (aValue as number)
         } else if (sortConfig.key === 'created_at') {
-          aValue = new Date(aValue as string || '');
-          bValue = new Date(bValue as string || '');
+          aValue = new Date((aValue as string) || '')
+          bValue = new Date((bValue as string) || '')
           return sortConfig.direction === 'asc'
             ? (aValue as Date).getTime() - (bValue as Date).getTime()
-            : (bValue as Date).getTime() - (aValue as Date).getTime();
+            : (bValue as Date).getTime() - (aValue as Date).getTime()
         } else {
-          aValue = (aValue as string) || '';
-          bValue = (bValue as string) || '';
-          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+          aValue = (aValue as string) || ''
+          bValue = (bValue as string) || ''
+          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
         }
       })
-    : filteredPayments;
+    : filteredPayments
 
-  const paginatedPayments = sortedPayments.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  const paginatedPayments = sortedPayments.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
 
   logWithTimestamp(
     F,
@@ -403,12 +410,12 @@ const PaymentsList = () => {
     page,
     'Offset:',
     page * rowsPerPage
-  );
+  )
 
   const acknowledgePayment = async (paymentId: string | null) => {
     if (!paymentId) {
-      logWithTimestamp(F, '❌ Attempted to acknowledge payment with null paymentId');
-      return;
+      logWithTimestamp(F, '❌ Attempted to acknowledge payment with null paymentId')
+      return
     }
     try {
       logWithTimestamp(
@@ -417,43 +424,45 @@ const PaymentsList = () => {
         paymentId,
         'URL:',
         `http://localhost:3001/api/acknowledgePayment`
-      );
+      )
       const response = await authFetch.fetch(`http://localhost:3001/api/acknowledgePayment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ paymentId }) // Send paymentId as required
-      });
+      })
       if (!response.ok) {
-        const errorText = await response.text();
-        logWithTimestamp(F, '❌ Acknowledgment failed with response:', errorText);
-        throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`);
+        const errorText = await response.text()
+        logWithTimestamp(F, '❌ Acknowledgment failed with response:', errorText)
+        throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`)
       }
-      const data: PaymentResponse = await response.json();
-      logWithTimestamp(F, 'Acknowledgment response:', JSON.stringify(data));
-      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`);
-      logWithTimestamp(F, 'Successfully acknowledged payment:', paymentId);
+      const data: PaymentResponse = await response.json()
+      logWithTimestamp(F, 'Acknowledgment response:', JSON.stringify(data))
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`)
+      logWithTimestamp(F, 'Successfully acknowledged payment:', paymentId)
       // Refresh the payments list after acknowledgment
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`;
-      const refreshResponse = await authFetch.fetch(url, { method: 'GET' });
-      const refreshData: PaymentResponse = await refreshResponse.json();
-      if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`);
-      setPayments(refreshData.data.map(payment => ({
-        payment_id: payment.payment_id || null,
-        button_id: payment.button_id || null,
-        payer_id: payment.payer_id || null,
-        txid: payment.txid || null,
-        amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
-        completed: payment.completed === 1 || false,
-        is_new: payment.is_new === 1 || false,
-        created_at: payment.created_at || null,
-      })));
-      setTotalRecords(refreshData.total || refreshData.data.length);
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`
+      const refreshResponse = await authFetch.fetch(url, { method: 'GET' })
+      const refreshData: PaymentResponse = await refreshResponse.json()
+      if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`)
+      setPayments(
+        refreshData.data.map(payment => ({
+          payment_id: payment.payment_id || null,
+          button_id: payment.button_id || null,
+          payer_id: payment.payer_id || null,
+          txid: payment.txid || null,
+          amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
+          completed: payment.completed === 1 || false,
+          is_new: payment.is_new === 1 || false,
+          created_at: payment.created_at || null
+        }))
+      )
+      setTotalRecords(refreshData.total || refreshData.data.length)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '❌ Unknown error';
-      logWithTimestamp(F, '❌ Error acknowledging payment:', message);
-      setError(message);
+      const message = err instanceof Error ? err.message : '❌ Unknown error'
+      logWithTimestamp(F, '❌ Error acknowledging payment:', message)
+      setError(message)
     }
-  };
+  }
 
   if (loading) {
     return (
@@ -468,9 +477,9 @@ const PaymentsList = () => {
       >
         <CircularProgress />
       </Box>
-    );
+    )
   }
-  if (error !== '') return <Typography color="error">{error}</Typography>;
+  if (error !== '') return <Typography color="error">{error}</Typography>
 
   return (
     <Container>
@@ -528,8 +537,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('created_at');
+                        e.preventDefault()
+                        requestSort('created_at')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -541,8 +550,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('txid');
+                        e.preventDefault()
+                        requestSort('txid')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -554,8 +563,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('payment_id');
+                        e.preventDefault()
+                        requestSort('payment_id')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -567,8 +576,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('button_id');
+                        e.preventDefault()
+                        requestSort('button_id')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -580,8 +589,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('payer_id');
+                        e.preventDefault()
+                        requestSort('payer_id')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -593,8 +602,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('amount');
+                        e.preventDefault()
+                        requestSort('amount')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -606,8 +615,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('completed');
+                        e.preventDefault()
+                        requestSort('completed')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -619,8 +628,8 @@ const PaymentsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('is_new');
+                        e.preventDefault()
+                        requestSort('is_new')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -632,14 +641,14 @@ const PaymentsList = () => {
               </TableHead>
               <TableBody>
                 {paginatedPayments.map((payment, index) => {
-                  const fullTxid = payment.txid || '';
-                  const fullPaymentId = payment.payment_id || '';
-                  const fullButtonId = payment.button_id || '';
-                  const fullPayerId = payment.payer_id || '';
-                  const isTxidTruncated = fullTxid !== formatId(fullTxid);
-                  const isPaymentIdTruncated = fullPaymentId !== formatId(fullPaymentId);
-                  const isButtonIdTruncated = fullButtonId !== formatId(fullButtonId);
-                  const isPayerIdTruncated = fullPayerId !== formatId(fullPayerId);
+                  const fullTxid = payment.txid || ''
+                  const fullPaymentId = payment.payment_id || ''
+                  const fullButtonId = payment.button_id || ''
+                  const fullPayerId = payment.payer_id || ''
+                  const isTxidTruncated = fullTxid !== formatId(fullTxid)
+                  const isPaymentIdTruncated = fullPaymentId !== formatId(fullPaymentId)
+                  const isButtonIdTruncated = fullButtonId !== formatId(fullButtonId)
+                  const isPayerIdTruncated = fullPayerId !== formatId(fullPayerId)
                   return (
                     <TableRow key={payment.payment_id || index}>
                       <TableCell>{formatTime(payment.created_at)}</TableCell>
@@ -692,7 +701,7 @@ const PaymentsList = () => {
                         )}
                       </TableCell>
                     </TableRow>
-                  );
+                  )
                 })}
               </TableBody>
             </Table>
@@ -719,7 +728,7 @@ const PaymentsList = () => {
               count={filteredPayments.length}
               page={page}
               onPageChange={(e, newPage) => {
-                setPage(newPage);
+                setPage(newPage)
                 logWithTimestamp(
                   F,
                   'Page changed to:',
@@ -728,12 +737,12 @@ const PaymentsList = () => {
                   paginatedPayments,
                   'filteredPayments.length:',
                   filteredPayments.length
-                );
-                setHoveredValue(null);
-                setClickedValue(null);
-                setIsClicked(false);
-                setExitDirection(null);
-                setLastClickedColumn(null);
+                )
+                setHoveredValue(null)
+                setClickedValue(null)
+                setIsClicked(false)
+                setExitDirection(null)
+                setLastClickedColumn(null)
               }}
               rowsPerPage={rowsPerPage}
               onRowsPerPageChange={handleRowsPerPageChange}
@@ -822,9 +831,9 @@ const PaymentsList = () => {
                     onClick={() => {
                       navigator.clipboard
                         .writeText(clickedValue)
-                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
-                      setClickedValue(null);
-                      setIsClicked(false);
+                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+                      setClickedValue(null)
+                      setIsClicked(false)
                     }}
                   >
                     <ContentCopyIcon />
@@ -852,7 +861,7 @@ const PaymentsList = () => {
         </>
       )}
     </Container>
-  );
-};
+  )
+}
 
-export default PaymentsList;
+export default PaymentsList

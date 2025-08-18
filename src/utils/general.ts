@@ -2,13 +2,16 @@
  * @file utils/general.ts
  * @description General utility functions for the Gateway application.
  * This module provides reusable functions for ID generation, formatting, timestamp conversion,
- * and HTTP request handling with timeout support.
- * @author [Your Name or Team] (optional, replace with actual author if known)
- * @date 2025-08-11
- * @version 1.6
+ * HTTP request handling with timeout support, and ID/merchant validation.
+ * @author [Your Name]
+ * @date 2025-08-17
+ * @version 1.10
+ * Change Log:
+ * - 17Aug2025_1625 BST (v1.8): Renamed isIdMatch to getBase58Regex for clarity.
+ * - 17Aug2025_1630 BST (v1.9): Added isBase58 function for boolean validation of 12-character Base58 IDs.
+ * - 17Aug2025_1640 BST (v1.10): Added isMerchantId for 64-character hex merchant ID validation.
  */
-
-import { WalletClient, AuthFetch } from '@bsv/sdk'; // Import WalletClient for typing
+import { WalletClient, AuthFetch } from '@bsv/sdk' // Import WalletClient for typing
 
 /**
  * Generates a random Base58-encoded string of specified length.
@@ -16,13 +19,39 @@ import { WalletClient, AuthFetch } from '@bsv/sdk'; // Import WalletClient for t
  * @returns A Base58-encoded string of length n.
  */
 export function generateBase58(n: number = 12): string {
-  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let result = '';
+  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let result = ''
   for (let i = 0; i < n; i++) {
-    const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % 58;
-    result += base58Alphabet[randomIndex];
+    const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % 58
+    result += base58Alphabet[randomIndex]
   }
-  return result;
+  return result
+}
+
+/**
+ * Returns a regex for matching 12-character Base58-encoded IDs.
+ * @returns A RegExp object matching 12-character Base58 strings.
+ */
+export function getBase58Regex(): RegExp {
+  return /[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}/g
+}
+
+/**
+ * Checks if a string is a valid 12-character Base58-encoded ID.
+ * @param id The string to validate.
+ * @returns True if the string is a 12-character Base58 ID, false otherwise.
+ */
+export function isBase58(id: string): boolean {
+  return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}$/.test(id)
+}
+
+/**
+ * Checks if a string is a valid 64- to 66-character hex merchant ID.
+ * @param id The string to validate.
+ * @returns True if the string is a 64- to 66-character hex string, false otherwise.
+ */
+export function isMerchantId(id: string): boolean {
+  return /^[0-9a-fA-F]{64,66}$/.test(id);
 }
 
 /**
@@ -31,8 +60,8 @@ export function generateBase58(n: number = 12): string {
  * @returns Formatted string (e.g., "abcde...fghij") or the original string if too short.
  */
 export function formatId(id: string): string {
-  if (id.length < 10) return id; // Fallback for short IDs
-  return `${id.slice(0, 5)}...${id.slice(-5)}`;
+  if (id.length < 10) return id // Fallback for short IDs
+  return `${id.slice(0, 5)}...${id.slice(-5)}`
 }
 
 /**
@@ -42,13 +71,13 @@ export function formatId(id: string): string {
  */
 export function formatTimestamp(dateStr: string | undefined): string {
   if (!dateStr) {
-    return 'N/A';
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
-    return date.toISOString().replace('T', ' ').slice(0, 19);
+    const date = new Date(dateStr)
+    return date.toISOString().replace('T', ' ').slice(0, 19)
   } catch (error) {
-    return 'N/A';
+    return 'N/A'
   }
 }
 
@@ -59,7 +88,7 @@ export function formatTimestamp(dateStr: string | undefined): string {
  * @param wallet The WalletClient instance for authentication.
  * @param timeoutMs The timeout duration in milliseconds (default: 15000).
  * @returns A Promise resolving to the Response object.
- * @throws Error if the request times out or fails.
+ * @throws Error with detailed context if the request times out or fails.
  */
 export const fetchWithTimeout = async (
   url: string,
@@ -69,14 +98,79 @@ export const fetchWithTimeout = async (
 ): Promise<Response> => {
   const authFetch = new AuthFetch(wallet);
   const timeoutId = setTimeout(() => {
-    throw new Error(`❌ Request timed out after ${timeoutMs}ms`);
+    throw new Error(`❌ Request timed out after ${timeoutMs}ms for URL: ${url}`);
   }, timeoutMs);
   try {
     const response = await authFetch.fetch(url, options);
+    if (!response.ok) {
+      let errorDetail = '';
+      try {
+        errorDetail = await response.text();
+      } catch (textError) {
+        errorDetail = 'Failed to retrieve error details';
+      }
+      throw new Error(
+        `Failed to fetch ${url} with method ${options.method || 'GET'}: Status ${response.status} ${response.statusText}, Details: ${errorDetail}`
+      );
+    }
     return response;
-  } catch (err) {
-    throw err; // Let the caller handle the error, including timeout
+  } catch (err: any) {
+    throw new Error(
+      `Failed to fetch ${url} with method ${options.method || 'GET'}: ${err.message}${
+        err.status ? `, Status: ${err.status}` : ''
+      }`
+    );
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+export const validateCSS = (css: string): boolean => {
+  try {
+    const rules = css
+      .split('}')
+      .map(rule => rule.trim())
+      .filter(rule => rule.length > 0);
+    for (const rule of rules) {
+      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim());
+      if (!selectorPart || !propertiesPart) return false;
+      const properties = propertiesPart
+        .split(';')
+        .map(prop => prop.trim())
+        .filter(prop => prop.length > 0);
+      for (const prop of properties) {
+        const [key, value] = prop.split(':').map(part => part.trim());
+        if (!key || !value) return false;
+        // Allow hex colors of 3+ characters
+        if (value.includes('#')) {
+          const hexMatch = value.match(/#[0-9a-fA-F]{3,}/g);
+          if (!hexMatch) return false;
+        }
+        // Check for balanced parentheses and valid linear-gradient syntax
+        if (value.includes('(')) {
+          const openCount = (value.match(/\(/g) || []).length;
+          const closeCount = (value.match(/\)/g) || []).length;
+          if (openCount !== closeCount) return false;
+          if (value.includes('linear-gradient')) {
+            // Ensure linear-gradient ends with ')' and has at least two colors
+            if (!value.match(/linear-gradient\s*\([^)]*\)\s*$/)) return false;
+            const colorMatches = value.match(/#[0-9a-fA-F]{3,}/g);
+            if (!colorMatches || colorMatches.length < 2) return false;
+          }
+        }
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const extractCSS = (input: string): string => {
+  const match = input.match(/<style>([\s\S]*?)<\/style>/);
+  return match ? match[1].trim() : input.trim();
+};
+
+export const sanitizeInput = (input: string): string => {
+  return input.replace(/[<>]/g, '');
 };

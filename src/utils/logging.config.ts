@@ -17,9 +17,9 @@ const loggingConfig: { [file: string]: boolean } = {
   'routes/listButtons': true,
   'routes/listPayments': true,
   'utils/initializeIds': true,
-  'index': true,
-  'inject': true,
-  'server': true
+  index: true,
+  inject: true,
+  server: true
 }
 
 export default loggingConfig

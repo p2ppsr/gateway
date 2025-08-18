@@ -10,7 +10,7 @@
  * - Prefixed IIFE in `useEffect` with `void` to prevent floating promise warning.
  * - Replaced process.env with utils/constants.ts for configuration.
  */
-const F = 'App' 
+const F = 'App'
 import React, { useState, useEffect } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Theme from './components/Theme'
@@ -30,8 +30,7 @@ import { logWithTimestamp } from './utils/logging'
 
 // AuthFetch – constructed once per session
 logWithTimestamp(F, `CONFIG:${CONFIG}`)
-const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN
-const wallet = new WalletClient('auto', WALLET_ORIGIN)
+const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
 
 const API_BASE = CONFIG.API_BASE
@@ -56,7 +55,7 @@ const App: React.FC = () => {
   useAsyncEffect(() => {
     const intervalId = setInterval(() => {
       void (async () => {
-        const hasMNC = await checkForMetanetclient(WALLET_ORIGIN)
+        const hasMNC = await checkForMetanetclient(CONFIG.WALLET_ORIGIN)
         setIsMncMissing(hasMNC === 0)
       })()
     }, 2000)

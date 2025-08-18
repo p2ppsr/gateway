@@ -5,7 +5,7 @@
  * from the official GitHub repository, including placeholders for mobile app links.
  */
 
-import { logWithTimestamp } from "./logging"
+import { logWithTimestamp } from './logging'
 
 /**
  * Represents the download URLs for the Metanet client across supported platforms.

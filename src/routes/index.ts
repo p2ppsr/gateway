@@ -9,14 +9,24 @@
  * - 04Aug2025_1038 BST (v1.0): Reverted to working state, initial aggregation of core routes.
  * - 11Aug2025_1045 BST (v1.1): Added initializeIds route to support pre-population of ids table on startup.
  */
-import createButton from './createButton';
-import buttonCode from './buttonCode';
-import acknowledgePayment from './acknowledgePayment';
-import getStatus from './getStatus';
-import invoice from './invoice';
-import listButtons from './listButtons';
-import listPayments from './listPayments';
-import pay from './pay';
-import initializeIds from './initializeIds'; // Import the new route
+import createButton from './createButton'
+import buttonCode from './buttonCode'
+import acknowledgePayment from './acknowledgePayment'
+import getStatus from './getStatus'
+import invoice from './invoice'
+import listButtons from './listButtons'
+import listPayments from './listPayments'
+import pay from './pay'
+import initializeIds from './initializeIds' // Import the new route
 
-export default [createButton, buttonCode, acknowledgePayment, getStatus, invoice, listButtons, listPayments, pay, initializeIds];
+export default [
+  createButton,
+  buttonCode,
+  acknowledgePayment,
+  getStatus,
+  invoice,
+  listButtons,
+  listPayments,
+  pay,
+  initializeIds
+]

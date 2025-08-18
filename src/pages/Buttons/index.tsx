@@ -23,8 +23,8 @@
  * not external connections or hardware constraints (MacBook Pro M4 Max, 128GB RAM, 2TB SSD), guiding optimization efforts
  * Version: v3.74 (Updated 13Aug2025_2230 BST to align with schema changes)
  */
-const F = 'pages/Buttons';
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+const F = 'pages/Buttons'
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import {
   CircularProgress,
   Container,
@@ -46,312 +46,334 @@ import {
   Card,
   TextField,
   Tooltip
-} from '@mui/material';
-import { FirstPage, LastPage, ReceiptLong } from '@mui/icons-material';
-import { WalletClient, AuthFetch } from '@bsv/sdk';
-import { useTheme } from '@mui/material/styles';
-import { Link } from 'react-router-dom';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import { formatId, formatTimestamp } from '../../utils/general';
-import { logWithTimestamp } from '../../utils/logging';
-import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants';
-const WALLET_ORIGIN = CONFIG.WALLET_ORIGIN;
-const wallet = new WalletClient('auto', WALLET_ORIGIN);
-const authFetch = new AuthFetch(wallet);
+} from '@mui/material'
+import { FirstPage, LastPage, ReceiptLong } from '@mui/icons-material'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { useTheme } from '@mui/material/styles'
+import { Link } from 'react-router-dom'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
+import { formatId, formatTimestamp } from '../../utils/general'
+import { logWithTimestamp } from '../../utils/logging'
+import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
+
+const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
+const authFetch = new AuthFetch(wallet)
 
 /**
- * Represents a payment button created by the user
+ * Represents a payment button created by the user.
+ * Mirrors the `payment_buttons` table structure.
  */
 interface Button {
-  id: string | null; // Unique identifier for the button (optional, may be deprecated)
-  button_id: string | null; // Pre-created ID for the button (now primary key)
-  amount: number; // Configured payment amount, non-nullable with default 0
-  description: string; // Custom description for the button, non-nullable with default "No description"
-  html_code: string; // Custom HTML code for the button, non-nullable with default "<div>Pay Now</div>"
-  variable_amount: boolean; // Whether the amount is variable, non-nullable with default false
-  multi_use: boolean; // Whether the button can be used multiple times, non-nullable with default false
-  used: boolean; // Whether the button has been used, non-nullable with default false
-  total_paid: number | null; // Total amount paid through the button, nullable
-  timestamp: string | null; // Creation timestamp
-  created_at: string | null; // Alternative creation timestamp
-  payment_id: string | null; // Associated payment ID
+  button_id: string // Pre-created ID for the button (primary key, non-nullable)
+  amount: number // Configured payment amount, default 0
+  description: string // Custom description for the button, default "No description"
+  html_code: string // Custom HTML code for the button, default "<div>Pay Now</div>"
+  variable_amount: boolean // Whether the amount is variable, default false
+  multi_use: boolean // Whether the button can be used multiple times, default false
+  used: boolean // Whether the button has been used, default false
+  total_paid: number | null // Total amount paid through the button, nullable
+  created_at: string // Timestamp when the button was created, non-nullable
+  updated_at: string // Timestamp when the button was last updated, non-nullable
+  payment_id: string | null // Associated payment ID, nullable
 }
 
 interface ButtonResponse {
-  status: string;
-  message: string;
-  title?: string; // Optional title from API
+  status: string
+  message: string
+  title?: string // Optional title from API
   data: {
-    id?: string | null;
-    buttonId?: string | null;
-    amount?: string | number | null;
-    description?: string | null;
-    htmlCode?: string | null;
-    variable?: number | null;
-    multiUse?: number | null;
-    used?: number | null;
-    totalPaid?: string | number | null;
-    timestamp?: string | null;
-    created_at?: string | null;
-    paymentId?: string | null;
-  }[];
-  total?: number;
+  buttonId: string;            // PK, non-nullable
+  merchantId: string;          // FK, non-nullable
+  paymentId: string | null;    // nullable FK
+  amount: number;               // NOT NULL, default 0
+  description: string;          // NOT NULL
+  htmlCode: string;             // NOT NULL
+  variableAmount: boolean;     // NOT NULL
+  multiUse: boolean;           // NOT NULL
+  used: boolean;                 // NOT NULL
+  totalPaid: number | null;    // nullable until paid
+  createdAt: string;           // timestamp, NOT NULL
+  updatedAt: string;           // timestamp, NOT NULL
+  //* data: {
+  //   id?: string | null
+  //   buttonId?: string | null
+  //   amount?: number | null
+  //   //*amount?: string | number | null
+  //   description?: string | null
+  //   htmlCode?: string | null
+  //   variable?: number | null
+  //   multiUse?: number | null
+  //   used?: number | null
+  //   totalPaid?: number | null
+  //   //*totalPaid?: string | number | null
+  //   timestamp?: string | null
+  //   created_at?: string | null
+  //   paymentId?: string | null
+  }[]
+  total?: number
 }
 
 interface SortConfig {
-  key: keyof Button | null;
-  direction: 'asc' | 'desc';
+  key: keyof Button | null
+  direction: 'asc' | 'desc'
 }
 
 const PaymentButtonsList = () => {
-  const [buttons, setButtons] = useState<Button[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [customRowsPerPage, setCustomRowsPerPage] = useState('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all');
-  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' });
-  const [customOptions, setCustomOptions] = useState<number[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [title, setTitle] = useState<string>('Payment Buttons'); // Default title
-  const theme = useTheme();
-  const fetchTimeout = useRef<number | null>(null);
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
-  const [clickedValue, setClickedValue] = useState<string | null>(null);
-  const [isClicked, setIsClicked] = useState(false); // New state to disable hover after click
-  const [exitDirection, setExitDirection] = useState<string | null>(null); // Track exit direction
-  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null); // Track last clicked column
-  const tableRef = useRef<HTMLDivElement>(null);
+  const [buttons, setButtons] = useState<Button[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(5)
+  const [customRowsPerPage, setCustomRowsPerPage] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
+  const [customOptions, setCustomOptions] = useState<number[]>([])
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [title, setTitle] = useState<string>('Payment Buttons') // Default title
+  const theme = useTheme()
+  const fetchTimeout = useRef<number | null>(null)
+  const [hoveredValue, setHoveredValue] = useState<string | null>(null)
+  const [clickedValue, setClickedValue] = useState<string | null>(null)
+  const [isClicked, setIsClicked] = useState(false) // New state to disable hover after click
+  const [exitDirection, setExitDirection] = useState<string | null>(null) // Track exit direction
+  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null) // Track last clicked column
+  const tableRef = useRef<HTMLDivElement>(null)
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     'Button Id': null,
     'Payment Id': null,
     'HTML Code': null
-  });
+  })
 
   const handleMouseEnter = (fullValue: string, columnName: string, rowIndex: number) => {
-    logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex);
+    logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex)
     if (!isClicked) {
-      setHoveredValue(fullValue);
+      setHoveredValue(fullValue)
       const columnCell = document.querySelector(
         `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Button Id', 'Payment Id', 'HTML Code'].indexOf(columnName) + 2})`
-      ) as HTMLTableCellElement | null;
+      ) as HTMLTableCellElement | null
       if (columnCell) {
-        columnRefs.current[columnName] = columnCell;
+        columnRefs.current[columnName] = columnCell
       }
     }
-  };
+  }
 
   const handleMouseLeave = (e: React.MouseEvent) => {
-    logWithTimestamp(F, 'Mouse leave');
+    logWithTimestamp(F, 'Mouse leave')
     if (tableRef.current && hoveredValue && !isClicked) {
-      const tableRect = tableRef.current.getBoundingClientRect();
-      const mouseY = e.clientY;
-      const mouseX = e.clientX;
+      const tableRect = tableRef.current.getBoundingClientRect()
+      const mouseY = e.clientY
+      const mouseX = e.clientX
       const hoveredColumn = Object.keys(columnRefs.current).find(col =>
         columnRefs.current[col]?.contains(e.target as Node)
-      );
+      )
       if (hoveredColumn) {
-        const colRect = columnRefs.current[hoveredColumn]!.getBoundingClientRect();
-        const isBottomExit = mouseY > colRect.bottom && mouseX >= colRect.left && mouseX <= colRect.right;
-        if (isBottomExit && (hoveredColumn === 'Button Id' || hoveredColumn === 'Payment Id' || hoveredColumn === 'HTML Code')) {
-          setExitDirection('bottom');
+        const colRect = columnRefs.current[hoveredColumn]!.getBoundingClientRect()
+        const isBottomExit = mouseY > colRect.bottom && mouseX >= colRect.left && mouseX <= colRect.right
+        if (
+          isBottomExit &&
+          (hoveredColumn === 'Button Id' || hoveredColumn === 'Payment Id' || hoveredColumn === 'HTML Code')
+        ) {
+          setExitDirection('bottom')
         } else {
-          setHoveredValue(null);
-          setExitDirection(null);
+          setHoveredValue(null)
+          setExitDirection(null)
         }
       } else {
-        setHoveredValue(null);
-        setExitDirection(null);
+        setHoveredValue(null)
+        setExitDirection(null)
       }
     }
-  };
+  }
 
   const handleClick = (fullValue: string, columnName: string) => {
-    logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName);
-    setHoveredValue(null); // Clear hover state
-    setIsClicked(true); // Disable further hover events
-    setClickedValue(fullValue);
-    setLastClickedColumn(columnName); // Track the clicked column
-    navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
-  };
+    logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName)
+    setHoveredValue(null) // Clear hover state
+    setIsClicked(true) // Disable further hover events
+    setClickedValue(fullValue)
+    setLastClickedColumn(columnName) // Track the clicked column
+    navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+  }
 
   const handleReset = () => {
-    logWithTimestamp(F, 'Reset click');
-    setClickedValue(null);
-    setIsClicked(false); // Re-enable hover events
-    setHoveredValue(null); // Clear hover on reset
-    setExitDirection(null);
-    setLastClickedColumn(null); // Clear last clicked column
-  };
+    logWithTimestamp(F, 'Reset click')
+    setClickedValue(null)
+    setIsClicked(false) // Re-enable hover events
+    setHoveredValue(null) // Clear hover on reset
+    setExitDirection(null)
+    setLastClickedColumn(null) // Clear last clicked column
+  }
 
   const fetchButtons = async () => {
-    setLoading(true);
-    setButtons([]); // Clear state to force refresh
+    setLoading(true)
+    setButtons([]) // Clear state to force refresh
     try {
-      const url = `${location.protocol}//${location.host}/api/listButtons?limit=${MAX_PAYMENT_SATS}`;
-      logWithTimestamp(F, 'Fetching total buttons with URL:', url);
-      const response = await authFetch.fetch(url, { method: 'GET' });
-      const data: ButtonResponse = await response.json();
-      logWithTimestamp(F, 'API response:', JSON.stringify(data)); // Debug API response
-      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total buttons'}`);
+      const url = `${location.protocol}//${location.host}/api/listButtons?limit=${500}`
+      logWithTimestamp(F, 'Fetching total buttons with URL:', url)
+      const response = await authFetch.fetch(url, { method: 'GET' })
+      const data: ButtonResponse = await response.json()
+      logWithTimestamp(F, 'API response:', JSON.stringify(data)) // Debug API response
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total buttons'}`)
       // Map API response to Button interface
-      const mappedButtons = data.data.map(button => {
-        const isVariable = button.variable === 1 || false;
-        return {
-          id: button.id || null,
-          button_id: button.buttonId || null,
-          amount: isVariable ? 0 : (typeof button.amount === 'string' ? parseFloat(button.amount) : button.amount || 0),
-          description: button.description || 'No description',
-          html_code: button.htmlCode || '<div>Pay Now</div>',
-          variable_amount: isVariable,
-          multi_use: button.multiUse === 1 || false,
-          used: button.used === 1 || false,
-          total_paid: typeof button.totalPaid === 'string' ? parseFloat(button.totalPaid) : button.totalPaid || null,
-          timestamp: button.timestamp || null,
-          created_at: button.created_at || null,
-          payment_id: button.paymentId || null,
-        };
-      });
-      logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons));
-      setTotalRecords(data.total || mappedButtons.length);
-      setButtons(mappedButtons);
-      setTitle(data.title || 'Payment Buttons');
-      logWithTimestamp(F, 'Initial buttons length:', mappedButtons.length);
+const mappedButtons: Button[] = data.data.map((button) => {
+  const isVariable = !!button.variableAmount
+  return {
+    button_id: button.buttonId,
+    amount: isVariable ? 0 : (button.amount ?? 0),
+    description: button.description ?? 'No description',
+    html_code: button.htmlCode ?? '<div>Pay Now</div>',
+    variable_amount: isVariable,
+    multi_use: !!button.multiUse,
+    used: !!button.used,
+    total_paid: button.totalPaid ?? null,
+    created_at: button.createdAt,           // required
+    updated_at: button.updatedAt,           // required
+    payment_id: button.paymentId ?? null,
+  }
+})
+      logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons))
+      setTotalRecords(data.total || mappedButtons.length)
+      setButtons(mappedButtons)
+      setTitle(data.title || 'Payment Buttons')
+      logWithTimestamp(F, 'Initial buttons length:', mappedButtons.length)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '❌ Unknown error';
-      logWithTimestamp(F, '❌ Error fetching total buttons:', message);
-      setError(message);
+      const message = err instanceof Error ? err.message : '❌ Unknown error'
+      logWithTimestamp(F, '❌ Error fetching total buttons:', message)
+      setError(message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchButtons(); // Initial fetch on mount
+    fetchButtons() // Initial fetch on mount
     return () => {
-      if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
-    };
-  }, []); // Empty dependency array ensures this runs only on mount
+      if (fetchTimeout.current) clearTimeout(fetchTimeout.current)
+    }
+  }, []) // Empty dependency array ensures this runs only on mount
 
   useEffect(() => {
-    setPage(0);
-  }, [usedFilter]);
+    setPage(0)
+  }, [usedFilter])
 
   const requestSort = (key: keyof Button) => {
-    let direction: 'asc' | 'desc' = 'asc';
+    let direction: 'asc' | 'desc' = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+      direction = 'desc'
     }
-    setSortConfig({ key, direction });
-  };
+    setSortConfig({ key, direction })
+  }
 
   const handleRowsPerPageChange = (event: React.ChangeEvent<{ value: unknown }>) => {
-    const value = event.target.value;
+    const value = event.target.value
     logWithTimestamp(
       F,
       'Rows per page change:',
       value,
       'Current options:',
       rowsPerPageOptions.map(opt => opt.value)
-    );
+    )
     if (typeof value === 'object' && value !== null && 'value' in value && value.value === 0) {
-      setShowCustomInput(true);
+      setShowCustomInput(true)
     } else {
-      const numValue = typeof value === 'number' ? value : (value as any)?.value || 5;
-      const isValidOption = rowsPerPageOptions.some(option => option.value === numValue);
+      const numValue = typeof value === 'number' ? value : (value as any)?.value || 5
+      const isValidOption = rowsPerPageOptions.some(option => option.value === numValue)
       if (isValidOption) {
-        setRowsPerPage(numValue);
-        setCustomRowsPerPage('');
-        setShowCustomInput(false);
-        setPage(0);
+        setRowsPerPage(numValue)
+        setCustomRowsPerPage('')
+        setShowCustomInput(false)
+        setPage(0)
       } else {
-        setRowsPerPage(5);
-        setPage(0);
+        setRowsPerPage(5)
+        setPage(0)
       }
     }
-  };
+  }
 
   const handleCustomRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value.replace(/[^0-9]/g, '');
-    setCustomRowsPerPage(value);
-  };
+    const value = event.target.value.replace(/[^0-9]/g, '')
+    setCustomRowsPerPage(value)
+  }
 
   const handleCustomInputComplete = (
     event: React.KeyboardEvent<HTMLDivElement> | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return;
-    const numValue = parseInt(customRowsPerPage, 10);
-    logWithTimestamp(F, 'Custom rows on complete:', numValue);
+    if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return
+    const numValue = parseInt(customRowsPerPage, 10)
+    logWithTimestamp(F, 'Custom rows on complete:', numValue)
     if (isNaN(numValue) || numValue <= 0 || numValue > 100) {
-      setRowsPerPage(5);
+      setRowsPerPage(5)
     } else {
-      setRowsPerPage(numValue);
+      setRowsPerPage(numValue)
       setCustomOptions(prev => {
         if (!prev.includes(numValue) && ![5, 10, 25].includes(numValue)) {
-          return [...prev, numValue].sort((a, b) => a - b).slice(-3);
+          return [...prev, numValue].sort((a, b) => a - b).slice(-3)
         }
-        return prev;
-      });
+        return prev
+      })
     }
-    setCustomRowsPerPage('');
-    setShowCustomInput(false);
-    setPage(0);
-  };
+    setCustomRowsPerPage('')
+    setShowCustomInput(false)
+    setPage(0)
+  }
 
   const baseOptions = [
     { value: 5, label: '5' },
     { value: 10, label: '10' },
     { value: 25, label: '25' }
-  ];
+  ]
   const rowsPerPageOptions = [
     { value: 0, label: 'set 1..500' },
     ...baseOptions,
     ...customOptions.map(value => ({ value, label: value.toString() }))
-  ];
+  ]
 
   const filteredButtons =
     usedFilter === 'all'
       ? buttons
       : buttons.filter(
-          button => (usedFilter === 'used' && button.used === true) || (usedFilter === 'unused' && button.used === false)
-        );
+          button =>
+            (usedFilter === 'used' && button.used === true) || (usedFilter === 'unused' && button.used === false)
+        )
   const sortedButtons = sortConfig.key
     ? [...filteredButtons].sort((a, b) => {
-        if (!sortConfig.key) return 0; // Default to no change if key is null
-        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key];
-        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key];
+        if (!sortConfig.key) return 0 // Default to no change if key is null
+        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key]
+        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key]
         // Handle null/undefined values by placing them at the end
-        if (aValue === null || aValue === undefined) return 1;
-        if (bValue === null || bValue === undefined) return -1;
+        if (aValue === null || aValue === undefined) return 1
+        if (bValue === null || bValue === undefined) return -1
         // Convert to comparable types
         if (sortConfig.key === 'amount' || sortConfig.key === 'total_paid') {
-          aValue = (aValue as number) || 0;
-          bValue = (bValue as number) || 0;
+          aValue = (aValue as number) || 0
+          bValue = (bValue as number) || 0
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
-        } else if (sortConfig.key === 'variable_amount' || sortConfig.key === 'multi_use' || sortConfig.key === 'used') {
-          aValue = (aValue as boolean) ? 1 : 0;
-          bValue = (bValue as boolean) ? 1 : 0;
+            : (bValue as number) - (aValue as number)
+        } else if (
+          sortConfig.key === 'variable_amount' ||
+          sortConfig.key === 'multi_use' ||
+          sortConfig.key === 'used'
+        ) {
+          aValue = (aValue as boolean) ? 1 : 0
+          bValue = (bValue as boolean) ? 1 : 0
           return sortConfig.direction === 'asc'
             ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
-        } else if (sortConfig.key === 'timestamp' || sortConfig.key === 'created_at') {
-          aValue = new Date(aValue as string || '');
-          bValue = new Date(bValue as string || '');
+            : (bValue as number) - (aValue as number)
+        } else if (sortConfig.key === 'updated_at' || sortConfig.key === 'created_at') {
+          aValue = new Date((aValue as string) || '')
+          bValue = new Date((bValue as string) || '')
           return sortConfig.direction === 'asc'
             ? (aValue as Date).getTime() - (bValue as Date).getTime()
-            : (bValue as Date).getTime() - (aValue as Date).getTime();
+            : (bValue as Date).getTime() - (aValue as Date).getTime()
         } else {
-          aValue = (aValue as string) || '';
-          bValue = (bValue as string) || '';
-          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
+          aValue = (aValue as string) || ''
+          bValue = (bValue as string) || ''
+          return sortConfig.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
         }
       })
-    : filteredButtons;
-  const paginatedButtons = sortedButtons.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+    : filteredButtons
+  const paginatedButtons = sortedButtons.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
   logWithTimestamp(
     F,
     'Paginated buttons length:',
@@ -366,33 +388,39 @@ const PaymentButtonsList = () => {
     page,
     'Offset:',
     page * rowsPerPage
-  );
+  )
 
   useLayoutEffect(() => {
     paginatedButtons.forEach((button, index) => {
-      const buttonIdCell = document.querySelector(`tr:nth-child(${index + 1}) td:nth-child(2)`) as HTMLTableCellElement | null;
-      const paymentIdCell = document.querySelector(`tr:nth-child(${index + 1}) td:nth-child(3)`) as HTMLTableCellElement | null;
-      const htmlCodeCell = document.querySelector(`tr:nth-child(${index + 1}) td:nth-child(10)`) as HTMLTableCellElement | null;
+      const buttonIdCell = document.querySelector(
+        `tr:nth-child(${index + 1}) td:nth-child(2)`
+      ) as HTMLTableCellElement | null
+      const paymentIdCell = document.querySelector(
+        `tr:nth-child(${index + 1}) td:nth-child(3)`
+      ) as HTMLTableCellElement | null
+      const htmlCodeCell = document.querySelector(
+        `tr:nth-child(${index + 1}) td:nth-child(10)`
+      ) as HTMLTableCellElement | null
       if (buttonIdCell) {
-        columnRefs.current['Button Id'] = buttonIdCell;
-        logWithTimestamp(F, `Button Id ref assigned for index: ${index}`);
+        columnRefs.current['Button Id'] = buttonIdCell
+        logWithTimestamp(F, `Button Id ref assigned for index: ${index}`)
       } else {
-        logWithTimestamp(F, 'Button Id ref is null for index:', index);
+        logWithTimestamp(F, 'Button Id ref is null for index:', index)
       }
       if (paymentIdCell) {
-        columnRefs.current['Payment Id'] = paymentIdCell;
-        logWithTimestamp(F, `Payment Id ref assigned for index: ${index}`);
+        columnRefs.current['Payment Id'] = paymentIdCell
+        logWithTimestamp(F, `Payment Id ref assigned for index: ${index}`)
       } else {
-        logWithTimestamp(F, 'Payment Id ref is null for index:', index);
+        logWithTimestamp(F, 'Payment Id ref is null for index:', index)
       }
       if (htmlCodeCell) {
-        columnRefs.current['HTML Code'] = htmlCodeCell;
-        logWithTimestamp(F, `HTML Code ref assigned for index: ${index}`);
+        columnRefs.current['HTML Code'] = htmlCodeCell
+        logWithTimestamp(F, `HTML Code ref assigned for index: ${index}`)
       } else {
-        logWithTimestamp(F, 'HTML Code ref is null for index:', index);
+        logWithTimestamp(F, 'HTML Code ref is null for index:', index)
       }
-    });
-  }, [paginatedButtons]);
+    })
+  }, [paginatedButtons])
 
   if (loading) {
     return (
@@ -407,7 +435,7 @@ const PaymentButtonsList = () => {
       >
         <CircularProgress />
       </Box>
-    );
+    )
   }
   if (error !== '') {
     return (
@@ -422,7 +450,7 @@ const PaymentButtonsList = () => {
       >
         <Typography color="error">❌ Error: {error}</Typography>
       </Box>
-    );
+    )
   }
   return (
     <Container>
@@ -480,8 +508,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('created_at');
+                        e.preventDefault()
+                        requestSort('created_at')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -493,8 +521,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('button_id');
+                        e.preventDefault()
+                        requestSort('button_id')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -506,8 +534,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('payment_id');
+                        e.preventDefault()
+                        requestSort('payment_id')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -519,8 +547,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('amount');
+                        e.preventDefault()
+                        requestSort('amount')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -535,8 +563,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('variable_amount');
+                        e.preventDefault()
+                        requestSort('variable_amount')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -548,8 +576,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('multi_use');
+                        e.preventDefault()
+                        requestSort('multi_use')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -561,8 +589,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('used');
+                        e.preventDefault()
+                        requestSort('used')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -574,8 +602,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('total_paid');
+                        e.preventDefault()
+                        requestSort('total_paid')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -587,8 +615,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('description');
+                        e.preventDefault()
+                        requestSort('description')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -600,8 +628,8 @@ const PaymentButtonsList = () => {
                       component="a"
                       href="#"
                       onClick={e => {
-                        e.preventDefault();
-                        requestSort('html_code');
+                        e.preventDefault()
+                        requestSort('html_code')
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
@@ -612,12 +640,15 @@ const PaymentButtonsList = () => {
               </TableHead>
               <TableBody>
                 {paginatedButtons.map((button, index) => {
-                  const fullButtonId = button.button_id || '';
-                  const fullPaymentId = button.payment_id || '';
-                  const fullHtmlCode = button.html_code || '<div>Pay Now</div>'; // Use default if null
+                  const fullButtonId = button.button_id || ''
+                  const fullPaymentId = button.payment_id || ''
+                  const fullHtmlCode = button.html_code || '<div>Pay Now</div>' // Use default if null
+                  //console.log('button.total_paid=', button.total_paid)
                   return (
                     <TableRow key={button.button_id || index}>
-                      <TableCell>{formatTimestamp(button.created_at || button.timestamp || new Date().toISOString())}</TableCell>
+                      <TableCell>
+                        {formatTimestamp(button.created_at || button.updated_at || new Date().toISOString())}
+                      </TableCell>
                       <TableCell
                         ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Button Id'] = el)}
                         onMouseEnter={() => handleMouseEnter(fullButtonId, 'Button Id', index + 1)}
@@ -651,7 +682,7 @@ const PaymentButtonsList = () => {
                           : '<div>Pay Now</div>'}
                       </TableCell>
                     </TableRow>
-                  );
+                  )
                 })}
               </TableBody>
             </Table>
@@ -678,7 +709,7 @@ const PaymentButtonsList = () => {
               count={filteredButtons.length}
               page={page}
               onPageChange={(e, newPage) => {
-                setPage(newPage);
+                setPage(newPage)
                 logWithTimestamp(
                   F,
                   'Page changed to:',
@@ -687,12 +718,12 @@ const PaymentButtonsList = () => {
                   paginatedButtons,
                   'filteredButtons.length:',
                   filteredButtons.length
-                );
-                setHoveredValue(null);
-                setClickedValue(null);
-                setIsClicked(false);
-                setExitDirection(null);
-                setLastClickedColumn(null);
+                )
+                setHoveredValue(null)
+                setClickedValue(null)
+                setIsClicked(false)
+                setExitDirection(null)
+                setLastClickedColumn(null)
               }}
               rowsPerPage={rowsPerPage}
               onRowsPerPageChange={handleRowsPerPageChange}
@@ -752,11 +783,9 @@ const PaymentButtonsList = () => {
                     cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
                   }}
                 >
-                  {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '') ? (
-                    clickedValue
-                  ) : (
-                    hoveredValue || clickedValue
-                  )}
+                  {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '')
+                    ? clickedValue
+                    : hoveredValue || clickedValue}
                 </Typography>
               </Tooltip>
               {hoveredValue && (
@@ -775,9 +804,9 @@ const PaymentButtonsList = () => {
                     onClick={() => {
                       navigator.clipboard
                         .writeText(clickedValue)
-                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err));
-                      setClickedValue(null);
-                      setIsClicked(false);
+                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+                      setClickedValue(null)
+                      setIsClicked(false)
                     }}
                   >
                     <ContentCopyIcon />
@@ -805,6 +834,6 @@ const PaymentButtonsList = () => {
         </>
       )}
     </Container>
-  );
-};
-export default PaymentButtonsList;
+  )
+}
+export default PaymentButtonsList

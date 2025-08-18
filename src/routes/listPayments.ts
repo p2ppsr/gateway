@@ -26,43 +26,43 @@
  * - 14Aug2025_0130 BST (v2.4): Fixed F scoping issue to resolve TS2304 errors in logWithTimestamp calls.
  * - 14Aug2025_0145 BST (v2.5): Fixed db runtime initialization to resolve "db is not a function" error.
  */
-import knex, { Knex } from 'knex';
-import knexConfig from '../../knexfile';
-import { Request, Response } from 'express';
-import { logWithTimestamp } from '../utils/logging';
-const db: Knex = knex(knexConfig);
+import knex, { Knex } from 'knex'
+import knexConfig from '../../knexfile'
+import { Request, Response } from 'express'
+import { logWithTimestamp } from '../utils/logging'
+const db: Knex = knex(knexConfig)
 
 // Extend Request type to include auth property
 interface AuthRequest extends Request {
   auth: {
-    identityKey: string;
-  };
+    identityKey: string
+  }
 }
 
 interface Payment {
-  payment_id: string;
-  txid: string | null;
-  payer_id: string | null;
-  amount: number;
-  completed: boolean;
-  is_new: boolean;
-  created_at: string | null;
-  button_id: string;
-  description: string;
+  payment_id: string
+  txid: string | null
+  payer_id: string | null
+  amount: number
+  completed: boolean
+  is_new: boolean
+  created_at: string | null
+  button_id: string
+  description: string
 }
 
 interface PaymentButton {
-  button_id: string;
-  payment_id: string | null;
-  amount: number;
-  variable_amount: boolean;
-  multi_use: boolean;
-  used: boolean;
-  total_paid: number | null;
-  description: string;
-  html_code: string;
-  created_at: string | null;
-  updated_at: string | null;
+  button_id: string
+  payment_id: string | null
+  amount: number
+  variable_amount: boolean
+  multi_use: boolean
+  used: boolean
+  total_paid: number | null
+  description: string
+  html_code: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 export default {
@@ -70,19 +70,21 @@ export default {
   path: '/listPayments',
   F: 'routes/listPayments', // File identifier for logging
   func: async (req: AuthRequest, res: Response): Promise<void> => {
-    logWithTimestamp('routes/listPayments', '🔍 [listPayments] Received request with query:', req.query);
-    const { limit = '10', offset = '0' } = req.query; // Default as strings to handle query params
-    let limitNum = parseInt(limit as string, 10);
-    let offsetNum = parseInt(offset as string, 10);
+    logWithTimestamp('routes/listPayments', '🔍 [listPayments] Received request with query:', req.query)
+    const { limit = '10', offset = '0' } = req.query // Default as strings to handle query params
+    let limitNum = parseInt(limit as string, 10)
+    let offsetNum = parseInt(offset as string, 10)
 
     // Validate pagination parameters
     if (isNaN(limitNum) || limitNum <= 0 || limitNum > 1000) {
-      logWithTimestamp('routes/listPayments', '⚠️ [listPayments] Invalid limit parameter, using default 10:', { limit });
-      limitNum = 10;
+      logWithTimestamp('routes/listPayments', '⚠️ [listPayments] Invalid limit parameter, using default 10:', { limit })
+      limitNum = 10
     }
     if (isNaN(offsetNum) || offsetNum < 0) {
-      logWithTimestamp('routes/listPayments', '⚠️ [listPayments] Invalid offset parameter, using default 0:', { offset });
-      offsetNum = 0;
+      logWithTimestamp('routes/listPayments', '⚠️ [listPayments] Invalid offset parameter, using default 0:', {
+        offset
+      })
+      offsetNum = 0
     }
 
     try {
@@ -102,42 +104,53 @@ export default {
         .where('payments.merchant_id', req.auth.identityKey)
         .where('payments.completed', 1) // Filter for completed payments
         .limit(limitNum)
-        .offset(offsetNum);
+        .offset(offsetNum)
 
-      logWithTimestamp('routes/listPayments', '🔍 [listPayments] Executing SQL query:', { sql: sqlQuery.toString() });
-      const payments: Payment[] = await sqlQuery;
-      logWithTimestamp('routes/listPayments', '🔍 [listPayments] Query result:', { payments, limit: limitNum, offset: offsetNum });
+      logWithTimestamp('routes/listPayments', '🔍 [listPayments] Executing SQL query:', { sql: sqlQuery.toString() })
+      const payments: Payment[] = await sqlQuery
+      logWithTimestamp('routes/listPayments', '🔍 [listPayments] Query result:', {
+        payments,
+        limit: limitNum,
+        offset: offsetNum
+      })
 
       if (payments.length === 0) {
-        logWithTimestamp('routes/listPayments', '⚠️ [listPayments] No payments found for merchant:', { merchantId: req.auth.identityKey });
+        logWithTimestamp('routes/listPayments', '⚠️ [listPayments] No payments found for merchant:', {
+          merchantId: req.auth.identityKey
+        })
       }
 
       const total = await db('payments')
         .where('merchant_id', req.auth.identityKey)
         .where('completed', 1)
         .count('* as count')
-        .first();
-      const totalCount = total ? parseInt(total.count as string, 10) : 0;
+        .first()
+      const totalCount = total ? parseInt(total.count as string, 10) : 0
 
-      logWithTimestamp('routes/listPayments', '✅ [listPayments] Payments fetched successfully:', { total: totalCount, returned: payments.length, limit: limitNum, offset: offsetNum });
+      logWithTimestamp('routes/listPayments', '✅ [listPayments] Payments fetched successfully:', {
+        total: totalCount,
+        returned: payments.length,
+        limit: limitNum,
+        offset: offsetNum
+      })
       res.status(200).json({
         status: 'success',
         message: 'Payments fetched successfully',
         data: payments,
-        total: totalCount,
-      });
+        total: totalCount
+      })
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '❌ Unknown error';
+      const message = error instanceof Error ? error.message : '❌ Unknown error'
       logWithTimestamp('routes/listPayments', '❌ [listPayments] Error fetching payments:', {
         message,
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         query: req.query,
-        sql: (error as any).sql || 'No SQL available',
-      });
+        sql: (error as any).sql || 'No SQL available'
+      })
       res.status(500).json({
         status: 'error',
-        message: `❌ ${message}`,
-      });
+        message: `❌ ${message}`
+      })
     }
-  },
-};
+  }
+}

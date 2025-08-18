@@ -26,23 +26,23 @@
  * - 13Aug2025_1740 BST (v2.36): Fixed TypeScript type mismatch (TS2367) in variableAmount and multiUse.
  * - 13Aug2025_2315 BST (v2.37): Updated to align with schema changes (removed id, currency, accepts; renamed customCSS to html_code; adjusted nullability).
  */
-const F = 'routes/createButton';
-import knex, { Knex } from 'knex';
-import knexConfig from '../../knexfile';
-import type { Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
-import { MAX_PAYMENT_SATS } from '../utils/constants';
-import { logWithTimestamp } from '../utils/logging';
-const db: Knex = knex(knexConfig);
+const F = 'routes/createButton'
+import knex, { Knex } from 'knex'
+import knexConfig from '../../knexfile'
+import type { Request, Response } from 'express'
+import { body, validationResult } from 'express-validator'
+import { MAX_PAYMENT_SATS } from '../utils/constants'
+import { logWithTimestamp } from '../utils/logging'
+const db: Knex = knex(knexConfig)
 
 interface RequestBody {
-  amount?: number;
-  variableAmount: boolean; // Explicitly typed as boolean after validation
-  multiUse: boolean; // Explicitly typed as boolean after validation
-  description: string;
-  htmlCode?: string; // Renamed from customCSS
-  paymentId: string; // Client-provided payment ID, pre-initialized
-  buttonId: string; // Client-provided button ID, pre-initialized
+  amount?: number
+  variableAmount: boolean // Explicitly typed as boolean after validation
+  multiUse: boolean // Explicitly typed as boolean after validation
+  description: string
+  htmlCode?: string // Renamed from customCSS
+  paymentId: string // Client-provided payment ID, pre-initialized
+  buttonId: string // Client-provided button ID, pre-initialized
 }
 
 export default {
@@ -59,11 +59,11 @@ export default {
     body('amount')
       .optional()
       .custom((value, { req }) => {
-        const { variableAmount = false } = req.body as Partial<RequestBody>; // Type assertion
+        const { variableAmount = false } = req.body as Partial<RequestBody> // Type assertion
         if (!variableAmount && (!Number.isInteger(value) || value < 1 || value > MAX_PAYMENT_SATS)) {
-          throw new Error(`❌ Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons`);
+          throw new Error(`❌ Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons`)
         }
-        return true;
+        return true
       })
       .withMessage(
         `Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons, or 0 for variable`
@@ -84,16 +84,16 @@ export default {
       .notEmpty()
       .withMessage('buttonId must be a non-empty string')
       .isLength({ min: 12, max: 24 })
-      .withMessage('buttonId must be between 12 and 24 characters'),
+      .withMessage('buttonId must be between 12 and 24 characters')
   ],
   func: async (req: Request, res: Response): Promise<void> => {
-    const errors = validationResult(req);
+    const errors = validationResult(req)
     if (!errors.isEmpty()) {
-      logWithTimestamp(F, '❌ [createButton] Validation errors:', errors.array());
-      res.status(400).json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() });
-      return;
+      logWithTimestamp(F, '❌ [createButton] Validation errors:', errors.array())
+      res.status(400).json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() })
+      return
     }
-    const merchantId = (req as any).auth?.identityKey || 'unknown'; // Default to 'unknown' if not authenticated
+    const merchantId = (req as any).auth?.identityKey || 'unknown' // Default to 'unknown' if not authenticated
     const {
       amount = 0,
       variableAmount = false,
@@ -101,8 +101,8 @@ export default {
       description,
       htmlCode = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
       paymentId,
-      buttonId,
-    }: RequestBody = req.body as RequestBody; // Type assertion to match validated structure
+      buttonId
+    }: RequestBody = req.body as RequestBody // Type assertion to match validated structure
     logWithTimestamp(F, '🔍 [createButton] [Step 1] Create button request (sats):', {
       merchantId,
       amount,
@@ -111,41 +111,48 @@ export default {
       description,
       htmlCode,
       paymentId,
-      buttonId,
-    });
+      buttonId
+    })
     try {
       // Verify or initialize IDs in ids table
       const initializeId = async (id: string, type: 'payment' | 'button') => {
-        const exists = await db('ids').where({ id, type }).first();
+        const exists = await db('ids').where({ id, type }).first()
         if (!exists) {
-          await db('ids').insert({ id, merchant_id: merchantId, timestamp: db.fn.now(), type });
-          logWithTimestamp(F, `✅ [createButton] Initialized ${type} ID:`, { id, merchantId });
+          await db('ids').insert({ id, merchant_id: merchantId, timestamp: db.fn.now(), type })
+          logWithTimestamp(F, `✅ [createButton] Initialized ${type} ID:`, { id, merchantId })
         }
-        return true;
-      };
-      await initializeId(paymentId, 'payment');
-      await initializeId(buttonId, 'button');
+        return true
+      }
+      await initializeId(paymentId, 'payment')
+      await initializeId(buttonId, 'button')
       // Check for existing payment button to avoid duplicates
-      logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId, buttonId });
+      logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId, buttonId })
       const existingButton = await db('payment_buttons')
         .where({ button_id: buttonId })
         .orWhere({ payment_id: paymentId })
-        .first();
+        .first()
       if (existingButton) {
-        logWithTimestamp(F, '✅ [createButton] Button already exists, skipping insert:', { paymentId, buttonId, existingButton });
+        logWithTimestamp(F, '✅ [createButton] Button already exists, skipping insert:', {
+          paymentId,
+          buttonId,
+          existingButton
+        })
         res.status(200).json({
           status: 'success',
           message: 'Button already exists',
           paymentId,
-          buttonId,
-        });
-        return;
+          buttonId
+        })
+        return
       }
-      logWithTimestamp(F, '🔍 [createButton] [Step 4] No duplicate found, proceeding with insert:', { paymentId, buttonId });
-      const amountInSats = variableAmount ? 0 : amount;
-      logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to sats:', amountInSats);
+      logWithTimestamp(F, '🔍 [createButton] [Step 4] No duplicate found, proceeding with insert:', {
+        paymentId,
+        buttonId
+      })
+      const amountInSats = variableAmount ? 0 : amount
+      logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to sats:', amountInSats)
       // Insert into payment_buttons
-      await db.transaction(async (trx) => {
+      await db.transaction(async trx => {
         await db('payment_buttons')
           .transacting(trx)
           .insert({
@@ -158,24 +165,24 @@ export default {
             variable_amount: variableAmount,
             multi_use: multiUse,
             used: false,
-            total_paid: null,
-          });
-        logWithTimestamp(F, '✅ [createButton] Inserted payment button:', { paymentId, buttonId });
+            total_paid: null
+          })
+        logWithTimestamp(F, '✅ [createButton] Inserted payment button:', { paymentId, buttonId })
         res.status(201).json({
           status: 'success',
           message: 'Payment button created successfully',
           paymentId,
-          buttonId,
-        });
-      });
+          buttonId
+        })
+      })
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '❌ Unknown error';
+      const errorMessage = err instanceof Error ? err.message : '❌ Unknown error'
       logWithTimestamp(F, '❌ [createButton] Error creating payment button:', {
         message: errorMessage,
         stack: err instanceof Error ? err.stack : '❌ No stack trace',
-        requestBody: req.body,
-      });
-      res.status(500).json({ status: 'error', message: `❌ ${errorMessage}` });
+        requestBody: req.body
+      })
+      res.status(500).json({ status: 'error', message: `❌ ${errorMessage}` })
     }
-  },
-};
+  }
+}

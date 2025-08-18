@@ -16,88 +16,102 @@
  * - 13Aug2025_2215 BST (v1.0.13): Standardized field ordering across all tables (primary key, foreign keys, non-nullable attributes, nullable attributes, timestamps).
  * - 13Aug2025_2220 BST (v1.0.14): Fixed TS1005 syntax error by ensuring proper brace matching.
  */
-import { Knex } from 'knex';
+import { Knex } from 'knex'
 
 export async function up(knex: Knex): Promise<void> {
-  await knex.raw('SET FOREIGN_KEY_CHECKS = 0');
-  return knex.transaction(async (trx) => {
+  await knex.raw('SET FOREIGN_KEY_CHECKS = 0')
+  return knex.transaction(async trx => {
     await knex.schema
       .createTable('admins', (table: any) => {
-        table.string('admin_id', 255).notNullable().primary();
-        table.timestamp('created_at').defaultTo(knex.fn.now());
-        table.timestamp('updated_at').defaultTo(knex.fn.now());
+        table.string('admin_id', 255).notNullable().primary()
+        table.timestamp('created_at').defaultTo(knex.fn.now())
+        table.timestamp('updated_at').defaultTo(knex.fn.now())
       })
-      .transacting(trx);
+      .transacting(trx)
     await knex.schema
       .createTable('ids', (table: any) => {
-        table.string('id', 12).notNullable().primary();
-        table.string('merchant_id', 255).notNullable().references('merchant_id').inTable('merchants').onDelete('CASCADE');
-        table.enum('type', ['payment', 'button']).notNullable();
-        table.unique(['merchant_id', 'type']); // Ensure one button/payment per merchant
-        table.timestamp('timestamp').defaultTo(knex.fn.now());
+        table.string('id', 12).notNullable().primary() // Unique identifier for buttonId/paymentId
+        table
+          .string('merchant_id', 255)
+          .notNullable()
+          .references('merchant_id')
+          .inTable('merchants')
+          .onDelete('CASCADE')
+        table.enum('type', ['payment', 'button']).notNullable()
+        table.timestamp('timestamp').defaultTo(knex.fn.now())
       })
-      .transacting(trx);
+      .transacting(trx)
     await knex.schema
       .createTable('merchants', (table: any) => {
-        table.string('merchant_id', 255).notNullable().primary();
-        table.decimal('custom_fee_rate', 24, 10).unsigned().defaultTo(0);
-        table.boolean('welcomed').notNullable().defaultTo(false);
-        table.boolean('custom_fee').notNullable().defaultTo(false);
-        table.timestamp('created_at').defaultTo(knex.fn.now());
-        table.timestamp('updated_at').defaultTo(knex.fn.now());
+        table.string('merchant_id', 255).notNullable().primary()
+        table.decimal('custom_fee_rate', 24, 10).unsigned().defaultTo(0)
+        table.boolean('welcomed').notNullable().defaultTo(false)
+        table.boolean('custom_fee').notNullable().defaultTo(false)
+        table.timestamp('created_at').defaultTo(knex.fn.now())
+        table.timestamp('updated_at').defaultTo(knex.fn.now())
       })
-      .transacting(trx);
+      .transacting(trx)
     await knex.schema
       .createTable('payment_buttons', (table: any) => {
-        table.string('button_id', 12).notNullable().primary().references('id').inTable('ids').onDelete('CASCADE');
-        table.string('merchant_id', 255).notNullable().references('merchant_id').inTable('merchants').onDelete('CASCADE');
-        table.string('payment_id', 12).nullable().references('id').inTable('ids').onDelete('CASCADE');
-        table.bigInteger('amount').unsigned().notNullable().defaultTo(0);
-        table.text('description').notNullable().defaultTo('No description');
-        table.text('html_code').notNullable().defaultTo('<div>Pay Now</div>');
-        table.boolean('variable_amount').notNullable().defaultTo(false);
-        table.boolean('multi_use').notNullable().defaultTo(false);
-        table.boolean('used').notNullable().defaultTo(false);
-        table.bigInteger('total_paid').unsigned().nullable();
-        table.timestamp('created_at').defaultTo(knex.fn.now());
-        table.timestamp('updated_at').defaultTo(knex.fn.now());
+        table.string('button_id', 12).notNullable().primary().references('id').inTable('ids').onDelete('CASCADE')
+        table
+          .string('merchant_id', 255)
+          .notNullable()
+          .references('merchant_id')
+          .inTable('merchants')
+          .onDelete('CASCADE')
+        table.string('payment_id', 12).nullable().references('id').inTable('ids').onDelete('CASCADE')
+        table.bigInteger('amount').unsigned().notNullable().defaultTo(0)
+        table.text('description').notNullable().defaultTo('No description')
+        table.text('html_code').notNullable().defaultTo('<div>Pay Now</div>')
+        table.boolean('variable_amount').notNullable().defaultTo(false)
+        table.boolean('multi_use').notNullable().defaultTo(false)
+        table.boolean('used').notNullable().defaultTo(false)
+        table.bigInteger('total_paid').unsigned().nullable()
+        table.timestamp('created_at').defaultTo(knex.fn.now())
+        table.timestamp('updated_at').defaultTo(knex.fn.now())
       })
-      .transacting(trx);
+      .transacting(trx)
     await knex.schema
       .createTable('payments', (table: any) => {
-        table.string('payment_id', 12).notNullable().primary().references('id').inTable('ids').onDelete('CASCADE');
-        table.string('merchant_id', 255).notNullable().references('merchant_id').inTable('merchants').onDelete('CASCADE');
-        table.string('button_id', 12).notNullable().references('id').inTable('ids').onDelete('CASCADE');
-        table.string('transaction_id', 64).notNullable();
-        table.bigInteger('amount').unsigned().notNullable();
-        table.string('payer_id', 255).nullable();
-        table.string('txid', 64).nullable();
-        table.boolean('completed').notNullable().defaultTo(false);
-        table.boolean('is_new').notNullable().defaultTo(true);
-        table.text('blockchain_transaction', 'longtext').nullable();
-        table.decimal('exchange_rate', 24, 10).nullable();
-        table.timestamp('created_at').defaultTo(knex.fn.now());
-        table.timestamp('updated_at').defaultTo(knex.fn.now());
+        table.string('payment_id', 12).notNullable().primary().references('id').inTable('ids').onDelete('CASCADE')
+        table
+          .string('merchant_id', 255)
+          .notNullable()
+          .references('merchant_id')
+          .inTable('merchants')
+          .onDelete('CASCADE')
+        table.string('button_id', 12).notNullable().references('id').inTable('ids').onDelete('CASCADE')
+        table.string('transaction_id', 64).notNullable()
+        table.bigInteger('amount').unsigned().notNullable()
+        table.string('payer_id', 255).nullable()
+        table.string('txid', 64).nullable()
+        table.boolean('completed').notNullable().defaultTo(false)
+        table.boolean('is_new').notNullable().defaultTo(true)
+        table.text('blockchain_transaction', 'longtext').nullable()
+        table.decimal('exchange_rate', 24, 10).nullable()
+        table.timestamp('created_at').defaultTo(knex.fn.now())
+        table.timestamp('updated_at').defaultTo(knex.fn.now())
       })
-      .transacting(trx);
+      .transacting(trx)
     await knex.schema
       .createTable('server_settings', (table: any) => {
-        table.increments('id').primary();
-        table.string('stripe_api_key').nullable();
-        table.text('sendgrid_credentials').nullable();
-        table.decimal('default_fee_rate', 24, 10).unsigned().defaultTo(0);
-        table.boolean('setup_complete').notNullable().defaultTo(false);
-        table.timestamp('created_at').defaultTo(knex.fn.now());
-        table.timestamp('updated_at').defaultTo(knex.fn.now());
+        table.increments('id').primary()
+        table.string('stripe_api_key').nullable()
+        table.text('sendgrid_credentials').nullable()
+        table.decimal('default_fee_rate', 24, 10).unsigned().defaultTo(0)
+        table.boolean('setup_complete').notNullable().defaultTo(false)
+        table.timestamp('created_at').defaultTo(knex.fn.now())
+        table.timestamp('updated_at').defaultTo(knex.fn.now())
       })
-      .transacting(trx);
-    await knex.raw('SET FOREIGN_KEY_CHECKS = 1');
-  }); // Closing brace for knex.transaction
+      .transacting(trx)
+    await knex.raw('SET FOREIGN_KEY_CHECKS = 1')
+  }) // Closing brace for knex.transaction
 } // Closing brace for up function
 
 export async function down(knex: Knex): Promise<void> {
-  await knex.raw('SET FOREIGN_KEY_CHECKS = 0');
-  return knex.transaction(async (trx) => {
+  await knex.raw('SET FOREIGN_KEY_CHECKS = 0')
+  return knex.transaction(async trx => {
     await knex.schema
       .dropTableIfExists('server_settings')
       .dropTableIfExists('payments')
@@ -105,7 +119,7 @@ export async function down(knex: Knex): Promise<void> {
       .dropTableIfExists('merchants')
       .dropTableIfExists('ids')
       .dropTableIfExists('admins')
-      .transacting(trx);
-  });
-  await knex.raw('SET FOREIGN_KEY_CHECKS = 1');
+      .transacting(trx)
+  })
+  await knex.raw('SET FOREIGN_KEY_CHECKS = 1')
 }

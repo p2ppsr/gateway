@@ -55,244 +55,250 @@
  * - 13Aug2025_1220 BST (v4.19): Refined P2PKH validation and ensured payer_id consistency.
  * - 14Aug2025_0040 BST (v4.20): Updated to use payment_id instead of id in payment button query.
  */
-const F = 'routes/pay';
-import knex, { Knex } from 'knex';
-import knexConfig from '../../knexfile';
-import { Hash, P2PKH, PrivateKey, PublicKey, Transaction, Utils } from '@bsv/sdk';
-import { Request, Response } from 'express';
-import { logWithTimestamp } from '../utils/logging';
-const db: Knex = knex(knexConfig);
-let payment: Payment | undefined; // Declare payment outside try block for broader scope
+const F = 'routes/pay'
+import knex, { Knex } from 'knex'
+import knexConfig from '../../knexfile'
+import { Hash, P2PKH, PrivateKey, PublicKey, Transaction, Utils } from '@bsv/sdk'
+import { Request, Response } from 'express'
+import { logWithTimestamp } from '../utils/logging'
+const db: Knex = knex(knexConfig)
+let payment: Payment | undefined // Declare payment outside try block for broader scope
 
 interface Payment {
-  payment_id: string;
-  button_id: string;
-  payer_id: string | null;
-  merchant_id: string;
-  amount: number;
-  completed: boolean;
-  transaction_id: string; // Added to reflect schema
-  txid: string | null;
+  payment_id: string
+  button_id: string
+  payer_id: string | null
+  merchant_id: string
+  amount: number
+  completed: boolean
+  transaction_id: string // Added to reflect schema
+  txid: string | null
 }
 
 interface PaymentButton {
-  button_id: string; // Primary key
-  merchant_id: string;
-  payment_id: string | null; // Nullable foreign key
-  multi_use: boolean;
-  used: boolean;
-  variable_amount: boolean;
-  amount: number | null; // Optional to support variable buttons
-  description: string;
-  html_code: string;
-  total_paid: number | null;
-  created_at: string | null;
-  updated_at: string | null;
+  button_id: string // Primary key
+  merchant_id: string
+  payment_id: string | null // Nullable foreign key
+  multi_use: boolean
+  used: boolean
+  variable_amount: boolean
+  amount: number | null // Optional to support variable buttons
+  description: string
+  html_code: string
+  total_paid: number | null
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface RequestBody {
-  paymentId: string; // Client-passed paymentId referencing ids.id with type='payment'
-  buttonId: string; // Client-passed buttonId referencing ids.id with type='button'
+  paymentId: string // Client-passed paymentId referencing ids.id with type='payment'
+  buttonId: string // Client-passed buttonId referencing ids.id with type='button'
   transaction: {
-    txid: string;
-    atomicBeefTx: string;
-  };
-  lockingScript?: string;
+    txid: string
+    atomicBeefTx: string
+  }
+  lockingScript?: string
 }
 
 interface AuthRequest extends Request {
   auth: {
-    identityKey: string;
-  };
+    identityKey: string
+  }
 }
 
 export default {
   type: 'post' as const,
   path: '/pay',
   func: async (req: AuthRequest, res: Response): Promise<void> => {
-    logWithTimestamp(F, '🔍 [pay] Received pay request:', req.body);
-    const { paymentId, buttonId, transaction, lockingScript }: RequestBody = req.body;
+    logWithTimestamp(F, '🔍 [pay] Received pay request:', req.body)
+    const { paymentId, buttonId, transaction, lockingScript }: RequestBody = req.body
     try {
       // Validate that paymentId exists in ids with type='payment'
-      const paymentIdRecord = await db('ids').where({ id: paymentId, type: 'payment' }).first();
+      const paymentIdRecord = await db('ids').where({ id: paymentId, type: 'payment' }).first()
       if (!paymentIdRecord) {
-        logWithTimestamp(F, '❌ [pay] Invalid paymentId: not found in ids with type=payment:', { paymentId });
+        logWithTimestamp(F, '❌ [pay] Invalid paymentId: not found in ids with type=payment:', { paymentId })
         res.status(400).json({
           status: 'error',
-          message: 'Invalid paymentId: must reference an existing ids record with type=payment',
-        });
-        return;
+          message: 'Invalid paymentId: must reference an existing ids record with type=payment'
+        })
+        return
       }
       // Validate that buttonId exists in ids with type='button'
-      const buttonIdRecord = await db('ids').where({ id: buttonId, type: 'button' }).first();
+      const buttonIdRecord = await db('ids').where({ id: buttonId, type: 'button' }).first()
       if (!buttonIdRecord) {
-        logWithTimestamp(F, '❌ [pay] Invalid buttonId: not found in ids with type=button:', { buttonId });
+        logWithTimestamp(F, '❌ [pay] Invalid buttonId: not found in ids with type=button:', { buttonId })
         res.status(400).json({
           status: 'error',
-          message: 'Invalid buttonId: must reference an existing ids record with type=button',
-        });
-        return;
+          message: 'Invalid buttonId: must reference an existing ids record with type=button'
+        })
+        return
       }
       // Assign payment from database query
       payment = await db('payments')
         .where({
           payment_id: paymentId,
-          completed: false,
+          completed: false
         })
-        .first();
+        .first()
       if (!payment) {
-        logWithTimestamp(F, '❌ [pay] Payment not found or already completed:', { paymentId });
+        logWithTimestamp(F, '❌ [pay] Payment not found or already completed:', { paymentId })
         res.status(404).json({
           status: 'error',
-          message: 'Payment not found or already completed',
-        });
-        return;
+          message: 'Payment not found or already completed'
+        })
+        return
       }
-      const paymentRec: Payment = payment as Payment; // Local non-undefined alias
-      logWithTimestamp(F, '🔍 [pay] Retrieved payment record:', paymentRec);
+      const paymentRec: Payment = payment as Payment // Local non-undefined alias
+      logWithTimestamp(F, '🔍 [pay] Retrieved payment record:', paymentRec)
       if (paymentRec.merchant_id !== req.auth.identityKey) {
-        logWithTimestamp(F, '❌ [pay] Payment not originated by the same user:', { merchant_id: paymentRec.merchant_id, identityKey: req.auth.identityKey });
+        logWithTimestamp(F, '❌ [pay] Payment not originated by the same user:', {
+          merchant_id: paymentRec.merchant_id,
+          identityKey: req.auth.identityKey
+        })
         res.status(401).json({
           status: 'error',
-          message: 'Payment not originated by the same user',
-        });
-        return;
+          message: 'Payment not originated by the same user'
+        })
+        return
       }
       const button: PaymentButton | undefined = await db('payment_buttons')
         .where({ payment_id: paymentId }) // Use payment_id instead of id
-        .first();
-      logWithTimestamp(F, '🔍 [pay] Query result for button:', button || 'No matching button found');
+        .first()
+      logWithTimestamp(F, '🔍 [pay] Query result for button:', button || 'No matching button found')
       if (!button) {
-        logWithTimestamp(F, '❌ [pay] Payment button not found for payment_id:', { paymentId });
+        logWithTimestamp(F, '❌ [pay] Payment button not found for payment_id:', { paymentId })
         res.status(404).json({
           status: 'error',
-          message: 'Payment button not found',
-        });
-        return;
+          message: 'Payment button not found'
+        })
+        return
       }
       if (!button.multi_use && button.used) {
-        logWithTimestamp(F, '❌ [pay] Single-use button already used:', { paymentId });
+        logWithTimestamp(F, '❌ [pay] Single-use button already used:', { paymentId })
         res.status(400).json({
           status: 'error',
-          message: 'The single-use button has already been used',
-        });
-        return;
+          message: 'The single-use button has already been used'
+        })
+        return
       }
-      const { txid, atomicBeefTx } = transaction;
+      const { txid, atomicBeefTx } = transaction
       if (!txid || !atomicBeefTx || typeof atomicBeefTx !== 'string' || !/^[0-9a-fA-F]+$/.test(atomicBeefTx)) {
-        throw new Error('❌ Invalid transaction: txid or atomicBeefTx missing or invalid');
+        throw new Error('❌ Invalid transaction: txid or atomicBeefTx missing or invalid')
       }
-      let bsvtx: Transaction;
+      let bsvtx: Transaction
       try {
-        const txArray: number[] = Utils.toArray(atomicBeefTx, 'hex');
-        bsvtx = Transaction.fromAtomicBEEF(txArray);
+        const txArray: number[] = Utils.toArray(atomicBeefTx, 'hex')
+        bsvtx = Transaction.fromAtomicBEEF(txArray)
       } catch (e: unknown) {
-        throw new Error('❌ Invalid transaction format: unable to parse atomicBeefTx');
+        throw new Error('❌ Invalid transaction format: unable to parse atomicBeefTx')
       }
       if (!bsvtx.outputs || bsvtx.outputs.length === 0) {
-        throw new Error('❌ Invalid transaction: no outputs available');
+        throw new Error('❌ Invalid transaction: no outputs available')
       }
       if (bsvtx.id('hex') !== txid) {
-        throw new Error('❌ Transaction ID mismatch');
+        throw new Error('❌ Transaction ID mismatch')
       }
       if (!lockingScript) {
-        throw new Error('❌ Missing lockingScript in request');
+        throw new Error('❌ Missing lockingScript in request')
       }
-      logWithTimestamp(F, '🔍 [pay] Using client-provided lockingScript:', lockingScript);
+      logWithTimestamp(F, '🔍 [pay] Using client-provided lockingScript:', lockingScript)
       // Derive expected script and amount using P2PKH with payer_id
       const senderPrivateKey: PrivateKey = paymentRec.payer_id
         ? new PrivateKey(paymentRec.payer_id, 'hex')
-        : new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex'); // Fallback if payer_id is null
-      const recipientPublicKey: PublicKey = PublicKey.fromString(button.merchant_id);
-      const invoiceNumber: string = `2-3241645161d8-${paymentRec.transaction_id} 1`; // Use transaction_id from payment
-      const senderPrivateKeyString: string = senderPrivateKey.toString();
-      const recipientPublicKeyString: string = recipientPublicKey.toString();
+        : new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex') // Fallback if payer_id is null
+      const recipientPublicKey: PublicKey = PublicKey.fromString(button.merchant_id)
+      const invoiceNumber: string = `2-3241645161d8-${paymentRec.transaction_id} 1` // Use transaction_id from payment
+      const senderPrivateKeyString: string = senderPrivateKey.toString()
+      const recipientPublicKeyString: string = recipientPublicKey.toString()
       const combined: number[] = Utils.toArray(
         `${senderPrivateKeyString}${recipientPublicKeyString}${invoiceNumber}`,
         'utf8'
-      );
-      const derivedHash: number[] = Array.from(Hash.sha256(Hash.sha256(combined)));
-      const derivedPriv: PrivateKey = new PrivateKey(Utils.toHex(derivedHash), 'hex');
-      const derivedPublicKey: string = derivedPriv.toPublicKey().toString();
-      const pkh: P2PKH = new P2PKH();
-      const derivedScript: string = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex();
+      )
+      const derivedHash: number[] = Array.from(Hash.sha256(Hash.sha256(combined)))
+      const derivedPriv: PrivateKey = new PrivateKey(Utils.toHex(derivedHash), 'hex')
+      const derivedPublicKey: string = derivedPriv.toPublicKey().toString()
+      const pkh: P2PKH = new P2PKH()
+      const derivedScript: string = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex()
       const matchingOutput = bsvtx.outputs.find(
         (x: Transaction['outputs'][number]): boolean => x.lockingScript.toHex() === lockingScript // Use client-provided lockingScript
-      );
+      )
       if (!matchingOutput) {
         bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
-          logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex());
-          logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis);
-        });
+          logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex())
+          logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis)
+        })
         res.status(400).json({
           status: 'error',
-          message: 'The transaction does not satisfy the invoice',
-        });
-        return;
+          message: 'The transaction does not satisfy the invoice'
+        })
+        return
       }
-      const expectedAmount: number = matchingOutput.satoshis || 0; // Use actual amount from transaction
-      logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript);
-      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount);
+      const expectedAmount: number = matchingOutput.satoshis || 0 // Use actual amount from transaction
+      logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript)
+      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount)
       // Verify amount and proceed
       if (expectedAmount <= 0) {
-        logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount });
+        logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount })
         res.status(400).json({
           status: 'error',
-          message: 'Invalid amount in transaction',
-        });
-        return;
+          message: 'Invalid amount in transaction'
+        })
+        return
       }
-      logWithTimestamp(F, '✅ [pay] Matching output found:', { script: matchingOutput.lockingScript.toHex(), satoshis: expectedAmount });
-      let totalTransactionSatoshis = 0;
+      logWithTimestamp(F, '✅ [pay] Matching output found:', {
+        script: matchingOutput.lockingScript.toHex(),
+        satoshis: expectedAmount
+      })
+      let totalTransactionSatoshis = 0
       bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number) => {
-        logWithTimestamp(F, `🔍 Transaction Output ${i} script:`, out.lockingScript.toHex());
-        logWithTimestamp(F, `🔍 Transaction Output ${i} sats:`, out.satoshis);
-        totalTransactionSatoshis += out.satoshis || 0;
-      });
-      logWithTimestamp(F, '🔍 Total transaction satoshis:', totalTransactionSatoshis.toString());
+        logWithTimestamp(F, `🔍 Transaction Output ${i} script:`, out.lockingScript.toHex())
+        logWithTimestamp(F, `🔍 Transaction Output ${i} sats:`, out.satoshis)
+        totalTransactionSatoshis += out.satoshis || 0
+      })
+      logWithTimestamp(F, '🔍 Total transaction satoshis:', totalTransactionSatoshis.toString())
       if (totalTransactionSatoshis !== bsvtx.outputs.reduce((sum, out) => sum + (out.satoshis || 0), 0)) {
-        logWithTimestamp(F, '❌ Total satoshis mismatch');
+        logWithTimestamp(F, '❌ Total satoshis mismatch')
       } else {
-        logWithTimestamp(F, '🔍 Verified: Total satoshis matches sum of outputs');
+        logWithTimestamp(F, '🔍 Verified: Total satoshis matches sum of outputs')
       }
       await db.transaction(async (trx: Knex.Transaction) => {
         await trx('payments')
           .where({
             payment_id: paymentId,
-            transaction_id: paymentRec.transaction_id, // Ensure update targets the existing record
+            transaction_id: paymentRec.transaction_id // Ensure update targets the existing record
           })
           .update({
             completed: true,
             blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
             txid: txid,
             amount: expectedAmount,
-            transaction_id: paymentRec.transaction_id, // Preserve transaction_id
-          });
+            transaction_id: paymentRec.transaction_id // Preserve transaction_id
+          })
         await trx('payment_buttons')
           .where({ payment_id: paymentId }) // Use payment_id instead of id
           .update({
             used: true,
-            total_paid: db.raw('?? + ?', ['total_paid', expectedAmount]),
-          });
-      });
-      logWithTimestamp(F, `✅ [pay] Payment successful. TXID: ${txid}`);
-      const responseData = { status: 'success', message: 'Payment completed successfully', txid };
-      logWithTimestamp(F, '🔍 [pay] Response data:', responseData);
-      res.status(200).json(responseData);
-      return;
+            total_paid: db.raw('?? + ?', ['total_paid', expectedAmount])
+          })
+      })
+      logWithTimestamp(F, `✅ [pay] Payment successful. TXID: ${txid}`)
+      const responseData = { status: 'success', message: 'Payment completed successfully', txid }
+      logWithTimestamp(F, '🔍 [pay] Response data:', responseData)
+      res.status(200).json(responseData)
+      return
     } catch (error: unknown) {
-      const transactionIdForLog = payment && 'transaction_id' in payment ? payment.transaction_id : 'N/A';
+      const transactionIdForLog = payment && 'transaction_id' in payment ? payment.transaction_id : 'N/A'
       logWithTimestamp(F, '❌ [pay] Error processing payment:', {
         message: error instanceof Error ? error.message : '❌ Unknown error',
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
-        transaction_id: transactionIdForLog,
-      });
+        transaction_id: transactionIdForLog
+      })
       res.status(500).json({
         status: 'error',
-        message: `❌ Internal server error: ${error instanceof Error ? error.message : 'Unknown error'} (transaction_id: ${transactionIdForLog})`,
-      });
-      return;
+        message: `❌ Internal server error: ${error instanceof Error ? error.message : 'Unknown error'} (transaction_id: ${transactionIdForLog})`
+      })
+      return
     }
-  },
-};
+  }
+}

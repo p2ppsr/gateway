@@ -5,7 +5,7 @@
  */
 export const MAX_PAYMENT_SATS: number = 10000
 export const CONFIG = {
-  WALLET_ORIGIN: 'localhost:3321', // Default for Metanet client connection
+  WALLET_ORIGIN: 'http://localhost:3321', // Default for Metanet client connection
   API_BASE: 'http://localhost:3001', // Default API base URL
   ALLOWED_ORIGIN: 'http://localhost:3000' // Default CORS origin
 } as const
