@@ -83,7 +83,7 @@ import { Link } from 'react-router-dom'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { formatId, formatTimestamp } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
-import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
+import { CONFIG } from '../../utils/constants'
 
 /**
  * Represents a payment received through a payment button
@@ -236,7 +236,7 @@ const PaymentsList = () => {
     setLoading(true)
     setPayments([]) // Clear state to force refresh
     try {
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=500`
       logWithTimestamp(F, 'Fetching total payments with URL:', url)
       const response = await authFetch.fetch(url, { method: 'GET' })
       const data: PaymentResponse = await response.json()
@@ -440,7 +440,7 @@ const PaymentsList = () => {
       if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`)
       logWithTimestamp(F, 'Successfully acknowledged payment:', paymentId)
       // Refresh the payments list after acknowledgment
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=${MAX_PAYMENT_SATS}`
+      const url = `${location.protocol}//${location.host}/api/listPayments?limit=500`
       const refreshResponse = await authFetch.fetch(url, { method: 'GET' })
       const refreshData: PaymentResponse = await refreshResponse.json()
       if (refreshData.status === 'error') throw new Error(`❌ ${refreshData.message ?? 'Failed to refresh payments'}`)

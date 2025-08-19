@@ -140,8 +140,7 @@ const Create: React.FC = () => {
   const copyIconRef = useRef<HTMLSpanElement | null>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const isMounted = useRef(false);
-  //*const idsInitialized = useRef({ button: false, payment: false });
-  // State declarations
+
   const [buttonText_fixed, setButtonText_fixed] = useState('Pay Now');
   const [buttonText_variable, setButtonText_variable] = useState('Pay Now');
   const [spendingDescription_fixed, setSpendingDescription_fixed] = useState('');
@@ -180,7 +179,7 @@ const [customCSS_fixed, setCustomCSS_fixed] = useState<string>(`<style>.gateway-
   background: gray;
   cursor: not-allowed;
   pointer-events: none;
-}</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`);
+}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`);
 const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.gateway-paybutton-variable {
   border-radius: 2em;
   border: none;
@@ -206,56 +205,6 @@ const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.ga
   cursor: not-allowed;
   pointer-events: none;
 }</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`);
-  // const [customCSS_fixed, setCustomCSS_fixed] = useState(`<style>.gateway-paybutton-fixed {
-  //   border-radius: 2em;
-  //   border: none;
-  //   padding: 0.7em 1em 0.7em 1em;
-  //   min-width: 10em;
-  //   background: linear-gradient(145deg, #8484FA, ${theme.palette.background.default});
-  //   color: ${theme.palette.mode === 'dark' ? '#ffffff' : '#000000'};
-  //   box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
-  //   user-select: none;
-  //   transition: all 0.3s;
-  //   font-weight: bold;
-  //   text-align: center;
-  // }
-  // .gateway-paybutton-fixed:hover {
-  //   cursor: pointer;
-  //   box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-  //   background: linear-gradient(145deg, #ABABFF,${theme.palette.background.paper});
-  //   color: ${theme.palette.mode === 'dark' ? '#ffffff' : '#000000'};
-  // }
-  // .gateway-paybutton-fixed.disabled {
-  //   opacity: 0.4;
-  //   background: gray;
-  //   cursor: not-allowed;
-  //   pointer-events: none;
-  // }</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`);
-  // const [customCSS_variable, setCustomCSS_variable] = useState(`<style>.gateway-paybutton-variable {
-  //   border-radius: 2em;
-  //   border: none;
-  //   padding: 0.7em 1em 0.7em 1em;
-  //   min-width: 10em;
-  //   background: linear-gradient(145deg, #FF6B6B, ${theme.palette.background.paper});
-  //   color: ${theme.palette.mode === 'dark' ? '#ffffff' : '#000000'};
-  //   box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
-  //   user-select: none;
-  //   transition: all 0.3s;
-  //   font-weight: bold;
-  //   text-align: center;
-  // }
-  // .gateway-paybutton-variable:hover {
-  //   cursor: pointer;
-  //   box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-  //   background: linear-gradient(145deg, #FF8787, ${theme.palette.background.default});
-  //   color: ${theme.palette.mode === 'dark' ? '#ffffff' : '#000000'};
-  // }
-  // .gateway-paybutton-variable.disabled {
-  //   opacity: 0.4;
-  //   background: gray;
-  //   cursor: not-allowed;
-  //   pointer-events: none;
-  // }</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`);
   const [lastValidCSS_fixed, setLastValidCSS_fixed] = useState(extractCSS(customCSS_fixed));
   const [lastValidCSS_variable, setLastValidCSS_variable] = useState(extractCSS(customCSS_variable));
   const [previewCode_fixed, setPreviewCode_fixed] = useState('');
@@ -563,7 +512,7 @@ const resetAll = async () => {
         box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
         background: linear-gradient(145deg, #7986cb, #2A2A2E);
         color: #ffffff;
-      }</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`;
+      }</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`;
       const variableCSS = `<style>.gateway-paybutton-variable {
         border-radius: 2em;
         border: none;
@@ -1124,7 +1073,7 @@ const validateCSSOnBlur = (value: string, type: 'fixed' | 'variable'): void => {
     toast.warn('⚠️ Invalid CSS syntax. Reverting to last valid CSS for generation.', { autoClose: 5000 });
     if (type === 'fixed') {
       setCustomCSS_fixed(
-        `<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`
+        `<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
       );
       logWithTimestamp(
         F,
@@ -1499,11 +1448,11 @@ return (
               background: linear-gradient(145deg, #7986cb, #1C1C1F);
               color: #ffffff;
             }`;
-            const fixedCSS = value ? `${fixedBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>` : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`;
+            const fixedCSS = value ? `${fixedBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>` : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`;
             const variableCSS = value ? `${variableBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>` : `${variableBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`;
             if (!validateCSS(extractCSS(fixedCSS))) {
               logWithTimestamp(F, 'handleSingleUseChange: Invalid fixed CSS, reverting to last valid:', lastValidCSS_fixed);
-              setCustomCSS_fixed(`<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed" data-amount="${MAX_PAYMENT_SATS}">Pay</div>`);
+              setCustomCSS_fixed(`<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`);
             } else {
               setCustomCSS_fixed(fixedCSS);
               setLastValidCSS_fixed(extractCSS(fixedCSS));

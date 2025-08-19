@@ -273,11 +273,12 @@ const PayButton = ({
           )
           await Promise.race([versionPromise, timeoutPromise])
           console.log(`[${new Date().toISOString()}] [${F}] ✅ Wallet version retrieved with ${type}`)
-          walletOutputs = await instance.listOutputs({ basket: paymentId }) // Use paymentId as basket
-          console.log(
-            `[${new Date().toISOString()}] [${F}] ✅ Wallet connected with ${type} on ${CONFIG.WALLET_ORIGIN}`,
-            walletOutputs
-          )
+          // The basket use can be removed if the check for sufficient funds is not required
+          // walletOutputs = await instance.listOutputs({ basket: paymentId }) // Use paymentId as basket
+          // console.log(
+          //   `[${new Date().toISOString()}] [${F}] ✅ Wallet connected with ${type} on ${CONFIG.WALLET_ORIGIN}`,
+          //   walletOutputs
+          // )
           wallet.substrate = instance.substrate // Set successful substrate
           break
         } catch (walletErr) {
@@ -287,20 +288,20 @@ const PayButton = ({
           )
         }
       }
-      if (!walletOutputs) throw new Error('❌ All wallet connection attempts failed')
-      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet outputs for basket:`, paymentId, walletOutputs)
+      // if (!walletOutputs) throw new Error('❌ All wallet connection attempts failed')
+      // console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet outputs for basket:`, paymentId, walletOutputs)
       // Skip basket-specific check if empty, rely on createAction
-      if (walletOutputs.outputs.length > 0 && walletOutputs.outputs[0].satoshis < effectiveAmount + 1) {
-        console.log(
-          `[${new Date().toISOString()}] [${F}] ⚠️ Warning: Insufficient funds in basket:`,
-          paymentId,
-          'Need:',
-          effectiveAmount + 1,
-          'sats, Got:',
-          walletOutputs.outputs[0].satoshis
-        )
-        throw new Error(`❌ Insufficient funds in basket: need at least ${effectiveAmount + 1} sats`)
-      }
+      // if (walletOutputs.outputs.length > 0 && walletOutputs.outputs[0].satoshis < effectiveAmount + 1) {
+      //   console.log(
+      //     `[${new Date().toISOString()}] [${F}] ⚠️ Warning: Insufficient funds in basket:`,
+      //     paymentId,
+      //     'Need:',
+      //     effectiveAmount + 1,
+      //     'sats, Got:',
+      //     walletOutputs.outputs[0].satoshis
+      //   )
+      //   throw new Error(`❌ Insufficient funds in basket: need at least ${effectiveAmount + 1} sats`)
+      // }
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet selected inputs:`, walletOutputs)
       const resStatus = await authFetch.fetch(`${server}/api/getStatus`, { method: 'GET' })
       const status = await resStatus.json()
@@ -367,6 +368,7 @@ const PayButton = ({
       let outputsWithSats =
         invoice.outputs?.map(output => ({
           ...output,
+          //* not to round
           satoshis: Math.round(output.satoshis)
         })) || []
       if (variable && outputsWithSats.length && outputsWithSats[0].satoshis === 0) {
