@@ -82,7 +82,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { logWithTimestamp } from '../../utils/logging';
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants';
 import { fetchWithTimeout, validateCSS } from '../../utils/general';
-import { initializeIds } from '../../utils/initializeIds';
+import { initializeIds, InitializeIdsResponse } from '../../utils/initializeIds';
 import { generateBase58 } from '../../utils/general';
 
 const debounce = (func: (...args: any[]) => void, wait: number) => {
@@ -449,12 +449,6 @@ useEffect(() => {
     setPaymentID(ids.paymentId);
   }, [ids.buttonId, ids.paymentId]);
 
-interface InitializeIdsResponse {
-  status: string;
-  message?: string;
-  id?: string; // Made optional to align with initializeIds behavior
-}
-
 // Replace resetAll (around lines 380-430)
 const resetAll = async () => {
   logWithTimestamp(F, 'resetAll: Starting full reset of page fields');
@@ -551,6 +545,12 @@ const resetAll = async () => {
         localStorage.setItem(`customCSS_fixed_${merchant}`, fixedCSS);
         localStorage.setItem(`customCSS_variable_${merchant}`, variableCSS);
       }
+      // Regenerate previews to ensure multiUse consistency
+      const fixedText = `Pay Now ${fixedSatAmount} Sats`;
+      const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(newFixedDescription)}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-multi-use="true">${fixedText}</div>`;
+      const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(newVariableDescription)}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
+      setPreviewFixedHtml(fixedPreviewHtml);
+      setPreviewVariableHtml(variablePreviewHtml);
       setRenderKey(prev => prev + 1);
       updatePreviewCodes();
       logWithTimestamp(F, 'resetAll: Successfully reset all fields and updated localStorage', {
@@ -563,7 +563,9 @@ const resetAll = async () => {
         fixedDescription: newFixedDescription,
         variableDescription: newVariableDescription,
         fixedCSS: fixedCSS.substring(0, 50) + '...',
-        variableCSS: variableCSS.substring(0, 50) + '...'
+        variableCSS: variableCSS.substring(0, 50) + '...',
+        fixedPreviewHtml: fixedPreviewHtml.substring(0, 50) + '...',
+        variablePreviewHtml: variablePreviewHtml.substring(0, 50) + '...'
       });
       toast.success('All fields reset successfully');
       return newState;
@@ -578,18 +580,20 @@ interface WalletIdentity {
   publicKey: string;
 }
 
+// Search for: "useEffect(() => { logWithTimestamp(F, '@version v4.9.91"
+// Replace lines 412–558:
 useEffect(() => {
   logWithTimestamp(F, '@version v4.9.91 (Updated 18Aug2025_1117 BST to fix invalid ID resets, ensure persistence, maintain description consistency, support multi-use button)');
   logWithTimestamp(F, 'useEffect: Starting initialization process');
   const initializeIfNeeded = async () => {
     let merchantId: string | undefined;
-    let wallet: WalletClient = new WalletClient('auto', 'http://localhost:3321');
+    let wallet: WalletClient = new WalletClient('auto', CONFIG.WALLET_ORIGIN);
     const clearClientSession = async () => {
       try {
-        wallet = new WalletClient('auto', 'http://localhost:3321');
+        wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN);
         await wallet.connectToSubstrate();
         logWithTimestamp(F, 'useEffect: Cleared client-side session data');
-      } catch (err) {
+      } catch (err: any) {
         logWithTimestamp(F, '❌ useEffect: Failed to clear client-side session:', err);
       }
     };
@@ -610,8 +614,8 @@ useEffect(() => {
           continue;
         }
         try {
-          logWithTimestamp(F, `useEffect: Attempting wallet connection with ${type} on http://localhost:3321`);
-          wallet = new WalletClient(substrate, 'http://localhost:3321');
+          logWithTimestamp(F, `useEffect: Attempting wallet connection with ${type} on ${CONFIG.WALLET_ORIGIN}`);
+          wallet = new WalletClient(substrate, CONFIG.WALLET_ORIGIN);
           await wallet.connectToSubstrate();
           const authResult = await wallet.isAuthenticated({});
           if (authResult.authenticated) {
@@ -624,7 +628,7 @@ useEffect(() => {
             return true;
           }
         } catch (walletErr) {
-          logWithTimestamp(F, `❌ useEffect: Wallet connection failed with ${type} on http://localhost:3321:`, walletErr);
+          logWithTimestamp(F, `❌ useEffect: Wallet connection failed with ${type} on CONFIG.WALLET_ORIGIN:`, walletErr);
         }
       }
       return false;
@@ -708,7 +712,7 @@ useEffect(() => {
       );
       serverStatus = await response.json();
       logWithTimestamp(F, 'useEffect: Server status:', serverStatus);
-    } catch (err) {
+    } catch (err: any) {
       logWithTimestamp(F, '❌ useEffect: Failed to fetch server status:', err);
     }
     const validReferrers = ['/buttons', '/actions', '/payments'];
@@ -786,85 +790,79 @@ useEffect(() => {
         toast.error(`❌ Failed to initialize IDs: ${err.message}`);
       }
     } else {
-      try {
-        const response = await fetchWithTimeout(
-          `${CONFIG.API_BASE}/api/buttonCode/${validPaymentID}`,
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-          },
-          wallet
-        );
-        const result = await response.json();
-        if (result.status !== 'success' || result.button_id !== validButtonID) {
-          logWithTimestamp(F, 'useEffect: Persisted IDs invalid on server:', { validButtonID, validPaymentID });
-          if (!isValidReferrer && isServerRestart) {
-            logWithTimestamp(F, 'useEffect: Invalid IDs and invalid referrer, initializing new IDs');
+      logWithTimestamp(F, 'useEffect: Validating persisted IDs', { merchant, validButtonID, validPaymentID });
+      if (merchant && validButtonID && validPaymentID) {
+        const validateIds = async () => {
+          try {
+            const response = await fetchWithTimeout(
+              `${location.protocol}//${location.host}/api/buttonCode/${validButtonID}`,
+              { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+              wallet
+            );
+            const data = await response.json();
+            logWithTimestamp(F, 'useEffect: Button code response', { status: data.status, buttonId: data.button_id, paymentId: data.payment_id });
+            if (data.status !== 'success' || data.button_id !== validButtonID || data.payment_id !== validPaymentID) {
+              logWithTimestamp(F, 'useEffect: Invalid persisted IDs, generating new ones', { validButtonID, validPaymentID });
+              localStorage.removeItem(`buttonID_${merchant}`);
+              localStorage.removeItem(`paymentID_${merchant}`);
+              localStorage.removeItem(`idsInitializedbutton_${merchant}`);
+              localStorage.removeItem(`idsInitializedpayment_${merchant}`);
+              validButtonID = generateBase58(12);
+              validPaymentID = generateBase58(12);
+              localStorage.setItem(`buttonID_${merchant}`, validButtonID);
+              localStorage.setItem(`paymentID_${merchant}`, validPaymentID);
+              localStorage.setItem(`idsInitializedbutton_${merchant}`, 'true');
+              localStorage.setItem(`idsInitializedpayment_${merchant}`, 'true');
+              setButtonID(validButtonID);
+              setPaymentID(validPaymentID);
+              setIds({ buttonId: validButtonID, paymentId: validPaymentID });
+              // Update descriptions and previews with new IDs and isSingleUse
+              const newDescription = `Payment using paymentId: ${validPaymentID}`;
+              setSpendingDescription_fixed(newDescription);
+              setSpendingDescription_variable(newDescription);
+              localStorage.setItem(`spendingDescription_fixed_${merchant}`, newDescription);
+              localStorage.setItem(`spendingDescription_variable_${merchant}`, newDescription);
+              const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`;
+              const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`;
+              const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
+              setPreviewFixedHtml(fixedPreviewHtml);
+              setPreviewVariableHtml(variablePreviewHtml);
+              generatePreviewHtml(paymentType, newDescription);
+              setUpdateCounter(prev => prev + 1);
+              logWithTimestamp(F, 'useEffect: Reinitialized IDs and updated previews', { validButtonID, validPaymentID, isSingleUse });
+            } else {
+              logWithTimestamp(F, 'useEffect: Valid persisted IDs', { validButtonID, validPaymentID });
+              setIds({ buttonId: validButtonID, paymentId: validPaymentID });
+            }
+          } catch (err: any) {
+            logWithTimestamp(F, '❌ useEffect: Failed to validate IDs', { error: err.message });
+            toast.error('❌ Failed to validate IDs', { autoClose: 5000 });
             validButtonID = generateBase58(12);
             validPaymentID = generateBase58(12);
-            localStorage.setItem(`buttonID_${merchantId}`, validButtonID);
-            localStorage.setItem(`paymentID_${merchantId}`, validPaymentID);
-            localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true');
-            localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true');
-            setSpendingDescription_fixed(`Payment using paymentId: ${validPaymentID}`);
-            setSpendingDescription_variable(`Payment using paymentId: ${validPaymentID}`);
-            localStorage.setItem(`spendingDescription_fixed_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-            localStorage.setItem(`spendingDescription_variable_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-            logWithTimestamp(F, 'useEffect: Initialized new IDs and descriptions:', { validButtonID, validPaymentID,
-              spendingDescription_fixed: `Payment using paymentId: ${validPaymentID}`,
-              spendingDescription_variable: `Payment using paymentId: ${validPaymentID}`
-            });
-          } else {
-            logWithTimestamp(F, 'useEffect: Preserving invalid server IDs due to valid referrer');
-            setSpendingDescription_fixed(`Payment using paymentId: ${validPaymentID}`);
-            setSpendingDescription_variable(`Payment using paymentId: ${validPaymentID}`);
-            localStorage.setItem(`spendingDescription_fixed_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-            localStorage.setItem(`spendingDescription_variable_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-            logWithTimestamp(F, 'useEffect: Updated descriptions to match payment ID:', {
-              spendingDescription_fixed: `Payment using paymentId: ${validPaymentID}`,
-              spendingDescription_variable: `Payment using paymentId: ${validPaymentID}`
-            });
+            localStorage.setItem(`buttonID_${merchant}`, validButtonID);
+            localStorage.setItem(`paymentID_${merchant}`, validPaymentID);
+            localStorage.setItem(`idsInitializedbutton_${merchant}`, 'true');
+            localStorage.setItem(`idsInitializedpayment_${merchant}`, 'true');
+            setButtonID(validButtonID);
+            setPaymentID(validPaymentID);
+            setIds({ buttonId: validButtonID, paymentId: validPaymentID });
+            // Update descriptions and previews with new IDs and isSingleUse
+            const newDescription = `Payment using paymentId: ${validPaymentID}`;
+            setSpendingDescription_fixed(newDescription);
+            setSpendingDescription_variable(newDescription);
+            localStorage.setItem(`spendingDescription_fixed_${merchant}`, newDescription);
+            localStorage.setItem(`spendingDescription_variable_${merchant}`, newDescription);
+            const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`;
+            const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`;
+            const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
+            setPreviewFixedHtml(fixedPreviewHtml);
+            setPreviewVariableHtml(variablePreviewHtml);
+            generatePreviewHtml(paymentType, newDescription);
+            setUpdateCounter(prev => prev + 1);
+            logWithTimestamp(F, 'useEffect: Reinitialized IDs and updated previews after validation failure', { validButtonID, validPaymentID, isSingleUse });
           }
-        } else {
-          logWithTimestamp(F, 'useEffect: Persisted IDs validated successfully:', { validButtonID, validPaymentID });
-          setSpendingDescription_fixed(`Payment using paymentId: ${validPaymentID}`);
-          setSpendingDescription_variable(`Payment using paymentId: ${validPaymentID}`);
-          localStorage.setItem(`spendingDescription_fixed_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-          localStorage.setItem(`spendingDescription_variable_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-          logWithTimestamp(F, 'useEffect: Updated descriptions to match payment ID:', {
-            spendingDescription_fixed: `Payment using paymentId: ${validPaymentID}`,
-            spendingDescription_variable: `Payment using paymentId: ${validPaymentID}`
-          });
-        }
-      } catch (validationError: any) {
-        logWithTimestamp(F, '❌ useEffect: Failed to validate persisted IDs:', validationError.message);
-        if (!isValidReferrer && isServerRestart) {
-          logWithTimestamp(F, 'useEffect: Invalid IDs and invalid referrer, initializing new IDs');
-          validButtonID = generateBase58(12);
-          validPaymentID = generateBase58(12);
-          localStorage.setItem(`buttonID_${merchantId}`, validButtonID);
-          localStorage.setItem(`paymentID_${merchantId}`, validPaymentID);
-          localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true');
-          localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true');
-          setSpendingDescription_fixed(`Payment using paymentId: ${validPaymentID}`);
-          setSpendingDescription_variable(`Payment using paymentId: ${validPaymentID}`);
-          localStorage.setItem(`spendingDescription_fixed_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-          localStorage.setItem(`spendingDescription_variable_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-          logWithTimestamp(F, 'useEffect: Initialized new IDs and descriptions:', { validButtonID, validPaymentID,
-            spendingDescription_fixed: `Payment using paymentId: ${validPaymentID}`,
-            spendingDescription_variable: `Payment using paymentId: ${validPaymentID}`
-          });
-        } else {
-          logWithTimestamp(F, 'useEffect: Preserving state due to valid referrer despite validation failure');
-          setSpendingDescription_fixed(`Payment using paymentId: ${validPaymentID}`);
-          setSpendingDescription_variable(`Payment using paymentId: ${validPaymentID}`);
-          localStorage.setItem(`spendingDescription_fixed_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-          localStorage.setItem(`spendingDescription_variable_${merchantId}`, `Payment using paymentId: ${validPaymentID}`);
-          logWithTimestamp(F, 'useEffect: Updated descriptions to match payment ID:', {
-            spendingDescription_fixed: `Payment using paymentId: ${validPaymentID}`,
-            spendingDescription_variable: `Payment using paymentId: ${validPaymentID}`
-          });
-        }
+        };
+        validateIds();
       }
     }
     // Update only ids state to avoid desync
@@ -1024,24 +1022,26 @@ useEffect(() => {
   if (paymentID && merchant) {
     const persistedFixedDescription = localStorage.getItem(`spendingDescription_fixed_${merchant}`) || `Payment using paymentId: ${paymentID}`;
     const persistedVariableDescription = localStorage.getItem(`spendingDescription_variable_${merchant}`) || `Payment using paymentId: ${paymentID}`;
-    
     // Only update if descriptions have changed to avoid redundant renders
     if (persistedFixedDescription !== spendingDescription_fixed || persistedVariableDescription !== spendingDescription_variable) {
       setSpendingDescription_fixed(persistedFixedDescription);
       setSpendingDescription_variable(persistedVariableDescription);
-      updatePreviewCodes();
       logWithTimestamp(F, 'useEffect: Updated descriptions from localStorage', {
         persistedFixedDescription,
         persistedVariableDescription,
       });
-    } else {
-      logWithTimestamp(F, 'useEffect: Descriptions unchanged, skipping update', {
-        persistedFixedDescription,
-        persistedVariableDescription,
-      });
     }
+    // Regenerate previews to ensure paymentID and isSingleUse consistency
+    generatePreviewHtml('fixed', persistedFixedDescription);
+    generatePreviewHtml('variable', persistedVariableDescription);
+    updatePreviewCodes();
+    logWithTimestamp(F, 'useEffect: Regenerated previews for paymentID change', {
+      paymentID,
+      isSingleUse,
+      multiUse: !isSingleUse
+    });
   }
-}, [paymentID, merchant, updatePreviewCodes, spendingDescription_fixed, spendingDescription_variable]);
+}, [paymentID, merchant, updatePreviewCodes, spendingDescription_fixed, spendingDescription_variable, generatePreviewHtml, isSingleUse]);
 
 const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
   const value = event.target.value;
@@ -1114,7 +1114,7 @@ const validateCSSOnBlur = (value: string, type: 'fixed' | 'variable'): void => {
 };
 
   const debouncedValidateCSS = debounce(validateCSSOnBlur, 500);
-
+    
   const handleCustomCSSBlur = (event: React.FocusEvent<HTMLInputElement>): void => {
     const value = event.target.value;
     debouncedValidateCSS(value, paymentType);
@@ -1194,19 +1194,19 @@ const handleCopyCode = async (): Promise<void> => {
     logWithTimestamp(F, 'handleCopyCode: Merchant identity not available', { merchant });
     return;
   }
-  // Clear all relevant localStorage entries to prevent stale ID reuse
+  // Clear localStorage to prevent stale ID reuse
   localStorage.removeItem(`buttonID_${merchant}`);
   localStorage.removeItem(`paymentID_${merchant}`);
   localStorage.removeItem(`idsInitializedbutton_${merchant}`);
   localStorage.removeItem(`idsInitializedpayment_${merchant}`);
   logWithTimestamp(F, 'handleCopyCode: Cleared localStorage entries for merchant:', merchant);
   // Generate new IDs
-  const newPaymentId = generateBase58(12);
-  const newButtonId = generateBase58(12);
+  let newButtonId = generateBase58(12);
+  let newPaymentId = generateBase58(12);
   logWithTimestamp(F, 'handleCopyCode: Generated new IDs', { newButtonId, newPaymentId });
+  // Validate IDs with server using initializeIds
   try {
-    // Validate IDs with server
-    await initializeIds(
+    const buttonResponse = await initializeIds(
       'button',
       wallet,
       newButtonId,
@@ -1217,26 +1217,45 @@ const handleCopyCode = async (): Promise<void> => {
       undefined,
       false
     );
-    await initializeIds(
+    logWithTimestamp(F, 'handleCopyCode: initializeIds response for button:', { status: buttonResponse.status, id: buttonResponse.id || 'undefined', newId: buttonResponse.newId });
+    if (buttonResponse.status !== 'success') {
+      if (buttonResponse.newId) {
+        newButtonId = buttonResponse.newId;
+        logWithTimestamp(F, 'handleCopyCode: Using server-suggested button ID:', newButtonId);
+      } else {
+        throw new Error(buttonResponse.message || 'Failed to initialize button ID');
+      }
+    }
+    newButtonId = buttonResponse.id || newButtonId;
+    const paymentResponse = await initializeIds(
       'payment',
       wallet,
       newPaymentId,
       merchant,
       setPaymentID,
-      undefined,
-      undefined,
+      setSpendingDescription_fixed,
+      setSpendingDescription_variable,
       undefined,
       false
     );
-    // Single state update to avoid desync
+    logWithTimestamp(F, 'handleCopyCode: initializeIds response for payment:', { status: paymentResponse.status, id: paymentResponse.id || 'undefined', newId: paymentResponse.newId });
+    if (paymentResponse.status !== 'success') {
+      if (paymentResponse.newId) {
+        newPaymentId = paymentResponse.newId;
+        logWithTimestamp(F, 'handleCopyCode: Using server-suggested payment ID:', newPaymentId);
+      } else {
+        throw new Error(paymentResponse.message || 'Failed to initialize payment ID');
+      }
+    }
+    newPaymentId = paymentResponse.id || newPaymentId;
     setIds({ buttonId: newButtonId, paymentId: newPaymentId });
     localStorage.setItem(`buttonID_${merchant}`, newButtonId);
     localStorage.setItem(`paymentID_${merchant}`, newPaymentId);
     localStorage.setItem(`idsInitializedbutton_${merchant}`, 'true');
     localStorage.setItem(`idsInitializedpayment_${merchant}`, 'true');
     logWithTimestamp(F, 'handleCopyCode: New IDs initialized:', { newButtonId, newPaymentId });
-  } catch (err) {
-    logWithTimestamp(F, '❌ handleCopyCode: Failed to initialize new IDs:', err);
+  } catch (err: any) {
+    logWithTimestamp(F, '❌ handleCopyCode: Failed to initialize new IDs:', { error: err.message });
     toast.error('❌ Failed to initialize new IDs', { autoClose: 5000 });
     return;
   }
@@ -1326,6 +1345,11 @@ const handleCopyCode = async (): Promise<void> => {
         : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(finalDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
       setPreviewCode_fixed(paymentType === 'fixed' ? htmlCode : previewCode_fixed);
       setPreviewCode_variable(paymentType === 'variable' ? htmlCode : previewCode_variable);
+      // Regenerate previews to ensure multiUse consistency
+      const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(finalDescription)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`;
+      const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(finalDescription)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`;
+      setPreviewFixedHtml(fixedPreviewHtml);
+      setPreviewVariableHtml(variablePreviewHtml);
       generatePreviewHtml(paymentType, finalDescription);
       setShowCode(true);
       logWithTimestamp(F, 'handleCopyCode: Button registered with ID:', serverButtonId, 'and paymentId:', serverPaymentId, 'multiUse:', multiUse);
@@ -1606,5 +1630,5 @@ return (
   </Root>
 );
 };
-
 export default Create;
+

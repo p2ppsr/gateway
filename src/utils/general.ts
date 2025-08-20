@@ -11,7 +11,7 @@
  * - 17Aug2025_1630 BST (v1.9): Added isBase58 function for boolean validation of 12-character Base58 IDs.
  * - 17Aug2025_1640 BST (v1.10): Added isMerchantId for 64-character hex merchant ID validation.
  */
-import { WalletClient, AuthFetch } from '@bsv/sdk' // Import WalletClient for typing
+import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk' // Import WalletClient for typing
 
 /**
  * Generates a random Base58-encoded string of specified length.
@@ -45,14 +45,28 @@ export function isBase58(id: string): boolean {
   return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}$/.test(id)
 }
 
-/**
- * Checks if a string is a valid 64- to 66-character hex merchant ID.
- * @param id The string to validate.
- * @returns True if the string is a 64- to 66-character hex string, false otherwise.
- */
-export function isMerchantId(id: string): boolean {
-  return /^[0-9a-fA-F]{64,66}$/.test(id);
-}
+export const isMerchantId = (value: string): boolean => {
+  // Check for 64 or 66 characters
+  if (![64, 66].includes(value.length)) {
+    return false;
+  }
+  // Check for valid hex string
+  const hexRegex = /^[0-9a-fA-F]+$/;
+  if (!hexRegex.test(value)) {
+    return false;
+  }
+  // If 66 characters, ensure it starts with '02' or '03' (compressed public key)
+  if (value.length === 66 && !value.startsWith('02') && !value.startsWith('03')) {
+    return false;
+  }
+  // Validate as secp256k1 public key
+  try {
+    PublicKey.fromString(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Formats an ID (e.g., transaction_id or button_id) as 'first5...last5' with ellipses.

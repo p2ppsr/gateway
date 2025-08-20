@@ -15,10 +15,12 @@ import type { Dispatch, SetStateAction } from 'react';
 
 const F = 'utils/initializeIds';
 
-interface InitializeIdsResponse {
+export type InitializeIdsResponse = {
   status: 'success' | 'error';
   message?: string;
-}
+  id?: string;
+  newId?: string;
+};
 
 export const initializeIds = async (
   type: 'payment' | 'button',
@@ -35,7 +37,6 @@ export const initializeIds = async (
   let retryCount = 0;
   let delay = 1000; // Initial delay in ms
   let isCircuitBreakerOpen = false;
-
   let effectiveMerchantId: string;
   try {
     effectiveMerchantId = merchantId || (await wallet.getPublicKey({ identityKey: true })).publicKey;
@@ -44,7 +45,6 @@ export const initializeIds = async (
     logWithTimestamp(F, `initializeIds: Failed to get merchant ID: ${error.message}`);
     effectiveMerchantId = merchantId || '';
   }
-
   const isInitializedKey = `idsInitialized${type}_${effectiveMerchantId}`;
   const storedIdKey = `${type === 'button' ? 'buttonID' : 'paymentID'}_${effectiveMerchantId}`;
   const isInitialized = localStorage.getItem(isInitializedKey);
@@ -53,7 +53,6 @@ export const initializeIds = async (
     F,
     `initializeIds: Checking localStorage for ${type} ID with merchantId ${effectiveMerchantId} - isInitialized: ${!!isInitialized}, storedId: ${storedId}`
   );
-
   if (isInitialized && storedId) {
     logWithTimestamp(F, `initializeIds: ${type} ID already initialized for merchant ${effectiveMerchantId}, using cached ID: ${storedId}`);
     if (setId) setId(storedId);
@@ -63,17 +62,16 @@ export const initializeIds = async (
       setSpendingDescription_variable(description);
       logWithTimestamp(F, `initializeIds: Updated spending descriptions with ${type} ID: ${storedId}`);
     }
-    return { status: 'success' };
+    return { status: 'success', id: storedId };
   }
-
-  const attemptInitialize = async (): Promise<InitializeIdsResponse> => {
+  const attemptInitialize = async (currentId: string): Promise<InitializeIdsResponse> => {
     if (isCircuitBreakerOpen) {
       logWithTimestamp(F, `initializeIds: Circuit breaker open, aborting ${type} ID initialization`);
       return { status: 'error', message: `Circuit breaker open for ${type} ID initialization` };
     }
     try {
-      if (!id || id.length !== 12) throw new Error('Invalid 12-character ID provided');
-      logWithTimestamp(F, `initializeIds: Validating ${type} ID: ${id} for merchant ${effectiveMerchantId}`);
+      if (!currentId || currentId.length !== 12) throw new Error('Invalid 12-character ID provided');
+      logWithTimestamp(F, `initializeIds: Validating ${type} ID: ${currentId} for merchant ${effectiveMerchantId}`);
       // Test wallet connectivity
       try {
         await wallet.getPublicKey({ identityKey: true });
@@ -86,7 +84,7 @@ export const initializeIds = async (
         ...(authToken && { Authorization: `Bearer ${authToken}` }),
       };
       const requestBody = JSON.stringify({
-        [type === 'payment' ? 'paymentId' : 'buttonId']: id,
+        [type === 'payment' ? 'paymentId' : 'buttonId']: currentId,
         merchantId: effectiveMerchantId,
       });
       logWithTimestamp(F, '[initializeIds] Sending request to /api/initializeIds:', { body: requestBody, headers });
@@ -100,32 +98,30 @@ export const initializeIds = async (
         wallet,
         30000
       );
-      if (!response.ok) {
-        const errorText = await response.text();
-        logWithTimestamp(F, `❌ [initializeIds] Server response for failed request:`, { status: response.status, text: errorText });
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
       const responseText = await response.text();
       const data = responseText ? JSON.parse(responseText) : {};
       logWithTimestamp(F, `initializeIds: Response for ${type} ID:`, { status: response.status, data, merchantId: effectiveMerchantId });
-      if (data.status === 'success') {
-        if (setId) setId(id);
+      if (response.status === 200 && data.status === 'success') {
+        if (setId) setId(currentId);
         if (type === 'payment' && setSpendingDescription_fixed && setSpendingDescription_variable) {
-          const description = `Payment using paymentId: ${id}`;
+          const description = `Payment using paymentId: ${currentId}`;
           setSpendingDescription_fixed(description);
           setSpendingDescription_variable(description);
-          logWithTimestamp(F, `initializeIds: Updated spending descriptions with ${type} ID: ${id}`);
+          logWithTimestamp(F, `initializeIds: Updated spending descriptions with ${type} ID: ${currentId}`);
         }
         localStorage.setItem(isInitializedKey, 'true');
-        localStorage.setItem(storedIdKey, id);
-        logWithTimestamp(F, `initializeIds: ${type} ID ${id} validated successfully for merchant ${effectiveMerchantId}`);
-        return { status: 'success' };
+        localStorage.setItem(storedIdKey, currentId);
+        logWithTimestamp(F, `initializeIds: ${type} ID ${currentId} validated successfully for merchant ${effectiveMerchantId}`);
+        return { status: 'success', id: currentId };
+      } else if (response.status === 409 && data.newId) {
+        logWithTimestamp(F, `initializeIds: Duplicate ${type} ID detected, using server-suggested ID: ${data.newId}`);
+        return { status: 'error', message: data.message, newId: data.newId };
       } else {
         throw new Error(`Failed to validate ${type} ID: ${data.message || 'No success status'} (Status: ${response.status})`);
       }
     } catch (err) {
       const error = err as Error;
-      logWithTimestamp(F, `❌ initializeIds: Error validating ${type} ID ${id} for merchant ${effectiveMerchantId}:`, {
+      logWithTimestamp(F, `❌ initializeIds: Error validating ${type} ID ${currentId} for merchant ${effectiveMerchantId}:`, {
         error: error.message,
         stack: error.stack,
         merchantId: effectiveMerchantId,
@@ -135,7 +131,7 @@ export const initializeIds = async (
         delay *= 2; // Exponential backoff
         logWithTimestamp(F, `initializeIds: Retrying ${type} ID initialization, attempt ${retryCount}/${maxRetries} after ${delay}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return attemptInitialize();
+        return attemptInitialize(currentId);
       }
       isCircuitBreakerOpen = true;
       logWithTimestamp(F, `initializeIds: Max retries reached or unrelated error, circuit breaker opened for ${type} ID`);
@@ -143,20 +139,19 @@ export const initializeIds = async (
         toast.error(`Failed to validate ${type} ID: ${error.message}`);
       }
       // Fallback to temporary ID
-      if (setId) setId(id);
+      if (setId) setId(currentId);
       if (type === 'payment' && setSpendingDescription_fixed && setSpendingDescription_variable) {
-        const description = `Payment using paymentId: ${id}`;
+        const description = `Payment using paymentId: ${currentId}`;
         setSpendingDescription_fixed(description);
         setSpendingDescription_variable(description);
         localStorage.setItem(`spendingDescription_fixed_${effectiveMerchantId}`, description);
         localStorage.setItem(`spendingDescription_variable_${effectiveMerchantId}`, description);
       }
       localStorage.setItem(isInitializedKey, 'true');
-      localStorage.setItem(storedIdKey, id);
-      logWithTimestamp(F, `initializeIds: Using temporary ${type} ID due to failure: ${id}`);
-      return { status: 'success' }; // Treat as success to avoid blocking
+      localStorage.setItem(storedIdKey, currentId);
+      logWithTimestamp(F, `initializeIds: Using temporary ${type} ID due to failure: ${currentId}`);
+      return { status: 'success', id: currentId }; // Treat as success to avoid blocking
     }
   };
-
-  return await attemptInitialize();
+  return await attemptInitialize(id);
 };

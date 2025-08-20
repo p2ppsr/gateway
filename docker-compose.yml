@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: gateway-mysql
+    environment:
+      # Pull DB settings from your .env
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${SQL_DATABASE_DB_NAME}
+      MYSQL_USER: ${SQL_DATABASE_USER}
+      MYSQL_PASSWORD: ${SQL_DATABASE_PASSWORD}
+    ports:
+      # Expose the DB on localhost using your configured port (defaults to 3306)
+      - "${SQL_DATABASE_PORT:-3306}:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    command: mysqld --default-authentication-plugin=mysql_native_password
+    restart: unless-stopped
+
+volumes:
+  db_data:
