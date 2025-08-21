@@ -3,25 +3,31 @@
  *
  * Displays a paginated table of payment buttons created by the user.
  * Each row represents a button, showing ID, amount, currency, and other details.
+ * For multi-use buttons, includes a collapsible sub-table of associated payments.
  *
- * - Fetches buttons from the backend using `authFetch` and the Metanet client with full data fetch
- * - Includes filters for usage (all, used, unused) and client-side sorting by all columns via clickable headers
+ * - Fetches buttons and their payments from the backend using `authFetch` and the Metanet client
+ * - Includes filters for usage (all, used, unused) and client-side sorting by all columns
  * - Implements an empty state with a CTA to create a button
- * - Uses MUI table components with pagination, allowing custom rows per page via a dropdown with a "set 5..100" trigger and a popup number input
- * - Utilizes `formatBSV` from `utils/general.ts` for consistent amount formatting
- * - Uses `logWithTimestamp` from `utils/logging.ts` with configuration from `logging.config.ts` to measure performance and color-code logs
+ * - Uses MUI table components with pagination, allowing custom rows per page
+ * - Uses `formatBSV` from `utils/general.ts` for amount formatting
+ * - Uses `logWithTimestamp` from `utils/logging.ts` for performance logging
  * - Optimizes performance with single initial fetch
- * - Adjusted `useRef` type to `number | null` to align with browser `setTimeout` return type, correcting TS2322 error
- * - Added `description` column to the table for custom spending descriptions
- * - Added `html_code` column to display truncated HTML code (first 16 chars, ellipsis, last 16 chars), renamed from customCSS
- * - Added check for buttons with html_code in database and logs discrepancy, with tracing for empty HTML code (03Aug2025_1425 BST)
- * - Updated to reflect successful html_code storage in database (03Aug2025_1459 BST)
- * - Added default sorting by timestamp (most recent first) (04Aug2025_1101 BST)
- * - Aligned with Payments page pattern and updated schema changes (13Aug2025_2230 BST)
+ * - Adjusted `useRef` type to `number | null` to fix TS2322
+ * - Added `description` and `html_code` columns
+ * - Added default sorting by timestamp (desc) (04Aug2025_1101 BST)
+ * - Aligned with Payments page schema (13Aug2025_2230 BST)
+ * - Added sub-table for payments per button (20Aug2025_2040 BST)
+ * - Fixed fetch error for top-level data array and optional payments (20Aug2025_2230 BST)
+ * - Added payments array logging to debug sub-table rendering (20Aug2025_2239 BST)
+ * - Added sub-table debugging with row logging and fixed total_paid mapping (20Aug2025_2256 BST)
+ * - Fixed TS1345 error by separating logWithTimestamp from conditional (20Aug2025_2302 BST)
+ * - Removed info icon from Amount(Sats) header and added hover tooltip for zero values (21Aug2025_0045 BST)
+ * - Adjusted sub-table UI: no line break for payment/icon, removed Sats column, removed blank row, added sorting (21Aug2025_0100 BST)
+ * - Fixed TS7053 and TS2769 errors by refining SortConfig and TableBody typing (21Aug2025_0130 BST)
+ * - Fixed TS7053, TS2367, TS2345 errors by aligning sub-table sorting with Payment properties (21Aug2025_0145 BST)
+ * - Fixed TS2769 and TS2367 errors by ensuring valid sub-table sorting keys (21Aug2025_0130 BST)
  *
- * Used by the Gateway UI to manage user-created payment buttons. For local testing, delays are attributed to server or application logic,
- * not external connections or hardware constraints (MacBook Pro M4 Max, 128GB RAM, 2TB SSD), guiding optimization efforts
- * Version: v3.74 (Updated 13Aug2025_2230 BST to align with schema changes)
+ * Version: v3.85 (Updated 21Aug2025_0130 BST)
  */
 const F = 'pages/Buttons'
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
@@ -45,79 +51,80 @@ import {
   Box,
   Card,
   TextField,
-  Tooltip
+  Tooltip,
+  Collapse
 } from '@mui/material'
-import { FirstPage, LastPage, ReceiptLong } from '@mui/icons-material'
+import { FirstPage, LastPage, ReceiptLong, ExpandMore, ExpandLess } from '@mui/icons-material'
 import { WalletClient, AuthFetch } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
 import { Link } from 'react-router-dom'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { formatId, formatTimestamp } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
-import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
-
-const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
+import { CONFIG } from '../../utils/constants'
+const wallet = new WalletClient('json-api', CONFIG.WALLET_ORIGIN) // Force json-api substrate
 const authFetch = new AuthFetch(wallet)
-
 /**
- * Represents a payment button created by the user.
- * Mirrors the `payment_buttons` table structure.
+ * Represents a payment button and its associated payments.
  */
 interface Button {
-  button_id: string // Pre-created ID for the button (primary key, non-nullable)
-  amount: number // Configured payment amount, default 0
-  description: string // Custom description for the button, default "No description"
-  html_code: string // Custom HTML code for the button, default "<div>Pay Now</div>"
-  variable_amount: boolean // Whether the amount is variable, default false
-  multi_use: boolean // Whether the button can be used multiple times, default false
-  used: boolean // Whether the button has been used, default false
-  total_paid: number | null // Total amount paid through the button, nullable
-  created_at: string // Timestamp when the button was created, non-nullable
-  updated_at: string // Timestamp when the button was last updated, non-nullable
-  payment_id: string | null // Associated payment ID, nullable
+  button_id: string
+  amount: number
+  description: string
+  html_code: string
+  variable_amount: boolean
+  multi_use: boolean
+  used: boolean
+  total_paid: number | null
+  created_at: string
+  updated_at: string
+  payment_id: string | null
+  payments: Payment[]
 }
-
+interface Payment {
+  payment_id: string
+  transaction_id: string
+  amount: number
+  txid: string | null
+  completed: boolean
+  created_at: string
+}
 interface ButtonResponse {
   status: string
   message: string
-  title?: string // Optional title from API
+  title?: string
   data: {
-  buttonId: string;            // PK, non-nullable
-  merchantId: string;          // FK, non-nullable
-  paymentId: string | null;    // nullable FK
-  amount: number;               // NOT NULL, default 0
-  description: string;          // NOT NULL
-  htmlCode: string;             // NOT NULL
-  variableAmount: boolean;     // NOT NULL
-  multiUse: boolean;           // NOT NULL
-  used: boolean;                 // NOT NULL
-  totalPaid: number | null;    // nullable until paid
-  createdAt: string;           // timestamp, NOT NULL
-  updatedAt: string;           // timestamp, NOT NULL
-  //* data: {
-  //   id?: string | null
-  //   buttonId?: string | null
-  //   amount?: number | null
-  //   //*amount?: string | number | null
-  //   description?: string | null
-  //   htmlCode?: string | null
-  //   variable?: number | null
-  //   multiUse?: number | null
-  //   used?: number | null
-  //   totalPaid?: number | null
-  //   //*totalPaid?: string | number | null
-  //   timestamp?: string | null
-  //   created_at?: string | null
-  //   paymentId?: string | null
+    buttonId: string
+    merchantId: string
+    paymentId: string | null
+    amount: number
+    description: string
+    htmlCode: string
+    variableAmount: boolean
+    multiUse: boolean
+    used: boolean
+    totalPaid: number | null
+    createdAt: string
+    updatedAt: string
+    payments?: {
+      paymentId: string
+      transactionId: string
+      amount: number
+      txid: string | null
+      completed: boolean
+      createdAt: string
+    }[]
   }[]
   total?: number
 }
-
 interface SortConfig {
-  key: keyof Button | null
+  key: Exclude<keyof Button, 'payments'> | null
   direction: 'asc' | 'desc'
 }
-
+interface SubTableSortConfig {
+  key: Exclude<keyof Payment, 'transaction_id' | 'txid'> | null
+  direction: 'asc' | 'desc'
+}
 const PaymentButtonsList = () => {
   const [buttons, setButtons] = useState<Button[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,23 +135,24 @@ const PaymentButtonsList = () => {
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>('all')
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
+  const [subTableSortConfig, setSubTableSortConfig] = useState<SubTableSortConfig>({ key: 'created_at', direction: 'desc' })
   const [customOptions, setCustomOptions] = useState<number[]>([])
   const [totalRecords, setTotalRecords] = useState(0)
-  const [title, setTitle] = useState<string>('Payment Buttons') // Default title
+  const [title, setTitle] = useState<string>('Payment Buttons')
+  const [expandedButton, setExpandedButton] = useState<string | null>(null)
   const theme = useTheme()
   const fetchTimeout = useRef<number | null>(null)
   const [hoveredValue, setHoveredValue] = useState<string | null>(null)
   const [clickedValue, setClickedValue] = useState<string | null>(null)
-  const [isClicked, setIsClicked] = useState(false) // New state to disable hover after click
-  const [exitDirection, setExitDirection] = useState<string | null>(null) // Track exit direction
-  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null) // Track last clicked column
+  const [isClicked, setIsClicked] = useState(false)
+  const [exitDirection, setExitDirection] = useState<string | null>(null)
+  const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     'Button Id': null,
     'Payment Id': null,
     'HTML Code': null
   })
-
   const handleMouseEnter = (fullValue: string, columnName: string, rowIndex: number) => {
     logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex)
     if (!isClicked) {
@@ -157,7 +165,6 @@ const PaymentButtonsList = () => {
       }
     }
   }
-
   const handleMouseLeave = (e: React.MouseEvent) => {
     logWithTimestamp(F, 'Mouse leave')
     if (tableRef.current && hoveredValue && !isClicked) {
@@ -185,52 +192,59 @@ const PaymentButtonsList = () => {
       }
     }
   }
-
   const handleClick = (fullValue: string, columnName: string) => {
     logWithTimestamp(F, 'Mouse click, fullValue:', fullValue, 'column:', columnName)
-    setHoveredValue(null) // Clear hover state
-    setIsClicked(true) // Disable further hover events
+    setHoveredValue(null)
+    setIsClicked(true)
     setClickedValue(fullValue)
-    setLastClickedColumn(columnName) // Track the clicked column
+    setLastClickedColumn(columnName)
     navigator.clipboard.writeText(fullValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
   }
-
   const handleReset = () => {
     logWithTimestamp(F, 'Reset click')
     setClickedValue(null)
-    setIsClicked(false) // Re-enable hover events
-    setHoveredValue(null) // Clear hover on reset
+    setIsClicked(false)
+    setHoveredValue(null)
     setExitDirection(null)
-    setLastClickedColumn(null) // Clear last clicked column
+    setLastClickedColumn(null)
   }
-
   const fetchButtons = async () => {
     setLoading(true)
-    setButtons([]) // Clear state to force refresh
+    setButtons([])
     try {
-      const url = `${location.protocol}//${location.host}/api/listButtons?limit=${500}`
-      logWithTimestamp(F, 'Fetching total buttons with URL:', url)
+      const url = `${location.protocol}//${location.host}/api/listButtons?limit=500`
+      logWithTimestamp(F, 'Fetching buttons with URL:', url)
       const response = await authFetch.fetch(url, { method: 'GET' })
       const data: ButtonResponse = await response.json()
-      logWithTimestamp(F, 'API response:', JSON.stringify(data)) // Debug API response
-      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch total buttons'}`)
-      // Map API response to Button interface
-const mappedButtons: Button[] = data.data.map((button) => {
-  const isVariable = !!button.variableAmount
-  return {
-    button_id: button.buttonId,
-    amount: isVariable ? 0 : (button.amount ?? 0),
-    description: button.description ?? 'No description',
-    html_code: button.htmlCode ?? '<div>Pay Now</div>',
-    variable_amount: isVariable,
-    multi_use: !!button.multiUse,
-    used: !!button.used,
-    total_paid: button.totalPaid ?? null,
-    created_at: button.createdAt,           // required
-    updated_at: button.updatedAt,           // required
-    payment_id: button.paymentId ?? null,
-  }
-})
+      logWithTimestamp(F, 'API response:', JSON.stringify(data))
+      if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch buttons'}`)
+      const mappedButtons: Button[] = data.data.map((button) => {
+        const payments = button.payments ? button.payments.map(payment => ({
+          payment_id: payment.paymentId,
+          transaction_id: payment.transactionId,
+          amount: payment.amount,
+          txid: payment.txid ?? null,
+          completed: !!payment.completed,
+          created_at: payment.createdAt
+        })) : []
+        logWithTimestamp(F, `Payments for button ${button.buttonId}:`, payments)
+        const totalPaid = button.totalPaid !== null && button.totalPaid !== undefined ? button.totalPaid : null
+        logWithTimestamp(F, `Total paid for button ${button.buttonId}:`, totalPaid)
+        return {
+          button_id: button.buttonId,
+          amount: button.variableAmount ? 0 : (button.amount ?? 0),
+          description: button.description ?? 'No description',
+          html_code: button.htmlCode ?? '<div>Pay Now</div>',
+          variable_amount: !!button.variableAmount,
+          multi_use: !!button.multiUse,
+          used: !!button.used,
+          total_paid: totalPaid,
+          created_at: button.createdAt,
+          updated_at: button.updatedAt,
+          payment_id: button.paymentId ?? null,
+          payments
+        }
+      })
       logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons))
       setTotalRecords(data.total || mappedButtons.length)
       setButtons(mappedButtons)
@@ -238,41 +252,36 @@ const mappedButtons: Button[] = data.data.map((button) => {
       logWithTimestamp(F, 'Initial buttons length:', mappedButtons.length)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '❌ Unknown error'
-      logWithTimestamp(F, '❌ Error fetching total buttons:', message)
+      logWithTimestamp(F, '❌ Error fetching buttons:', message)
       setError(message)
     } finally {
       setLoading(false)
     }
   }
-
   useEffect(() => {
-    fetchButtons() // Initial fetch on mount
+    fetchButtons()
     return () => {
       if (fetchTimeout.current) clearTimeout(fetchTimeout.current)
     }
-  }, []) // Empty dependency array ensures this runs only on mount
-
+  }, [])
   useEffect(() => {
     setPage(0)
   }, [usedFilter])
-
-  const requestSort = (key: keyof Button) => {
-    let direction: 'asc' | 'desc' = 'asc'
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc'
+  const requestSort = (key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'transaction_id' | 'txid'> | null, isSubTable?: boolean) => {
+    const config = isSubTable ? subTableSortConfig : sortConfig;
+    let direction: 'asc' | 'desc' = 'asc';
+    if (config.key === key && config.direction === 'asc') {
+      direction = 'desc';
     }
-    setSortConfig({ key, direction })
+    if (isSubTable) {
+      setSubTableSortConfig({ key: key as Exclude<keyof Payment, 'transaction_id' | 'txid'> | null, direction });
+    } else {
+      setSortConfig({ key: key as Exclude<keyof Button, 'payments'> | null, direction });
+    }
   }
-
   const handleRowsPerPageChange = (event: React.ChangeEvent<{ value: unknown }>) => {
     const value = event.target.value
-    logWithTimestamp(
-      F,
-      'Rows per page change:',
-      value,
-      'Current options:',
-      rowsPerPageOptions.map(opt => opt.value)
-    )
+    logWithTimestamp(F, 'Rows per page change:', value, 'Current options:', rowsPerPageOptions.map(opt => opt.value))
     if (typeof value === 'object' && value !== null && 'value' in value && value.value === 0) {
       setShowCustomInput(true)
     } else {
@@ -289,19 +298,17 @@ const mappedButtons: Button[] = data.data.map((button) => {
       }
     }
   }
-
   const handleCustomRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value.replace(/[^0-9]/g, '')
     setCustomRowsPerPage(value)
   }
-
   const handleCustomInputComplete = (
     event: React.KeyboardEvent<HTMLDivElement> | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     if (event.type === 'keypress' && (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter') return
     const numValue = parseInt(customRowsPerPage, 10)
     logWithTimestamp(F, 'Custom rows on complete:', numValue)
-    if (isNaN(numValue) || numValue <= 0 || numValue > 100) {
+    if (isNaN(numValue) || numValue <= 0 || numValue > 500) {
       setRowsPerPage(5)
     } else {
       setRowsPerPage(numValue)
@@ -316,7 +323,6 @@ const mappedButtons: Button[] = data.data.map((button) => {
     setShowCustomInput(false)
     setPage(0)
   }
-
   const baseOptions = [
     { value: 5, label: '5' },
     { value: 10, label: '10' },
@@ -327,7 +333,6 @@ const mappedButtons: Button[] = data.data.map((button) => {
     ...baseOptions,
     ...customOptions.map(value => ({ value, label: value.toString() }))
   ]
-
   const filteredButtons =
     usedFilter === 'all'
       ? buttons
@@ -337,13 +342,10 @@ const mappedButtons: Button[] = data.data.map((button) => {
         )
   const sortedButtons = sortConfig.key
     ? [...filteredButtons].sort((a, b) => {
-        if (!sortConfig.key) return 0 // Default to no change if key is null
-        let aValue: string | number | Date | boolean | null | undefined = a[sortConfig.key]
-        let bValue: string | number | Date | boolean | null | undefined = b[sortConfig.key]
-        // Handle null/undefined values by placing them at the end
+        let aValue: string | number | Date | boolean | null | undefined = sortConfig.key ? a[sortConfig.key] : undefined
+        let bValue: string | number | Date | boolean | null | undefined = sortConfig.key ? b[sortConfig.key] : undefined
         if (aValue === null || aValue === undefined) return 1
         if (bValue === null || bValue === undefined) return -1
-        // Convert to comparable types
         if (sortConfig.key === 'amount' || sortConfig.key === 'total_paid') {
           aValue = (aValue as number) || 0
           bValue = (bValue as number) || 0
@@ -374,6 +376,35 @@ const mappedButtons: Button[] = data.data.map((button) => {
       })
     : filteredButtons
   const paginatedButtons = sortedButtons.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+  const sortPayments = (payments: Payment[], config: SubTableSortConfig) => {
+    if (!config.key) return payments;
+    return [...payments].sort((a, b) => {
+      let aValue: string | number | Date | boolean | null | undefined = config.key ? a[config.key] : undefined
+      let bValue: string | number | Date | boolean | null | undefined = config.key ? b[config.key] : undefined
+      if (aValue === null || aValue === undefined) return 1
+      if (bValue === null || bValue === undefined) return -1
+      switch (config.key) {
+        case 'amount':
+          aValue = (aValue as number) || 0
+          bValue = (bValue as number) || 0
+          return config.direction === 'asc' ? (aValue as number) - (bValue as number) : (bValue as number) - (aValue as number)
+        case 'completed':
+          aValue = (aValue as boolean) ? 1 : 0
+          bValue = (bValue as boolean) ? 1 : 0
+          return config.direction === 'asc' ? (aValue as number) - (bValue as number) : (bValue as number) - (aValue as number)
+        case 'created_at':
+          aValue = new Date((aValue as string) || '')
+          bValue = new Date((bValue as string) || '')
+          return config.direction === 'asc' ? (aValue as Date).getTime() - (bValue as Date).getTime() : (bValue as Date).getTime() - (aValue as Date).getTime()
+        case 'payment_id':
+          aValue = (aValue as string) || ''
+          bValue = (bValue as string) || ''
+          return config.direction === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
+        default:
+          return 0
+      }
+    });
+  }
   logWithTimestamp(
     F,
     'Paginated buttons length:',
@@ -389,92 +420,45 @@ const mappedButtons: Button[] = data.data.map((button) => {
     'Offset:',
     page * rowsPerPage
   )
-
   useLayoutEffect(() => {
     paginatedButtons.forEach((button, index) => {
       const buttonIdCell = document.querySelector(
-        `tr:nth-child(${index + 1}) td:nth-child(2)`
+        `tr:nth-child(${index * 2 + 1}) td:nth-child(2)`
       ) as HTMLTableCellElement | null
       const paymentIdCell = document.querySelector(
-        `tr:nth-child(${index + 1}) td:nth-child(3)`
+        `tr:nth-child(${index * 2 + 1}) td:nth-child(3)`
       ) as HTMLTableCellElement | null
       const htmlCodeCell = document.querySelector(
-        `tr:nth-child(${index + 1}) td:nth-child(10)`
+        `tr:nth-child(${index * 2 + 1}) td:nth-child(10)`
       ) as HTMLTableCellElement | null
-      if (buttonIdCell) {
-        columnRefs.current['Button Id'] = buttonIdCell
-        logWithTimestamp(F, `Button Id ref assigned for index: ${index}`)
-      } else {
-        logWithTimestamp(F, 'Button Id ref is null for index:', index)
-      }
-      if (paymentIdCell) {
-        columnRefs.current['Payment Id'] = paymentIdCell
-        logWithTimestamp(F, `Payment Id ref assigned for index: ${index}`)
-      } else {
-        logWithTimestamp(F, 'Payment Id ref is null for index:', index)
-      }
-      if (htmlCodeCell) {
-        columnRefs.current['HTML Code'] = htmlCodeCell
-        logWithTimestamp(F, `HTML Code ref assigned for index: ${index}`)
-      } else {
-        logWithTimestamp(F, 'HTML Code ref is null for index:', index)
-      }
+      if (buttonIdCell) columnRefs.current['Button Id'] = buttonIdCell
+      if (paymentIdCell) columnRefs.current['Payment Id'] = paymentIdCell
+      if (htmlCodeCell) columnRefs.current['HTML Code'] = htmlCodeCell
+      logWithTimestamp(F, `Button Id ref assigned: ${!!buttonIdCell}, Payment Id ref: ${!!paymentIdCell}, HTML Code ref: ${!!htmlCodeCell}`)
     })
   }, [paginatedButtons])
-
   if (loading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          backgroundColor: theme.palette.background.default
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <CircularProgress />
       </Box>
     )
   }
   if (error !== '') {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '90vh',
-          backgroundColor: theme.palette.background.paper
-        }}
-      >
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '90vh' }}>
         <Typography color="error">❌ Error: {error}</Typography>
       </Box>
     )
   }
   return (
     <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
-      <Box
-        sx={{
-          textAlign: 'center',
-          marginBottom: theme.spacing(4),
-          marginTop: theme.spacing(5),
-          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
-        }}
-      >
+      <Box sx={{ textAlign: 'center', marginBottom: theme.spacing(4), marginTop: theme.spacing(5) }}>
         <Typography variant="h2">{title}</Typography>
         <Typography variant="subtitle1">View all the payment buttons you have created</Typography>
       </Box>
       {filteredButtons.length === 0 ? (
-        <Card
-          sx={{
-            maxWidth: 600,
-            margin: 'auto',
-            padding: theme.spacing(4),
-            textAlign: 'center',
-            backgroundColor: theme.palette.background.paper
-          }}
-        >
+        <Card sx={{ maxWidth: 600, margin: 'auto', padding: theme.spacing(4), textAlign: 'center' }}>
           <Stack spacing={3} alignItems="center">
             <ReceiptLong sx={{ fontSize: 60, color: theme.palette.text.secondary }} />
             <Typography variant="h2">No Payment Buttons Yet</Typography>
@@ -507,10 +491,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('created_at')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('created_at'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Timestamp {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -520,10 +501,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('button_id')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('button_id'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Button Id {sortConfig.key === 'button_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -533,10 +511,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('payment_id')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('payment_id'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Payment Id {sortConfig.key === 'payment_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -546,26 +521,17 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('amount')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('amount'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Amount(Sats) {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                      <Tooltip title="For variable buttons, this is the initial value (0). Check payments for actual amounts paid.">
-                        <span> ℹ️</span>
-                      </Tooltip>
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('variable_amount')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('variable_amount'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Variable {sortConfig.key === 'variable_amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -575,10 +541,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('multi_use')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('multi_use'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Multi-use {sortConfig.key === 'multi_use' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -588,10 +551,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('used')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('used'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Used {sortConfig.key === 'used' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -601,10 +561,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('total_paid')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('total_paid'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Total Paid {sortConfig.key === 'total_paid' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -614,10 +571,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('description')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('description'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       Description {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
@@ -627,82 +581,166 @@ const mappedButtons: Button[] = data.data.map((button) => {
                     <Typography
                       component="a"
                       href="#"
-                      onClick={e => {
-                        e.preventDefault()
-                        requestSort('html_code')
-                      }}
+                      onClick={e => { e.preventDefault(); requestSort('html_code'); }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
                       HTML Code {sortConfig.key === 'html_code' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
+                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedButtons.map((button, index) => {
                   const fullButtonId = button.button_id || ''
                   const fullPaymentId = button.payment_id || ''
-                  const fullHtmlCode = button.html_code || '<div>Pay Now</div>' // Use default if null
-                  //console.log('button.total_paid=', button.total_paid)
+                  const fullHtmlCode = button.html_code || '<div>Pay Now</div>'
+                  logWithTimestamp(F, `Rendering button ${button.button_id}, multi_use: ${button.multi_use}, payments:`, button.payments)
                   return (
-                    <TableRow key={button.button_id || index}>
-                      <TableCell>
-                        {formatTimestamp(button.created_at || button.updated_at || new Date().toISOString())}
-                      </TableCell>
-                      <TableCell
-                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Button Id'] = el)}
-                        onMouseEnter={() => handleMouseEnter(fullButtonId, 'Button Id', index + 1)}
-                        onMouseLeave={handleMouseLeave}
-                        onClick={() => handleClick(fullButtonId, 'Button Id')}
-                      >
-                        {formatId(button.button_id || '')}
-                      </TableCell>
-                      <TableCell
-                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['Payment Id'] = el)}
-                        onMouseEnter={() => handleMouseEnter(fullPaymentId, 'Payment Id', index + 1)}
-                        onMouseLeave={handleMouseLeave}
-                        onClick={() => handleClick(fullPaymentId, 'Payment Id')}
-                      >
-                        {formatId(button.payment_id || '')}
-                      </TableCell>
-                      <TableCell>{button.amount}</TableCell>
-                      <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
-                      <TableCell>{button.description}</TableCell>
-                      <TableCell
-                        ref={(el: HTMLTableCellElement | null) => (columnRefs.current['HTML Code'] = el)}
-                        onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index + 1)}
-                        onMouseLeave={handleMouseLeave}
-                        onClick={() => handleClick(fullHtmlCode, 'HTML Code')}
-                      >
-                        {button.html_code
-                          ? `${button.html_code.substring(0, 16)}...${button.html_code.slice(-16)}`
-                          : '<div>Pay Now</div>'}
-                      </TableCell>
-                    </TableRow>
+                    <React.Fragment key={button.button_id || index}>
+                      <TableRow>
+                        <TableCell>{formatTimestamp(button.created_at || button.updated_at)}</TableCell>
+                        <TableCell
+                          onMouseEnter={() => handleMouseEnter(fullButtonId, 'Button Id', index * 2 + 1)}
+                          onMouseLeave={handleMouseLeave}
+                          onClick={() => handleClick(fullButtonId, 'Button Id')}
+                        >
+                          {formatId(button.button_id)}
+                        </TableCell>
+                        <TableCell
+                          sx={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}
+                          onMouseEnter={() => handleMouseEnter(fullPaymentId, 'Payment Id', index * 2 + 1)}
+                          onMouseLeave={handleMouseLeave}
+                          onClick={() => handleClick(fullPaymentId, 'Payment Id')}
+                        >
+                          {formatId(button.payment_id || '')}
+                          {button.multi_use && button.payments.length > 0 && (
+                            <IconButton
+                              onClick={() => {
+                                logWithTimestamp(F, `Toggling collapse for button ${button.button_id}, expanded: ${expandedButton === button.button_id ? 'closing' : 'opening'}, current expandedButton: ${expandedButton}`);
+                                setExpandedButton(expandedButton === button.button_id ? null : button.button_id);
+                              }}
+                              sx={{ ml: 1, padding: 0 }}
+                            >
+                              {expandedButton === button.button_id ? <ExpandLess /> : <ExpandMore />}
+                            </IconButton>
+                          )}
+                        </TableCell>
+                        <TableCell
+                          onMouseEnter={() => button.amount === 0 ? handleMouseEnter('For variable buttons, this is the initial value (0). Check payments for actual amounts paid.', 'Amount(Sats)', index * 2 + 1) : null}
+                          onMouseLeave={handleMouseLeave}
+                          onClick={() => button.amount === 0 ? handleClick('For variable buttons, this is the initial value (0). Check payments for actual amounts paid.', 'Amount(Sats)') : null}
+                        >
+                          {button.amount}
+                        </TableCell>
+                        <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>{button.used ? 'Yes' : 'No'}</TableCell>
+                        <TableCell>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
+                        <TableCell>{button.description}</TableCell>
+                        <TableCell
+                          onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index * 2 + 1)}
+                          onMouseLeave={handleMouseLeave}
+                          onClick={() => handleClick(fullHtmlCode, 'HTML Code')}
+                        >
+                          {button.html_code
+                            ? `${button.html_code.substring(0, 16)}...${button.html_code.slice(-16)}`
+                            : '<div>Pay Now</div>'}
+                        </TableCell>
+                        <TableCell />
+                      </TableRow>
+                      {button.multi_use && button.payments.length > 0 && (
+                        <Collapse in={expandedButton === button.button_id} timeout="auto" unmountOnExit key={`collapse-${button.button_id}`}>
+                          <Box sx={{ padding: 2, backgroundColor: theme.palette.background.default, minHeight: '50px', overflow: 'visible' }}>
+                            {/*logWithTimestamp(F, `Sub-table payments for ${button.button_id}:`, button.payments)*/}
+                            <Table size="small" sx={{ minWidth: '100%', border: '1px solid', borderColor: theme.palette.divider, display: 'table' }}>
+                              <TableHead>
+                                <TableRow sx={{ display: 'table-row' }}>
+                                  <TableCell>
+                                    <Typography
+                                      component="a"
+                                      href="#"
+                                      onClick={e => { e.preventDefault(); requestSort('created_at', true); }}
+                                      sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
+                                    >
+                                      Timestamp {subTableSortConfig.key === 'created_at' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography
+                                      component="a"
+                                      href="#"
+                                      onClick={e => { e.preventDefault(); requestSort('payment_id', true); }}
+                                      sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
+                                    >
+                                      Payment Id {subTableSortConfig.key === 'payment_id' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography
+                                      component="a"
+                                      href="#"
+                                      onClick={e => { e.preventDefault(); requestSort('amount', true); }}
+                                      sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
+                                    >
+                                      Amount {subTableSortConfig.key === 'amount' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography
+                                      component="a"
+                                      href="#"
+                                      onClick={e => { e.preventDefault(); requestSort('completed', true); }}
+                                      sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
+                                    >
+                                      Used {subTableSortConfig.key === 'completed' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                                    </Typography>
+                                  </TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody sx={{ display: 'table-row-group' }}>
+                                {button.payments.length > 0 ? (
+                                  sortPayments(button.payments, subTableSortConfig).map((payment, paymentIndex) => {
+                                    logWithTimestamp(F, `Rendering payment row ${paymentIndex} for ${button.button_id}:`, payment)
+                                    return (
+                                      <TableRow key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}-${paymentIndex}`} sx={{ display: 'table-row' }}>
+                                        <TableCell>{formatTimestamp(payment.created_at)}</TableCell>
+                                        <TableCell>{formatId(payment.payment_id)}</TableCell>
+                                        <TableCell
+                                          onMouseEnter={() => payment.amount === 0 ? handleMouseEnter('For variable buttons, this is the initial value (0). Check payments for actual amounts paid.', 'Amount(Sats)', index * 2 + 1) : null}
+                                          onMouseLeave={handleMouseLeave}
+                                          onClick={() => payment.amount === 0 ? handleClick('For variable buttons, this is the initial value (0). Check payments for actual amounts paid.', 'Amount(Sats)') : null}
+                                        >
+                                          {payment.amount}
+                                        </TableCell>
+                                        <TableCell>{payment.completed ? 'Yes' : 'No'}</TableCell>
+                                      </TableRow>
+                                    )
+                                  })
+                                ) : (
+                                  <TableRow sx={{ display: 'table-row' }}>
+                                    <TableCell colSpan={4}>
+                                      <Typography color="text.secondary">No payments available</Typography>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </Box>
+                        </Collapse>
+                      )}
+                    </React.Fragment>
                   )
                 })}
               </TableBody>
             </Table>
           </TableContainer>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.25,
-              justifyContent: 'flex-end',
-              width: '100%',
-              boxSizing: 'border-box',
-              padding: '4px 0'
-            }}
-          >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, justifyContent: 'flex-end', padding: '4px 0' }}>
             <IconButton onClick={() => setPage(0)} disabled={page === 0} color="inherit" size="small" sx={{ mr: 0.5 }}>
               <FirstPage />
             </IconButton>
             <IconButton onClick={() => setPage(page - 1)} disabled={page === 0} color="inherit" size="small">
-              {/* "Previous" handled by TablePagination context */}
+              {/* Previous */}
             </IconButton>
             <TablePagination
               component="div"
@@ -710,15 +748,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
               page={page}
               onPageChange={(e, newPage) => {
                 setPage(newPage)
-                logWithTimestamp(
-                  F,
-                  'Page changed to:',
-                  newPage,
-                  'Rows:',
-                  paginatedButtons,
-                  'filteredButtons.length:',
-                  filteredButtons.length
-                )
+                logWithTimestamp(F, 'Page changed to:', newPage, 'Rows:', paginatedButtons.length)
                 setHoveredValue(null)
                 setClickedValue(null)
                 setIsClicked(false)
@@ -736,7 +766,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
               color="inherit"
               size="small"
             >
-              {/* "Next" handled by TablePagination context */}
+              {/* Next */}
             </IconButton>
             <IconButton
               onClick={() => setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)}
@@ -802,8 +832,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                   <IconButton
                     size="small"
                     onClick={() => {
-                      navigator.clipboard
-                        .writeText(clickedValue)
+                      navigator.clipboard.writeText(clickedValue)
                         .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
                       setClickedValue(null)
                       setIsClicked(false)
@@ -826,7 +855,7 @@ const mappedButtons: Button[] = data.data.map((button) => {
                 onBlur={handleCustomInputComplete}
                 variant="outlined"
                 size="small"
-                inputProps={{ min: 1, max: 100, step: 1 }}
+                inputProps={{ min: 1, max: 500, step: 1 }}
                 sx={{ width: 100 }}
               />
             </Box>

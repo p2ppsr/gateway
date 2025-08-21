@@ -5,15 +5,15 @@
  * Validates the submitted transaction against the invoice created earlier, ensuring:
  * - The paymentId and buttonId exist in the ids table with correct types (payment and button, respectively), pre-created at gateway launch.
  * - The transaction is well-formed and matches the expected locking script (amount validated from transaction).
- * - The payment button (if single-use) has not already been used.
+ * - The payment exists in the payments table and is not already completed.
  *
  * Upon successful validation, the database is updated to mark the payment as complete,
- * store the atomic BEEF transaction, and update the button's usage state and total paid.
+ * store the atomic BEEF transaction, and record the txid.
  * The txid is received from the client and validated, then stored directly without extraction.
  *
  * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
  *
- * Version: v4.20 (Updated 14Aug2025_0040 BST to use payment_id instead of id)
+ * Version: v4.21 (Updated 20Aug2025_1925 BST to validate against payments table only)
  * Change Log:
  * - 05Aug2025_0430 BST (v2.2): Fixed payment_button_id mapping and standardized route path.
  * - 05Aug2025_0600 BST (v2.3): Updated to use transaction_id in where clause (incomplete fix).
@@ -54,6 +54,7 @@
  * - 13Aug2025_1215 BST (v4.18): Fixed P2PKH derivation using payer_id to resolve 400 error.
  * - 13Aug2025_1220 BST (v4.19): Refined P2PKH validation and ensured payer_id consistency.
  * - 14Aug2025_0040 BST (v4.20): Updated to use payment_id instead of id in payment button query.
+ * - 20Aug2025_1925 BST (v4.21): Updated to validate against payments table only, removing payment_buttons query to fix 404 error for multi-use buttons.
  */
 const F = 'routes/pay'
 import knex, { Knex } from 'knex'
@@ -63,7 +64,6 @@ import { Request, Response } from 'express'
 import { logWithTimestamp } from '../utils/logging'
 const db: Knex = knex(knexConfig)
 let payment: Payment | undefined // Declare payment outside try block for broader scope
-
 interface Payment {
   payment_id: string
   button_id: string
@@ -74,22 +74,6 @@ interface Payment {
   transaction_id: string // Added to reflect schema
   txid: string | null
 }
-
-interface PaymentButton {
-  button_id: string // Primary key
-  merchant_id: string
-  payment_id: string | null // Nullable foreign key
-  multi_use: boolean
-  used: boolean
-  variable_amount: boolean
-  amount: number | null // Optional to support variable buttons
-  description: string
-  html_code: string
-  total_paid: number | null
-  created_at: string | null
-  updated_at: string | null
-}
-
 interface RequestBody {
   paymentId: string // Client-passed paymentId referencing ids.id with type='payment'
   buttonId: string // Client-passed buttonId referencing ids.id with type='button'
@@ -99,13 +83,11 @@ interface RequestBody {
   }
   lockingScript?: string
 }
-
 interface AuthRequest extends Request {
   auth: {
     identityKey: string
   }
 }
-
 export default {
   type: 'post' as const,
   path: '/pay',
@@ -137,11 +119,12 @@ export default {
       payment = await db('payments')
         .where({
           payment_id: paymentId,
+          button_id: buttonId,
           completed: false
         })
         .first()
       if (!payment) {
-        logWithTimestamp(F, '❌ [pay] Payment not found or already completed:', { paymentId })
+        logWithTimestamp(F, '❌ [pay] Payment not found or already completed:', { paymentId, buttonId })
         res.status(404).json({
           status: 'error',
           message: 'Payment not found or already completed'
@@ -158,26 +141,6 @@ export default {
         res.status(401).json({
           status: 'error',
           message: 'Payment not originated by the same user'
-        })
-        return
-      }
-      const button: PaymentButton | undefined = await db('payment_buttons')
-        .where({ payment_id: paymentId }) // Use payment_id instead of id
-        .first()
-      logWithTimestamp(F, '🔍 [pay] Query result for button:', button || 'No matching button found')
-      if (!button) {
-        logWithTimestamp(F, '❌ [pay] Payment button not found for payment_id:', { paymentId })
-        res.status(404).json({
-          status: 'error',
-          message: 'Payment button not found'
-        })
-        return
-      }
-      if (!button.multi_use && button.used) {
-        logWithTimestamp(F, '❌ [pay] Single-use button already used:', { paymentId })
-        res.status(400).json({
-          status: 'error',
-          message: 'The single-use button has already been used'
         })
         return
       }
@@ -206,7 +169,7 @@ export default {
       const senderPrivateKey: PrivateKey = paymentRec.payer_id
         ? new PrivateKey(paymentRec.payer_id, 'hex')
         : new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex') // Fallback if payer_id is null
-      const recipientPublicKey: PublicKey = PublicKey.fromString(button.merchant_id)
+      const recipientPublicKey: PublicKey = PublicKey.fromString(paymentRec.merchant_id)
       const invoiceNumber: string = `2-3241645161d8-${paymentRec.transaction_id} 1` // Use transaction_id from payment
       const senderPrivateKeyString: string = senderPrivateKey.toString()
       const recipientPublicKeyString: string = recipientPublicKey.toString()
@@ -265,6 +228,7 @@ export default {
         await trx('payments')
           .where({
             payment_id: paymentId,
+            button_id: buttonId,
             transaction_id: paymentRec.transaction_id // Ensure update targets the existing record
           })
           .update({
@@ -274,12 +238,10 @@ export default {
             amount: expectedAmount,
             transaction_id: paymentRec.transaction_id // Preserve transaction_id
           })
+        // Optional: Update total_paid in payment_buttons if needed
         await trx('payment_buttons')
-          .where({ payment_id: paymentId }) // Use payment_id instead of id
-          .update({
-            used: true,
-            total_paid: db.raw('?? + ?', ['total_paid', expectedAmount])
-          })
+          .where({ button_id: buttonId })
+          .increment('total_paid', expectedAmount)
       })
       logWithTimestamp(F, `✅ [pay] Payment successful. TXID: ${txid}`)
       const responseData = { status: 'success', message: 'Payment completed successfully', txid }

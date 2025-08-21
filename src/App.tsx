@@ -9,10 +9,13 @@
  * - Rewrote `setInterval` to avoid misused Promise warning.
  * - Prefixed IIFE in `useEffect` with `void` to prevent floating promise warning.
  * - Replaced process.env with utils/constants.ts for configuration.
+ * - Removed nested BrowserRouter to fix "You cannot render a <Router> inside another <Router>" error (20Aug2025_2223 BST).
+ *
+ * Version: v1.1 (Updated 20Aug2025_2223 BST)
  */
 const F = 'App'
 import React, { useState, useEffect } from 'react'
-import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import Theme from './components/Theme'
 import Navbar from './components/Navbar'
 import Create from './pages/Create'
@@ -32,7 +35,6 @@ import { logWithTimestamp } from './utils/logging'
 logWithTimestamp(F, `CONFIG:${CONFIG}`)
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
-
 const API_BASE = CONFIG.API_BASE
 
 /**
@@ -59,7 +61,6 @@ const App: React.FC = () => {
         setIsMncMissing(hasMNC === 0)
       })()
     }, 2000)
-
     return () => clearInterval(intervalId)
   }, [])
 
@@ -82,16 +83,14 @@ const App: React.FC = () => {
     <Theme>
       <CssBaseline />
       <MetanetclientMissingModal open={isMncMissing} />
-      <Router>
-        <Navbar isAdmin={isAdmin} />
-        <Routes>
-          <Route path="/" element={<Create />} />
-          <Route path="/buttons" element={<Buttons />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/actions" element={<Actions />} />
-          <Route path="/money" element={<Money />} />
-        </Routes>
-      </Router>
+      <Navbar isAdmin={isAdmin} />
+      <Routes>
+        <Route path="/" element={<Create />} />
+        <Route path="/buttons" element={<Buttons />} />
+        <Route path="/payments" element={<Payments />} />
+        <Route path="/actions" element={<Actions />} />
+        <Route path="/money" element={<Money />} />
+      </Routes>
     </Theme>
   )
 }

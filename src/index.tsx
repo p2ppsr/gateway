@@ -1,13 +1,14 @@
-import React from 'react';
-import ReactDOM from 'react-dom';
+// src/index.tsx
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { logWithTimestamp } from './utils/logging';
+import './index.css';
+import React from 'react';
 
-const F = 'index';
-logWithTimestamp(F, 'All localStorage keys at startup:', Object.keys(localStorage));
-
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error('❌ Root element not found');
-}
-ReactDOM.render(<App />, rootElement);
+const container = document.getElementById('root')!;
+const root = createRoot(container);
+root.render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);

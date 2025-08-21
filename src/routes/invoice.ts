@@ -1,11 +1,11 @@
-/**
+ /**
  * @file src/routes/invoice.ts
  * @description POST route to create a payment invoice for a given paymentId and buttonId.
  * Validates the payment button, checks multi-use status, and generates a transaction output for payment processing.
- * For multi-use buttons, validates the paymentId via /api/initializeIds only if not in the ids table to handle HTML reuse cases.
+ * For multi-use buttons, generates a new paymentId directly via database checks to avoid duplicate payment_id errors and authentication issues.
  * Uses payment_buttons.description for the output description and generates a derived locking script.
  *
- * Version: v2.29 (Updated 20Aug2025_1445 BST to add maximum logging for ids table and authentication)
+ * Version: v2.32 (Updated 20Aug2025_1850 BST to fix timestamp format for ids table insertion)
  * Change Log:
  * - 19Aug2025_1135 BST (v2.19): Replaced fetch call to /api/initializeIds with direct call to initializeIds handler.
  * - 19Aug2025_1145 BST (v2.20): Fixed TypeScript error with InitRequest interface, updated 'mock' to 'simulate frontend request'.
@@ -16,7 +16,10 @@
  * - 19Aug2025_1240 BST (v2.25): Used payment_buttons.description for outputDescription.
  * - 20Aug2025_1422 BST (v2.26): Reverted to fetch call for /api/initializeIds to restore authentication middleware propagation, fixing 401 Unauthorized error.
  * - 20Aug2025_1427 BST (v2.27): Skipped /api/initializeIds call for valid multi-use buttons to avoid redundant authentication, fixing 403 Sender identity mismatch error.
- * - 20Aug2025_1445 BST (v2.29): Enhanced logging for ids table check, authentication context, and initializeIds response to debug second-click 403 error.
+ * - 20Aug2025_1445 BST (v2.29): Enhanced logging for ids table check and authentication context to debug second-click 403 error.
+ * - 20Aug2025_1515 BST (v2.30): Modified to call /api/initializeIds for multi-use buttons to generate new paymentId, fixing duplicate payment_id error.
+ * - 20Aug2025_1810 BST (v2.31): Generate new paymentId for multi-use buttons via direct database checks, bypassing /api/initializeIds to avoid 403 authentication errors.
+ * - 20Aug2025_1850 BST (v2.32): Fixed timestamp format for ids table insertion to use MySQL-compatible DATETIME format (YYYY-MM-DD HH:MM:SS).
  */
 const F = 'routes/invoice';
 import knex, { Knex } from 'knex';
@@ -133,68 +136,60 @@ export default {
         });
         return;
       }
-      // For multi-use buttons, check if paymentId exists in ids table
+      // For multi-use buttons, generate a new paymentId to avoid duplicates
       if (button.multi_use) {
-        logWithTimestamp(F, '🔍 [invoice] [Step 4] Checking ids table for paymentId:', {
-          paymentId,
-          merchantId,
-          query: db('ids').where({ id: paymentId, type: 'payment', merchant_id: merchantId }).toString(),
-        });
-        const existingId = await db('ids')
-          .where({ id: paymentId, type: 'payment', merchant_id: merchantId })
-          .first();
-        logWithTimestamp(F, '🔍 [invoice] [Step 4] ids table query result:', { existingId });
-        if (!existingId) {
-          logWithTimestamp(F, '🔍 [invoice] [Step 4] paymentId not found in ids table, validating with initializeIds:', paymentId);
-          const initResponse = await fetch(`${CONFIG.API_BASE}/api/initializeIds`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-bsv-auth-identity-key': senderIdentityKey,
-            },
-            body: JSON.stringify({
-              paymentId,
-              merchantId,
-              description: button.description,
-            }),
+        logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
+        let newPaymentId = randomBytes(12).toString('hex').slice(0, 12);
+        let attempts = 0;
+        const maxAttempts = 5;
+        while (attempts < maxAttempts) {
+          const existingPayment = await db('payments')
+            .where({ payment_id: newPaymentId })
+            .first();
+          const existingId = await db('ids')
+            .where({ id: newPaymentId, type: 'payment', merchant_id: merchantId })
+            .first();
+          logWithTimestamp(F, '🔍 [invoice] [Step 4] Checking new paymentId:', {
+            newPaymentId,
+            attempt: attempts + 1,
+            existsInPayments: !!existingPayment,
+            existsInIds: !!existingId,
           });
-          const initData = await initResponse.json();
-          logWithTimestamp(F, '🔍 [invoice] [Step 4] initializeIds response:', {
-            status: initResponse.status,
-            data: initData,
-            requestHeaders: {
-              'x-bsv-auth-identity-key': senderIdentityKey,
-            },
-            responseHeaders: Object.fromEntries(initResponse.headers.entries()),
-          });
-          if (initResponse.status === 409 && initData?.status === 'error' && initData?.newId) {
-            paymentId = initData.newId;
-            logWithTimestamp(F, '🔍 [invoice] [Step 4] Using new paymentId from initializeIds:', paymentId);
-            // Refresh button data to get updated payment_id and description
-            const updatedButton: PaymentButton | undefined = await db('payment_buttons')
-              .where({ button_id: buttonId, merchant_id: merchantId })
-              .first();
-            if (updatedButton) {
-              logWithTimestamp(F, '🔍 [invoice] [Step 4] Refreshed button data:', {
-                ...updatedButton,
-                description: updatedButton.description || 'Not set',
-              });
-              button.description = updatedButton.description;
-              button.payment_id = updatedButton.payment_id;
-            }
-          } else if (initResponse.status !== 200 || initData?.status !== 'success') {
-            logWithTimestamp(F, '❌ [invoice] initializeIds failed:', {
-              status: initResponse.status,
-              data: initData,
-            });
-            res.status(500).json({
-              status: 'error',
-              message: `Failed to validate paymentId: ${initData?.message || 'Unknown error'}`,
-            });
-            return;
+          if (!existingPayment && !existingId) {
+            paymentId = newPaymentId;
+            break;
           }
-        } else {
-          logWithTimestamp(F, '🔍 [invoice] [Step 4] paymentId already valid in ids table, skipping initializeIds:', paymentId);
+          newPaymentId = randomBytes(12).toString('hex').slice(0, 12);
+          attempts++;
+        }
+        if (attempts >= maxAttempts) {
+          logWithTimestamp(F, '❌ [invoice] Failed to generate unique paymentId after max attempts:', { maxAttempts });
+          res.status(500).json({
+            status: 'error',
+            message: 'Failed to generate unique paymentId',
+          });
+          return;
+        }
+        logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId:', paymentId);
+        // Format timestamp for MySQL DATETIME
+        const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        logWithTimestamp(F, '🔍 [invoice] [Step 4] Formatted timestamp for ids table:', { timestamp });
+        // Insert new paymentId into ids table
+        try {
+          await db('ids').insert({
+            id: paymentId,
+            type: 'payment',
+            merchant_id: merchantId,
+            timestamp,
+          }).onConflict(['id', 'type', 'merchant_id']).merge();
+          logWithTimestamp(F, '✅ [invoice] [Step 4] New paymentId inserted into ids table:', paymentId);
+        } catch (insertError) {
+          logWithTimestamp(F, '❌ [invoice] Failed to insert paymentId into ids table:', {
+            error: insertError instanceof Error ? insertError.message : 'Unknown error',
+            stack: insertError instanceof Error ? insertError.stack : 'No stack trace',
+            paymentId,
+          });
+          throw insertError;
         }
       }
       logWithTimestamp(F, '🔍 [invoice] [Step 5] Validating amount:', {
@@ -219,22 +214,40 @@ export default {
         .where({ table_name: 'payments' })
         .select('column_name');
       logWithTimestamp(F, '🔍 [invoice] [Step 6] Payments table schema:', paymentsSchema.map(col => col.column_name));
-      await db('payments').insert({
-        transaction_id: transactionIdNew,
-        payment_id: paymentId,
-        button_id: buttonId,
-        payer_id: senderIdentityKey,
-        merchant_id: merchantId,
-        completed: false,
-        blockchain_transaction: '',
-        amount,
-        exchange_rate: 1,
-      });
-      logWithTimestamp(F, '✅ [invoice] [Step 7] Payment invoice created:', {
-        paymentId,
+      // Log existing payments for buttonId
+      const existingPayments = await db('payments')
+        .where({ button_id: buttonId })
+        .select('transaction_id', 'payment_id');
+      logWithTimestamp(F, '🔍 [invoice] [Step 6] Existing payments for buttonId:', {
         buttonId,
-        transactionId: transactionIdNew,
+        existingPayments,
       });
+      try {
+        await db('payments').insert({
+          transaction_id: transactionIdNew,
+          payment_id: paymentId,
+          button_id: buttonId,
+          payer_id: senderIdentityKey,
+          merchant_id: merchantId,
+          completed: false,
+          blockchain_transaction: '',
+          amount,
+          exchange_rate: 1,
+        });
+        logWithTimestamp(F, '✅ [invoice] [Step 7] Payment invoice created:', {
+          paymentId,
+          buttonId,
+          transactionId: transactionIdNew,
+        });
+      } catch (insertError) {
+        logWithTimestamp(F, '❌ [invoice] Failed to insert payment:', {
+          error: insertError instanceof Error ? insertError.message : 'Unknown error',
+          stack: insertError instanceof Error ? insertError.stack : 'No stack trace',
+          paymentId,
+          transactionId: transactionIdNew,
+        });
+        throw insertError;
+      }
       let senderPrivateKey: PrivateKey;
       try {
         const hasCreatedAt =

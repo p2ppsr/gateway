@@ -7,10 +7,10 @@
  *
  * Used by the Gateway UI to display a merchant's payment buttons.
  * - Supports pagination with limit and offset query parameters.
- * - Includes left join with payments table to fetch payment_id.
+ * - Includes left join with payments table to fetch payment details.
  * - Orders by created_at with ascending or descending sort.
  *
- * Version: v2.27 (Updated 14Aug2025_0115 BST to refine join condition)
+ * Version: v2.29 (Updated 20Aug2025_2239 BST to enhance payments query debugging)
  * Change Log:
  * - 09Aug2025_2300 BST (v2.10): Initial implementation with pagination and filtering.
  * - 10Aug2025_1100 BST (v2.11): Added sort parameter and enhanced logging.
@@ -30,6 +30,8 @@
  * - 13Aug2025_2200 BST (v2.25): Updated to reflect schema changes with non-nullable amount, description, and html_code.
  * - 13Aug2025_2235 BST (v2.26): Refined mapping and defaults for schema alignment.
  * - 14Aug2025_0115 BST (v2.27): Refined join condition to use payment_id for consistency.
+ * - 20Aug2025_2230 BST (v2.28): Added payments array to response for sub-table display.
+ * - 20Aug2025_2239 BST (v2.29): Enhanced payments query debugging with logging.
  */
 const F = 'routes/listButtons'
 import knex, { Knex } from 'knex'
@@ -37,6 +39,7 @@ import knexConfig from '../../knexfile'
 import type { Request, Response } from 'express'
 import { query } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
+
 const db: Knex = knex(knexConfig)
 
 export default {
@@ -60,18 +63,16 @@ export default {
       res.status(400).json({ status: 'error', message: '❌ Invalid query parameters', errors })
       return
     }
-    const merchantId = (req as any).auth?.identityKey || 'unknown' // Default to 'unknown' if not authenticated
+    const merchantId = (req as any).auth?.identityKey || 'unknown'
     const { limit = 500, offset = 0, sort = 'desc', usage, excludeSingleUseRaw } = req.query
-    // Type guard for excludeSingleUse using ChatGPT-inspired approach
     const excludeSingleUse =
       typeof excludeSingleUseRaw === 'boolean'
         ? excludeSingleUseRaw
         : String(excludeSingleUseRaw).toLowerCase() === 'true'
-    // Type guard for usage
     const isUsageDefined = typeof usage === 'string'
     let usageValue: 'used' | 'unused' | undefined = undefined
     if (isUsageDefined) {
-      usageValue = usage as 'used' | 'unused' // Narrow to valid values
+      usageValue = usage as 'used' | 'unused'
     }
     logWithTimestamp(F, '🔍 [listButtons] Fetching buttons for merchant:', {
       merchantId,
@@ -81,107 +82,116 @@ export default {
       usage: usageValue,
       excludeSingleUse
     })
-try {
-// ---------- helpers ----------
-const logSql = (label: string, qb: Knex.QueryBuilder) => {
-  const s = qb.clone().toSQL();
-  console.log(`📜 ${label} SQL:`, s.sql);
-  console.log(`📦 ${label} bindings:`, s.bindings);
-};
-
-// ---------- pre-aggregate payments by button_id (no status column) ----------
-// Build payments aggregate without referencing status
-const paymentsAgg = db('payments')
-  .select('button_id')
-  .sum<{ paidSum: number }>({ paidSum: 'amount' })
-  .groupBy('button_id');
-
-// Main query
-let buttonQuery = db({ pb: 'payment_buttons' })
-  .leftJoin(paymentsAgg.as('pa'), 'pb.button_id', 'pa.button_id')
-  .where('pb.merchant_id', merchantId)
-  .select(
-    'pb.button_id as buttonId',
-    'pb.payment_id as paymentId',
-    'pb.amount',
-    'pb.variable_amount as variableAmount',
-    'pb.multi_use as multiUse',
-    'pb.used',
-    'pb.description',
-    'pb.html_code as htmlCode',
-    db.raw(`COALESCE(pb.created_at, CURRENT_TIMESTAMP) as "createdAt"`),
-    db.raw(`COALESCE(pb.updated_at, pb.created_at, CURRENT_TIMESTAMP) as "updatedAt"`),
-    db.raw(`COALESCE(pa.paidSum, pb.total_paid, 0) as "totalPaid"`)
-  )
-  .orderBy('pb.created_at', 'desc')
-  .limit(500);
-
-// Debug log the SQL before running
-console.log('📜 Final SQL:', buttonQuery.toString());
-console.log('🔍 Bindings:', buttonQuery.toSQL().bindings);
-
-// ---------- filters ----------
-if (excludeSingleUse) {
-  buttonQuery = buttonQuery.where('pb.multi_use', true);
-}
-if (usageValue === 'used') {
-  buttonQuery = buttonQuery.where('pb.used', true);
-} else if (usageValue === 'unused') {
-  buttonQuery = buttonQuery.where('pb.used', false);
-}
-
-// ---------- preview final SQL ----------
-const preview = buttonQuery
-  .clone()
-  .orderBy('pb.created_at', sort as 'asc' | 'desc')
-  .limit(Number(limit))
-  .offset(Number(offset));
-
-logSql('listButtons(final)', preview);
-
-// ---------- execute ----------
-const rows = await buttonQuery
-  .orderBy('pb.created_at', sort as 'asc' | 'desc')
-  .limit(Number(limit))
-  .offset(Number(offset));
-
-console.log('📊 rows.length =', rows.length);
-if (rows[0]) console.log('🔎 sample row[0]:', rows[0]);
-
-// ---------- count ----------
-const totalRow = await db('payment_buttons')
-  .where('merchant_id', merchantId)
-  .count<{ total: number }[]>({ total: 'button_id' });
-const total = Number(totalRow?.[0]?.total ?? 0);
-console.log('🧮 total buttons =', total);
-
-// ---------- normalize + quick sanity on totalPaid ----------
-const safeButtons = rows.map((b: any) => ({
-  ...b,
-  amount: b.amount ?? 0,
-  description: b.description ?? 'No description',
-  htmlCode: b.htmlCode ?? '<div>Pay Now</div>',
-  paymentId: b.paymentId ?? null,
-  totalPaid: Number(b.totalPaid ?? 0),
-}));
-
-const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.totalPaid) || 0), 0);
-console.log('💰 sum(totalPaid) (page) =', paidSum);
-
-logWithTimestamp(F, '✅ [listButtons] Buttons fetched successfully', { total, pagePaidSum: paidSum });
-
-res.status(200).json({
-  status: 'success',
-  message: 'Payment buttons fetched successfully',
-  data: safeButtons,
-  total,
-});
-
-
-} catch (err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
-  logWithTimestamp(F, '❌ Error fetching buttons', { message, queryParams: req.query });
-  res.status(500).json({ status: 'error', message: `❌ ${message}` });
-}
+    try {
+      // ---------- helpers ----------
+      const logSql = (label: string, qb: Knex.QueryBuilder) => {
+        const s = qb.clone().toSQL()
+        console.log(`📜 ${label} SQL:`, s.sql)
+        console.log(`📦 ${label} bindings:`, s.bindings)
+      }
+      // ---------- pre-aggregate payments by button_id ----------
+      const paymentsAgg = db('payments')
+        .select('button_id')
+        .sum<{ paidSum: number }>({ paidSum: 'amount' })
+        .groupBy('button_id')
+      logSql('paymentsAgg', paymentsAgg)
+      // Main query
+      let buttonQuery = db({ pb: 'payment_buttons' })
+        .leftJoin(paymentsAgg.as('pa'), 'pb.button_id', 'pa.button_id')
+        .where('pb.merchant_id', merchantId)
+        .select(
+          'pb.button_id as buttonId',
+          'pb.payment_id as paymentId',
+          'pb.amount',
+          'pb.variable_amount as variableAmount',
+          'pb.multi_use as multiUse',
+          'pb.used',
+          'pb.description',
+          'pb.html_code as htmlCode',
+          db.raw(`COALESCE(pb.created_at, CURRENT_TIMESTAMP) as "createdAt"`),
+          db.raw(`COALESCE(pb.updated_at, pb.created_at, CURRENT_TIMESTAMP) as "updatedAt"`),
+          db.raw(`COALESCE(pa.paidSum, pb.total_paid, 0) as "totalPaid"`)
+        )
+        .orderBy('pb.created_at', 'desc')
+        .limit(500)
+      logSql('buttonQuery', buttonQuery)
+      // ---------- filters ----------
+      if (excludeSingleUse) {
+        buttonQuery = buttonQuery.where('pb.multi_use', true)
+      }
+      if (usageValue === 'used') {
+        buttonQuery = buttonQuery.where('pb.used', true)
+      } else if (usageValue === 'unused') {
+        buttonQuery = buttonQuery.where('pb.used', false)
+      }
+      // ---------- preview final SQL ----------
+      const preview = buttonQuery
+        .clone()
+        .orderBy('pb.created_at', sort as 'asc' | 'desc')
+        .limit(Number(limit))
+        .offset(Number(offset))
+      logSql('listButtons(final)', preview)
+      // ---------- execute ----------
+      const rows = await buttonQuery
+        .orderBy('pb.created_at', sort as 'asc' | 'desc')
+        .limit(Number(limit))
+        .offset(Number(offset))
+      console.log('📊 rows.length =', rows.length)
+      if (rows[0]) console.log('🔎 sample row[0]:', rows[0])
+      // Fetch payments for each button
+      for (const button of rows) {
+        const paymentsQuery = db('payments')
+          .select(
+            'payment_id as paymentId',
+            'transaction_id as transactionId',
+            'amount',
+            'txid',
+            'completed',
+            'created_at as createdAt'
+          )
+          .where({ button_id: button.buttonId })
+          .orderBy('created_at', 'desc')
+        logSql(`payments for button ${button.buttonId}`, paymentsQuery)
+        button.payments = await paymentsQuery
+        logWithTimestamp(F, `Payments for button ${button.buttonId}:`, button.payments)
+      }
+      // ---------- count ----------
+      const totalRow = await db('payment_buttons')
+        .where('merchant_id', merchantId)
+        .count<{ total: number }[]>({ total: 'button_id' })
+      const total = Number(totalRow?.[0]?.total ?? 0)
+      console.log('🧮 total buttons =', total)
+      // ---------- normalize + quick sanity on totalPaid ----------
+      const safeButtons = rows.map((b: any) => ({
+        ...b,
+        amount: b.amount ?? 0,
+        description: b.description ?? 'No description',
+        htmlCode: b.htmlCode ?? '<div>Pay Now</div>',
+        paymentId: b.paymentId ?? null,
+        totalPaid: Number(b.totalPaid ?? 0),
+        payments: b.payments ? b.payments.map((p: any) => ({
+          paymentId: p.paymentId,
+          transactionId: p.transactionId,
+          amount: p.amount,
+          txid: p.txid ?? null,
+          completed: !!p.completed,
+          createdAt: p.createdAt
+        })) : []
+      }))
+      const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.totalPaid) || 0), 0)
+      console.log('💰 sum(totalPaid) (page) =', paidSum)
+      logWithTimestamp(F, '✅ [listButtons] Buttons fetched successfully', { total, pagePaidSum: paidSum })
+      res.status(200).json({
+        status: 'success',
+        message: 'Buttons fetched successfully',
+        title: 'Payment Buttons',
+        data: safeButtons,
+        total
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      logWithTimestamp(F, '❌ Error fetching buttons', { message, queryParams: req.query })
+      res.status(500).json({ status: 'error', message: `❌ ${message}` })
+    }
   }
 }
