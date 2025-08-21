@@ -4,13 +4,14 @@
  * POST route to validate client-generated payment or button IDs in the database.
  * Validates and stores the client-provided ID (paymentId or buttonId) in the ids table, ensuring uniqueness.
  * Updates the payment_buttons table's description and payment_id for multi-use buttons to reflect the new payment_id using getBase58Regex for replace all.
+ * Leverages the newly added 'description' column in the payments table for enhanced consistency.
  *
  * Used by the Gateway UI to pre-register a single unique ID for payment buttons or payments in the ids table,
  * satisfying the foreign key constraint for payment_buttons and payments.
  *
  * - IDs are client-generated 12-character Base58-encoded strings, validated for uniqueness by the database.
  *
- * Version: v1.49 (Updated 19Aug2025_1300 BST to fix maxAttempts scope and change log versioning)
+ * Version: v1.50 (Updated 21Aug2025_1453 BST to integrate 'description' column from payments table)
  * Change Log:
  * - 14Aug2025_2000 BST (v1.40): Updated to validate only the requested ID, returning success/failure status without querying other IDs.
  * - 17Aug2025_1605 BST (v1.41): Added description update for payment_id in payment_buttons table using replace all.
@@ -21,8 +22,9 @@
  * - 17Aug2025_1700 BST (v1.47): Corrected merchantId validation to 64 characters using isMerchantId.
  * - 17Aug2025_1705 BST (v1.48): Removed id from response, used paymentId/buttonId post-validation, fixed log typo.
  * - 19Aug2025_1240 BST (v1.49): Added payment_id update for multi-use buttons in payment_buttons, improved description handling with fallback, fixed maxAttempts scope, corrected versioning.
+ * - 21Aug2025_1453 BST (v1.50): Integrated 'description' column from payments table, enhanced description update logic.
  */
-const F = 'routes/initializeIds';
+const F = 'routes/initializeIds'
 import knex, { Knex } from 'knex';
 import knexConfig from '../../knexfile';
 import type { Request, Response } from 'express';
@@ -30,12 +32,14 @@ import { body, validationResult } from 'express-validator';
 import { logWithTimestamp } from '../utils/logging';
 import { generateBase58, getBase58Regex, isBase58, isMerchantId } from '../utils/general';
 const db: Knex = knex(knexConfig);
+
 interface Ids {
   buttonId?: string;
   paymentId?: string;
   merchantId: string;
   description?: string;
 }
+
 export default {
   type: 'post',
   path: '/initializeIds',
@@ -59,7 +63,7 @@ export default {
       .notEmpty()
       .withMessage('paymentId must be a non-empty string')
       .isLength({ min: 12, max: 12 })
-      .withMessage('paymentId must be exactly 12 characters')
+      .withMessage('paymentId must be a 12-character Base58 string')
       .custom((value) => isBase58(value))
       .withMessage('paymentId must be a 12-character Base58 string'),
     body('merchantId')
@@ -74,7 +78,9 @@ export default {
       .optional()
       .trim()
       .isString()
-      .withMessage('description must be a string'),
+      .withMessage('description must be a string')
+      .custom((value) => value === null || value.length <= 65535) // text max length in MySQL
+      .withMessage('description exceeds maximum length of 65535 characters'),
   ],
   func: async (req: Request, res: Response): Promise<void> => {
     logWithTimestamp(F, '[initializeIds] Route hit for /api/initializeIds', {
@@ -99,11 +105,11 @@ export default {
       });
       return;
     }
-    const senderIdentityKey = (req as any).auth?.identityKey
+    const senderIdentityKey = (req as any).auth?.identityKey;
     if (!senderIdentityKey) {
-      logWithTimestamp(F, '❌ [initializeIds] Missing sender identity key from auth context')
-      res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing sender identity' })
-      return
+      logWithTimestamp(F, '❌ [initializeIds] Missing sender identity key from auth context');
+      res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing sender identity' });
+      return;
     }
     const { buttonId, paymentId, merchantId, description } = req.body as Ids;
     if (!merchantId) {
@@ -132,9 +138,9 @@ export default {
       return;
     }
     if (senderIdentityKey !== merchantId) {
-      logWithTimestamp(F, '❌ [initializeIds] Sender identity does not match merchantId:', { senderIdentityKey, merchantId })
-      res.status(403).json({ status: 'error', message: 'Sender identity does not match merchantId', request: { body: req.body, headers: req.headers } })
-      return
+      logWithTimestamp(F, '❌ [initializeIds] Sender identity does not match merchantId:', { senderIdentityKey, merchantId });
+      res.status(403).json({ status: 'error', message: 'Sender identity does not match merchantId', request: { body: req.body, headers: req.headers } });
+      return;
     }
     logWithTimestamp(F, '✅ [initializeIds] MerchantId validated:', { merchantId });
     let targetId = buttonId || paymentId || generateBase58(12);
@@ -155,7 +161,7 @@ export default {
               newId,
               merchantId,
               type: targetType,
-              attempt: attempts
+              attempt: attempts,
             });
             if (attempts >= maxAttempts) {
               throw new Error(`Failed to generate unique ${targetType} ID after ${maxAttempts} attempts`);
@@ -165,18 +171,23 @@ export default {
                 .where({ payment_id: targetId, merchant_id: merchantId })
                 .first();
               if (button && button.multi_use) {
-                const newDescription = (description || button.description || `Payment to merchant with paymentId: ${newId}`).replace(getBase58Regex(), newId);
+                // Fetch existing payment description if available
+                const payment = await trx('payments')
+                  .where({ payment_id: targetId, merchant_id: merchantId })
+                  .first();
+                const newDescription = (description || payment?.description || button.description || `Payment to merchant with paymentId: ${newId}`)
+                  .replace(getBase58Regex(), newId);
                 await trx('payment_buttons')
                   .where({ payment_id: targetId, merchant_id: merchantId })
                   .update({
                     payment_id: newId,
                     description: newDescription,
-                    updated_at: trx.fn.now()
+                    updated_at: trx.fn.now(),
                   });
                 logWithTimestamp(F, '✅ [initializeIds] Updated payment_buttons:', {
                   payment_id: newId,
                   newDescription,
-                  merchantId
+                  merchantId,
                 });
               }
             }
@@ -197,7 +208,12 @@ export default {
           });
           logWithTimestamp(F, '✅ [initializeIds] ID inserted:', { id: targetId, merchantId, type: targetType });
           if (targetType === 'payment' && description) {
-            const newDescription = description.replace(getBase58Regex(), targetId);
+            // Fetch or initialize payment description
+            const paymentDescription = (await trx('payments')
+              .where({ payment_id: targetId, merchant_id: merchantId })
+              .first())?.description || description;
+            const newDescription = (paymentDescription || description || `Payment using paymentId: ${targetId}`)
+              .replace(getBase58Regex(), targetId);
             await trx('payment_buttons')
               .where({ payment_id: targetId, merchant_id: merchantId })
               .update({ description: newDescription, updated_at: trx.fn.now() });
@@ -205,6 +221,10 @@ export default {
               payment_id: targetId,
               newDescription,
             });
+            // Optionally update the payments table description
+            await trx('payments')
+              .where({ payment_id: targetId, merchant_id: merchantId })
+              .update({ description: newDescription });
           }
           break;
         }

@@ -10,7 +10,7 @@
  * - Includes left join with payments table to fetch payment details.
  * - Orders by created_at with ascending or descending sort.
  *
- * Version: v2.29 (Updated 20Aug2025_2239 BST to enhance payments query debugging)
+ * Version: v2.30 (Updated 21Aug2025_1520 BST to include 'description' from payments table)
  * Change Log:
  * - 09Aug2025_2300 BST (v2.10): Initial implementation with pagination and filtering.
  * - 10Aug2025_1100 BST (v2.11): Added sort parameter and enhanced logging.
@@ -32,15 +32,16 @@
  * - 14Aug2025_0115 BST (v2.27): Refined join condition to use payment_id for consistency.
  * - 20Aug2025_2230 BST (v2.28): Added payments array to response for sub-table display.
  * - 20Aug2025_2239 BST (v2.29): Enhanced payments query debugging with logging.
+ * - 21Aug2025_1520 BST (v2.30): Included 'description' from payments table in response.
  */
-const F = 'routes/listButtons'
-import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
-import type { Request, Response } from 'express'
-import { query } from 'express-validator'
-import { logWithTimestamp } from '../utils/logging'
-
-const db: Knex = knex(knexConfig)
+const F = 'routes/listButtons';
+import knex, { Knex } from 'knex';
+import knexConfig from '../../knexfile';
+import type { Request, Response } from 'express';
+import { query } from 'express-validator';
+import { logWithTimestamp } from '../utils/logging';
+import { formatId } from '../utils/general';
+const db: Knex = knex(knexConfig);
 
 export default {
   type: 'get',
@@ -54,25 +55,29 @@ export default {
     query('offset').optional().isInt({ min: 0 }).withMessage('Offset must be a non-negative integer').toInt(),
     query('sort').optional().isIn(['asc', 'desc']).withMessage('Sort must be either asc or desc'),
     query('usage').optional().isIn(['used', 'unused']).withMessage('Usage must be either used or unused'),
-    query('excludeSingleUse').optional().isBoolean().withMessage('excludeSingleUse must be a boolean').toBoolean()
+    query('excludeSingleUse')
+      .optional()
+      .isBoolean()
+      .withMessage('excludeSingleUse must be a boolean')
+      .toBoolean(),
   ],
   func: async (req: Request, res: Response): Promise<void> => {
-    const errors = (req as any).validationErrors
+    const errors = (req as any).validationErrors;
     if (errors && errors.length > 0) {
-      logWithTimestamp(F, '❌ [listButtons] Validation errors:', errors)
-      res.status(400).json({ status: 'error', message: '❌ Invalid query parameters', errors })
-      return
+      logWithTimestamp(F, '❌ [listButtons] Validation errors:', errors);
+      res.status(400).json({ status: 'error', message: '❌ Invalid query parameters', errors });
+      return;
     }
-    const merchantId = (req as any).auth?.identityKey || 'unknown'
-    const { limit = 500, offset = 0, sort = 'desc', usage, excludeSingleUseRaw } = req.query
+    const merchantId = (req as any).auth?.identityKey || 'unknown';
+    const { limit = 500, offset = 0, sort = 'desc', usage, excludeSingleUseRaw } = req.query;
     const excludeSingleUse =
       typeof excludeSingleUseRaw === 'boolean'
         ? excludeSingleUseRaw
-        : String(excludeSingleUseRaw).toLowerCase() === 'true'
-    const isUsageDefined = typeof usage === 'string'
-    let usageValue: 'used' | 'unused' | undefined = undefined
+        : String(excludeSingleUseRaw).toLowerCase() === 'true';
+    const isUsageDefined = typeof usage === 'string';
+    let usageValue: 'used' | 'unused' | undefined = undefined;
     if (isUsageDefined) {
-      usageValue = usage as 'used' | 'unused'
+      usageValue = usage as 'used' | 'unused';
     }
     logWithTimestamp(F, '🔍 [listButtons] Fetching buttons for merchant:', {
       merchantId,
@@ -80,21 +85,21 @@ export default {
       offset,
       sort,
       usage: usageValue,
-      excludeSingleUse
-    })
+      excludeSingleUse,
+    });
     try {
       // ---------- helpers ----------
       const logSql = (label: string, qb: Knex.QueryBuilder) => {
-        const s = qb.clone().toSQL()
-        console.log(`📜 ${label} SQL:`, s.sql)
-        console.log(`📦 ${label} bindings:`, s.bindings)
-      }
+        const s = qb.clone().toSQL();
+        console.log(`📜 ${label} SQL:`, s.sql);
+        console.log(`📦 ${label} bindings:`, s.bindings);
+      };
       // ---------- pre-aggregate payments by button_id ----------
       const paymentsAgg = db('payments')
         .select('button_id')
         .sum<{ paidSum: number }>({ paidSum: 'amount' })
-        .groupBy('button_id')
-      logSql('paymentsAgg', paymentsAgg)
+        .groupBy('button_id');
+      logSql('paymentsAgg', paymentsAgg);
       // Main query
       let buttonQuery = db({ pb: 'payment_buttons' })
         .leftJoin(paymentsAgg.as('pa'), 'pb.button_id', 'pa.button_id')
@@ -113,32 +118,32 @@ export default {
           db.raw(`COALESCE(pa.paidSum, pb.total_paid, 0) as "totalPaid"`)
         )
         .orderBy('pb.created_at', 'desc')
-        .limit(500)
-      logSql('buttonQuery', buttonQuery)
+        .limit(500);
+      logSql('buttonQuery', buttonQuery);
       // ---------- filters ----------
       if (excludeSingleUse) {
-        buttonQuery = buttonQuery.where('pb.multi_use', true)
+        buttonQuery = buttonQuery.where('pb.multi_use', true);
       }
       if (usageValue === 'used') {
-        buttonQuery = buttonQuery.where('pb.used', true)
+        buttonQuery = buttonQuery.where('pb.used', true);
       } else if (usageValue === 'unused') {
-        buttonQuery = buttonQuery.where('pb.used', false)
+        buttonQuery = buttonQuery.where('pb.used', false);
       }
       // ---------- preview final SQL ----------
       const preview = buttonQuery
         .clone()
         .orderBy('pb.created_at', sort as 'asc' | 'desc')
         .limit(Number(limit))
-        .offset(Number(offset))
-      logSql('listButtons(final)', preview)
+        .offset(Number(offset));
+      logSql('listButtons(final)', preview);
       // ---------- execute ----------
       const rows = await buttonQuery
         .orderBy('pb.created_at', sort as 'asc' | 'desc')
         .limit(Number(limit))
-        .offset(Number(offset))
-      console.log('📊 rows.length =', rows.length)
-      if (rows[0]) console.log('🔎 sample row[0]:', rows[0])
-      // Fetch payments for each button
+        .offset(Number(offset));
+      console.log('📊 rows.length =', rows.length);
+      if (rows[0]) console.log('🔎 sample row[0]:', rows[0]);
+      // Fetch payments for each button with description
       for (const button of rows) {
         const paymentsQuery = db('payments')
           .select(
@@ -147,20 +152,21 @@ export default {
             'amount',
             'txid',
             'completed',
-            'created_at as createdAt'
+            'created_at as createdAt',
+            'description' // Added to fetch description from payments
           )
           .where({ button_id: button.buttonId })
-          .orderBy('created_at', 'desc')
-        logSql(`payments for button ${button.buttonId}`, paymentsQuery)
-        button.payments = await paymentsQuery
-        logWithTimestamp(F, `Payments for button ${button.buttonId}:`, button.payments)
+          .orderBy('created_at', 'desc');
+        logSql(`payments for button ${button.buttonId}`, paymentsQuery);
+        button.payments = await paymentsQuery;
+        logWithTimestamp(F, `Payments for button ${button.buttonId}:`, button.payments);
       }
       // ---------- count ----------
       const totalRow = await db('payment_buttons')
         .where('merchant_id', merchantId)
-        .count<{ total: number }[]>({ total: 'button_id' })
-      const total = Number(totalRow?.[0]?.total ?? 0)
-      console.log('🧮 total buttons =', total)
+        .count<{ total: number }[]>({ total: 'button_id' });
+      const total = Number(totalRow?.[0]?.total ?? 0);
+      console.log('🧮 total buttons =', total);
       // ---------- normalize + quick sanity on totalPaid ----------
       const safeButtons = rows.map((b: any) => ({
         ...b,
@@ -169,29 +175,32 @@ export default {
         htmlCode: b.htmlCode ?? '<div>Pay Now</div>',
         paymentId: b.paymentId ?? null,
         totalPaid: Number(b.totalPaid ?? 0),
-        payments: b.payments ? b.payments.map((p: any) => ({
-          paymentId: p.paymentId,
-          transactionId: p.transactionId,
-          amount: p.amount,
-          txid: p.txid ?? null,
-          completed: !!p.completed,
-          createdAt: p.createdAt
-        })) : []
-      }))
-      const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.totalPaid) || 0), 0)
-      console.log('💰 sum(totalPaid) (page) =', paidSum)
-      logWithTimestamp(F, '✅ [listButtons] Buttons fetched successfully', { total, pagePaidSum: paidSum })
+        payments: b.payments
+          ? b.payments.map((p: any) => ({
+              paymentId: p.paymentId,
+              transactionId: p.transactionId,
+              amount: p.amount,
+              txid: p.txid ?? null,
+              completed: !!p.completed,
+              createdAt: p.createdAt,
+              description: p.description || `Payment using paymentId: ${formatId(p.paymentId)}`, // Include payment description
+            }))
+          : [],
+      }));
+      const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.totalPaid) || 0), 0);
+      console.log('💰 sum(totalPaid) (page) =', paidSum);
+      logWithTimestamp(F, '✅ [listButtons] Buttons fetched successfully', { total, pagePaidSum: paidSum });
       res.status(200).json({
         status: 'success',
         message: 'Buttons fetched successfully',
         title: 'Payment Buttons',
         data: safeButtons,
-        total
-      })
+        total,
+      });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      logWithTimestamp(F, '❌ Error fetching buttons', { message, queryParams: req.query })
-      res.status(500).json({ status: 'error', message: `❌ ${message}` })
+      const message = err instanceof Error ? err.message : String(err);
+      logWithTimestamp(F, '❌ Error fetching buttons', { message, queryParams: req.query });
+      res.status(500).json({ status: 'error', message: `❌ ${message}` });
     }
-  }
-}
+  },
+};
