@@ -1,11 +1,11 @@
- /**
+/**
  * @file src/routes/invoice.ts
  * @description POST route to create a payment invoice for a given paymentId and buttonId.
  * Validates the payment button, checks multi-use status, and generates a transaction output for payment processing.
  * For multi-use buttons, generates a new paymentId directly via database checks to avoid duplicate payment_id errors and authentication issues.
  * Uses payment_buttons.description for the output description and generates a derived locking script.
  *
- * Version: v2.32 (Updated 20Aug2025_1850 BST to fix timestamp format for ids table insertion)
+ * Version: v2.33 (Updated 21Aug2025_2231 BST to enable single-use buttons for first payment and disable after use)
  * Change Log:
  * - 19Aug2025_1135 BST (v2.19): Replaced fetch call to /api/initializeIds with direct call to initializeIds handler.
  * - 19Aug2025_1145 BST (v2.20): Fixed TypeScript error with InitRequest interface, updated 'mock' to 'simulate frontend request'.
@@ -20,6 +20,7 @@
  * - 20Aug2025_1515 BST (v2.30): Modified to call /api/initializeIds for multi-use buttons to generate new paymentId, fixing duplicate payment_id error.
  * - 20Aug2025_1810 BST (v2.31): Generate new paymentId for multi-use buttons via direct database checks, bypassing /api/initializeIds to avoid 403 authentication errors.
  * - 20Aug2025_1850 BST (v2.32): Fixed timestamp format for ids table insertion to use MySQL-compatible DATETIME format (YYYY-MM-DD HH:MM:SS).
+ * - 21Aug2025_2231 BST (v2.33): Enabled single-use buttons for first payment and disabled after use by updating 'used' flag.
  */
 const F = 'routes/invoice';
 import knex, { Knex } from 'knex';
@@ -32,6 +33,7 @@ import { logWithTimestamp } from '../utils/logging';
 import { CONFIG } from '../utils/constants';
 const db: Knex = knex(knexConfig);
 let transactionIdNew: string;
+
 interface PaymentButton {
   button_id: string;
   merchant_id: string;
@@ -46,12 +48,14 @@ interface PaymentButton {
   created_at: string | null;
   updated_at: string | null;
 }
+
 interface RequestBody {
   paymentId: string;
   buttonId: string;
   merchantId: string;
   amount: number;
 }
+
 export default {
   type: 'post',
   path: '/invoice',
@@ -234,6 +238,13 @@ export default {
           amount,
           exchange_rate: 1,
         });
+        // Update used flag for single-use buttons after first payment
+        if (!button.multi_use && !button.used) {
+          await db('payment_buttons')
+            .where({ button_id: buttonId, merchant_id: merchantId })
+            .update({ used: true, updated_at: db.fn.now() });
+          logWithTimestamp(F, '✅ [invoice] [Step 7] Marked single-use button as used:', { buttonId });
+        }
         logWithTimestamp(F, '✅ [invoice] [Step 7] Payment invoice created:', {
           paymentId,
           buttonId,

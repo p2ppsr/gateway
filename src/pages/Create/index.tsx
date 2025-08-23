@@ -179,7 +179,12 @@ const [customCSS_fixed, setCustomCSS_fixed] = useState<string>(`<style>.gateway-
   background: gray;
   cursor: not-allowed;
   pointer-events: none;
-}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`);
+}
+[data-width="fit-content"] .gateway-paybutton-fixed {
+  min-width: 0 !important;
+  width: fit-content;
+}
+</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`);
 const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.gateway-paybutton-variable {
   border-radius: 2em;
   border: none;
@@ -204,7 +209,12 @@ const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.ga
   background: gray;
   cursor: not-allowed;
   pointer-events: none;
-}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`);
+}
+[data-width="fit-content"] .gateway-paybutton-variable {
+  min-width: 0 !important;
+  width: fit-content;
+}
+</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`);
   const [lastValidCSS_fixed, setLastValidCSS_fixed] = useState(extractCSS(customCSS_fixed));
   const [lastValidCSS_variable, setLastValidCSS_variable] = useState(extractCSS(customCSS_variable));
   const [previewCode_fixed, setPreviewCode_fixed] = useState('');
@@ -506,7 +516,12 @@ const resetAll = async () => {
         box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
         background: linear-gradient(145deg, #7986cb, #2A2A2E);
         color: #ffffff;
-      }</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`;
+      }
+      [data-width="fit-content"] .gateway-paybutton-fixed {
+        min-width: 0 !important;
+        width: fit-content;
+      }
+      </style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`;
       const variableCSS = `<style>.gateway-paybutton-variable {
         border-radius: 2em;
         border: none;
@@ -525,7 +540,12 @@ const resetAll = async () => {
         box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
         background: linear-gradient(145deg, #7986cb, #1C1C1F);
         color: #ffffff;
-      }</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`;
+      }
+      [data-width="fit-content"] .gateway-paybutton-variable {
+        min-width: 0 !important;
+        width: fit-content;
+      }
+      </style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`;
       setCustomCSS_fixed(fixedCSS);
       setCustomCSS_variable(variableCSS);
       setLastValidCSS_fixed(extractCSS(fixedCSS));
@@ -1452,6 +1472,10 @@ return (
               box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
               background: linear-gradient(145deg, #7986cb, #2A2A2E);
               color: #ffffff;
+            };
+            [data-width="fit-content"] .gateway-paybutton-fixed {
+            min-width: 0 !important;
+            width: fit-content;
             }`;
             const variableBaseCSS = `<style>.gateway-paybutton-variable {
               border-radius: 2em;
@@ -1471,6 +1495,10 @@ return (
               box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
               background: linear-gradient(145deg, #7986cb, #1C1C1F);
               color: #ffffff;
+            }
+            [data-width="fit-content"] .gateway-paybutton-variable {
+            min-width: 0 !important;
+            width: fit-content;
             }`;
             const fixedCSS = value ? `${fixedBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>` : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`;
             const variableCSS = value ? `${variableBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>` : `${variableBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`;

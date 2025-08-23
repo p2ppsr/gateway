@@ -1,0 +1,28 @@
+assets by path [1m[32m*.html[39m[22m 188 KiB
+  asset [1m[32mbutton.html[39m[22m 2.61 KiB [1m[33m[compared for emit][39m[22m [from: public/button.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed64.html[39m[22m 1.82 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed64.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed49.html[39m[22m 1.79 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed49.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed52.html[39m[22m 1.78 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed52.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed162.html[39m[22m 1.52 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed162.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed163.html[39m[22m 1.52 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed163.html] [1m[32m[copied][39m[22m
+  asset [1m[32mfixed136.html[39m[22m 1.38 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed136.html] [1m[32m[copied][39m[22m
+  + 151 assets
+asset [1m[32mpay.js[39m[22m 2.77 MiB [1m[32m[emitted][39m[22m (name: main)
+asset [1m[32mgatewaycash.svg[39m[22m 16.5 KiB [1m[33m[compared for emit][39m[22m [from: public/gatewaycash.svg] [1m[32m[copied][39m[22m
+asset [1m[32m.DS_Store[39m[22m 6 KiB [1m[33m[compared for emit][39m[22m [from: public/.DS_Store] [1m[32m[copied][39m[22m
+asset [1m[32mfavicon.ico[39m[22m 4.19 KiB [1m[33m[compared for emit][39m[22m [from: public/favicon.ico] [1m[32m[copied][39m[22m
+asset [1m[32mpay.js.LICENSE.txt[39m[22m 3.35 KiB [1m[33m[compared for emit][39m[22m [from: public/pay.js.LICENSE.txt] [1m[32m[copied][39m[22m
+asset [1m[32mmanifest.json[39m[22m 593 bytes [1m[33m[compared for emit][39m[22m [from: public/manifest.json] [1m[32m[copied][39m[22m
+224 modules
+webpack 5.101.0 compiled [1m[32msuccessfully[39m[22m in 848 ms
+assets by status 2.98 MiB [1m[32m[cached][39m[22m 164 assets
+cached modules 2.41 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 224 modules
+webpack 5.101.0 compiled [1m[32msuccessfully[39m[22m in 24 ms
+assets by status 2.98 MiB [1m[32m[cached][39m[22m 164 assets
+asset [1m[32mfixed164.html[39m[22m 1.38 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed164.html] [1m[32m[copied][39m[22m
+cached modules 2.41 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 224 modules
+webpack 5.101.0 compiled [1m[32msuccessfully[39m[22m in 30 ms
+assets by status 2.98 MiB [1m[32m[cached][39m[22m 165 assets
+asset [1m[32mfixed165.html[39m[22m 1.33 KiB [1m[33m[compared for emit][39m[22m [from: public/fixed165.html] [1m[32m[copied][39m[22m
+cached modules 2.41 MiB (javascript) 1.25 KiB (runtime) [1m[32m[cached][39m[22m 224 modules
+webpack 5.101.0 compiled [1m[32msuccessfully[39m[22m in 27 ms

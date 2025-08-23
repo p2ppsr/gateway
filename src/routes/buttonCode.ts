@@ -1,7 +1,7 @@
 /**
  * @file src/routes/buttonCode.ts
  * @description GET route to retrieve payment button code details for a given paymentId.
- * @version v2.35 (Updated 18Aug2025_0158 BST to fix TypeScript errors and maintain streamlined code)
+ * @version v2.37 (Updated 21Aug2025_2359 BST to use DOM manipulation for reliable class handling)
  */
 const F = 'routes/buttonCode';
 import { Request, Response } from 'express';
@@ -13,7 +13,7 @@ import { logWithTimestamp } from '../utils/logging';
 import { WalletClient } from '@bsv/sdk';
 import { CONFIG } from '../utils/constants';
 import { isMerchantId } from '../utils/general';
-
+import { JSDOM } from 'jsdom';
 const db: Knex = knex(knexConfig);
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN);
 
@@ -52,90 +52,79 @@ export default {
       res.status(400).json({ status: 'error', message: 'Invalid parameters', errors: errors.array() });
       return;
     }
-
     const paymentId = req.params.paymentId;
     logWithTimestamp(F, '[buttonCode] [Step 1] Received request for paymentId:', paymentId, 'Type:', typeof paymentId);
-
     try {
       logWithTimestamp(F, '[buttonCode] [Step 2] Checking database connection...');
       await db.raw('SELECT 1');
       logWithTimestamp(F, '[buttonCode] [Step 2] Database connection successful');
-
       const query = db('payment_buttons').where({ payment_id: paymentId }).first();
       logWithTimestamp(F, '[buttonCode] [Step 3] Query constructed:', query.toString());
-
       const button: PaymentButton | undefined = await query;
       logWithTimestamp(F, '[buttonCode] [Step 3] Raw query result:', button ? JSON.stringify(button) : 'No record found');
-
       if (!button) {
         logWithTimestamp(F, '[buttonCode] [Step 4] No button found for paymentId:', paymentId);
         res.status(404).json({ status: 'error', message: `No button found for paymentId: ${paymentId}` });
         return;
       }
-
       logWithTimestamp(F, '[buttonCode] [Step 4] Validating button fields:', {
         button_id: button.button_id,
         html_code: button.html_code,
         description: button.description,
         payment_id: button.payment_id,
       });
-
       if (!button.html_code || button.html_code.trim() === '') {
         logWithTimestamp(F, '[buttonCode] [Step 5] Missing or empty html_code for paymentId:', paymentId);
         res.status(400).json({ status: 'error', message: 'html_code is required and cannot be empty' });
         return;
       }
-
       if (!button.description || button.description.trim() === '') {
         logWithTimestamp(F, '[buttonCode] [Step 5] Missing or empty description for paymentId:', paymentId);
         res.status(400).json({ status: 'error', message: 'description is required and cannot be empty' });
         return;
       }
-
       logWithTimestamp(F, '[buttonCode] [Step 5] Found and validated button:', JSON.stringify(button));
-
       let modifiedCode = button.html_code;
       const divId = button.button_id;
       const divMatch = modifiedCode.match(new RegExp(`<div[^>]*id="${divId}"[^>]*>([\\s\\S]*?)</div>`, 'i'));
       let buttonCode: string;
-
-      if (divMatch) {
-        const fullDiv = divMatch[0];
-        logWithTimestamp(F, '[buttonCode] [Step 6a] Original div block:', fullDiv);
-        const updatedDiv = fullDiv
-          .replace(new RegExp(`id="${button.button_id}"`, 'g'), `id="${button.button_id}"`)
-          .replace(
-            new RegExp(`data-paymentId="${button.payment_id}"`, 'g'),
-            `data-paymentId="${button.payment_id || button.button_id}"`
-          )
-          .replace(
-            new RegExp(`data-description="[^"]*"`, 'g'),
-            `data-description="${button.description}"`
-          );
-        logWithTimestamp(F, '[buttonCode] [Step 6b] Updated div block:', updatedDiv);
-        modifiedCode = modifiedCode.replace(fullDiv, updatedDiv);
+      const disabledClass = button.used && !button.multi_use ? ' disabled' : ''; // Conditionally apply disabled
+      const dom = new JSDOM(modifiedCode);
+      const document = dom.window.document;
+      const div = document.querySelector(`div[id="${button.button_id}"]`);
+      if (div) {
+        logWithTimestamp(F, '[buttonCode] [Step 6a] Original div block:', div.outerHTML);
+        // Remove existing disabled class and add conditionally
+        div.classList.remove('disabled');
+        if (disabledClass) {
+          div.classList.add('disabled');
+        }
+        logWithTimestamp(F, '[buttonCode] [Step 6b] Updated div block:', div.outerHTML);
+        modifiedCode = dom.serialize();
         const styleMatch = modifiedCode.match(/<style>[\s\S]*?<\/style>/i);
         const styles = styleMatch ? styleMatch[0] : '';
-        buttonCode = `${styles}${updatedDiv}<script src="${CONFIG.API_BASE}/pay.js"></script>`;
+        buttonCode = `${styles}${div.outerHTML}<script src="${CONFIG.API_BASE}/pay.js"></script>`;
       } else {
-        const styleMatch = modifiedCode.match(/<style>[\s\S]*?<\/style>/i);
-        const styles = styleMatch ? styleMatch[0] : '';
-        const defaultText = `Pay Now ${button.amount} Sats`;
-        buttonCode = `
-          ${styles}
-          <div id="${button.button_id}" class="gateway-paybutton" data-paymentId="${button.payment_id || button.button_id}" data-buttonId="${button.button_id}" data-amount="${button.amount}" data-variable="${button.variable_amount}" data-description="${button.description}" data-server="${CONFIG.API_BASE}">
-            ${defaultText}
-          </div>
-          <script src="${CONFIG.API_BASE}/pay.js"></script>
-        `;
+        logWithTimestamp(F, '[buttonCode] [Step 6a] No div match found, using default:', modifiedCode);
+        const domDefault = new JSDOM('');
+        const defaultDiv = domDefault.window.document.createElement('div');
+        defaultDiv.id = button.button_id;
+        defaultDiv.className = `gateway-paybutton${disabledClass}`;
+        defaultDiv.setAttribute('data-paymentId', button.payment_id || button.button_id);
+        defaultDiv.setAttribute('data-buttonId', button.button_id);
+        defaultDiv.setAttribute('data-amount', button.amount.toString());
+        defaultDiv.setAttribute('data-variable', button.variable_amount.toString());
+        defaultDiv.setAttribute('data-description', button.description);
+        defaultDiv.setAttribute('data-server', CONFIG.API_BASE);
+        defaultDiv.textContent = `Pay Now ${button.amount} Sats`;
+        const styleMatchDefault = modifiedCode.match(/<style>[\s\S]*?<\/style>/i);
+        const stylesDefault = styleMatchDefault ? styleMatchDefault[0] : '';
+        buttonCode = `${stylesDefault}${defaultDiv.outerHTML}<script src="${CONFIG.API_BASE}/pay.js"></script>`;
       }
-
       logWithTimestamp(F, '[buttonCode] [Step 6c] Generated button code:', buttonCode);
-
       if (!isMerchantId(button.merchant_id)) {
         throw new Error(`Invalid merchant_id format: ${button.merchant_id}`);
       }
-
       res.status(200).json({
         status: 'success',
         payment_id: button.payment_id,
