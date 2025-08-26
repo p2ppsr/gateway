@@ -145,6 +145,16 @@ const PaymentButtonsList = () => {
     'HTML Code': null,
   });
 
+  const cellStyle = {
+    borderRight: `1px solid ${theme.palette.divider}`,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  };
+  const lastCellStyle = {
+    ...cellStyle,
+    borderRight: 'none',
+  };
+  const expandedRowBg = '#4c4a4aff';
+
   const handleMouseEnter = (fullValue: string, columnName: string, rowIndex: number) => {
     logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex);
     if (!isClicked) {
@@ -514,7 +524,7 @@ const PaymentButtonsList = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -527,7 +537,7 @@ const PaymentButtonsList = () => {
                       Timestamp {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -540,7 +550,7 @@ const PaymentButtonsList = () => {
                       Button Id {sortConfig.key === 'button_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -553,7 +563,7 @@ const PaymentButtonsList = () => {
                       Payment Id {sortConfig.key === 'payment_id' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -566,7 +576,7 @@ const PaymentButtonsList = () => {
                       Sats {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -579,7 +589,7 @@ const PaymentButtonsList = () => {
                       Variable {sortConfig.key === 'variable_amount' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -592,7 +602,7 @@ const PaymentButtonsList = () => {
                       Multi-use {sortConfig.key === 'multi_use' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -605,7 +615,7 @@ const PaymentButtonsList = () => {
                       Used {sortConfig.key === 'used' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -618,7 +628,7 @@ const PaymentButtonsList = () => {
                       Total Paid {sortConfig.key === 'total_paid' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={cellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -631,7 +641,7 @@ const PaymentButtonsList = () => {
                       Description {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={lastCellStyle}>
                     <Typography
                       component="a"
                       href="#"
@@ -644,7 +654,6 @@ const PaymentButtonsList = () => {
                       HTML Code {sortConfig.key === 'html_code' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
-                  <TableCell />
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -656,143 +665,93 @@ const PaymentButtonsList = () => {
                   return (
                     <React.Fragment key={button.render_id}>
                       <TableRow data-used={`used-${fullButtonId}-${button.used}`}>
-                        <TableCell>{formatTimeLocal(button.created_at || button.updated_at)}</TableCell>
+                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{formatTimeLocal(button.created_at || button.updated_at)}</TableCell>
                         <TableCell
                           onMouseEnter={() => handleMouseEnter(fullButtonId, 'Button Id', index * 2 + 1)}
                           onMouseLeave={handleMouseLeave}
                           onClick={() => handleClick(fullButtonId, 'Button Id')}
+                          sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}
                         >
                           {formatId(button.button_id)}
                         </TableCell>
                         <TableCell
-                          sx={{ display: 'flex', alignItems: 'center', verticalAlign: 'middle', padding: '6px 0' }}
                           onMouseEnter={() => handleMouseEnter(fullPaymentId, 'Payment Id', index * 2 + 1)}
                           onMouseLeave={handleMouseLeave}
                           onClick={() => handleClick(fullPaymentId, 'Payment Id')}
+                          sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}
                         >
-                          {formatId(button.payment_id || '')}
-                          {button.multi_use && button.payments.length > 0 && (
-                            <IconButton
-                              onClick={() => {
-                                logWithTimestamp(F, `Toggling collapse for button ${button.button_id}, expanded: ${expandedButton === button.button_id ? 'closing' : 'opening'}, current expandedButton: ${expandedButton}`);
-                                setExpandedButton(expandedButton === button.button_id ? null : button.button_id);
-                              }}
-                              sx={{ ml: 1, padding: 0, verticalAlign: 'middle' }}
-                            >
-                              {expandedButton === button.button_id ? <ExpandLess /> : <ExpandMore />}
-                            </IconButton>
-                          )}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pr: 0.5 }}>
+                            {formatId(button.payment_id || '')}
+                            {button.multi_use && button.payments.length > 0 && (
+                              <IconButton
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  logWithTimestamp(F, `Toggling collapse for button ${button.button_id}, expanded: ${expandedButton === button.button_id ? 'closing' : 'opening'}, current expandedButton: ${expandedButton}`);
+                                  setExpandedButton(expandedButton === button.button_id ? null : button.button_id);
+                                }}
+                                sx={{ padding: 0 }}
+                              >
+                                {expandedButton === button.button_id ? <ExpandLess /> : <ExpandMore />}
+                              </IconButton>
+                            )}
+                          </Box>
                         </TableCell>
                         <TableCell
                           onMouseEnter={() => button.amount === 0 ? handleMouseEnter('For variable buttons, this is the initial value (0). Check payments for actual amounts paid.', 'Sats', index * 2 + 1) : null}
                           onMouseLeave={handleMouseLeave}
                           onClick={() => button.amount === 0 ? handleClick('For variable buttons, this is the initial value (0). Check payments for actual amounts paid.', 'Sats') : null}
+                          sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}
                         >
                           {button.amount}
                         </TableCell>
-                        <TableCell>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>{button.multi_use ? 'Yes' : 'No'}</TableCell>
-                        <TableCell data-debug={`used-${fullButtonId}-${button.used ? 'Yes' : 'No'}`}>
+                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.variable_amount ? 'Yes' : 'No'}</TableCell>
+                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.multi_use ? 'Yes' : 'No'}</TableCell>
+                        <TableCell data-debug={`used-${fullButtonId}-${button.used ? 'Yes' : 'No'}`} sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>
                           {button.used ? 'Yes' : 'No'}
                         </TableCell>
-                        <TableCell>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
-                        <TableCell>{button.description}</TableCell>
+                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
+                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.description}</TableCell>
                         <TableCell
                           onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index * 2 + 1)}
                           onMouseLeave={handleMouseLeave}
                           onClick={() => handleClick(fullHtmlCode, 'HTML Code')}
+                          sx={{ ...lastCellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}
                         >
                           {button.html_code
                             ? `${button.html_code.substring(0, 16)}...${button.html_code.slice(-16)}`
                             : '<div>Pay Now</div>'}
                         </TableCell>
-                        <TableCell />
                       </TableRow>
-                      {button.multi_use && button.payments.length > 0 && (
-                        <TableRow>
-                          <TableCell colSpan={11} sx={{ p: 0 }}>
-                            <Collapse in={expandedButton === button.button_id} timeout="auto" unmountOnExit>
-                              <Box sx={{ p: 0, backgroundColor: '#4c4a4aff' }}>
-                                <Table size="small" sx={{ minWidth: '100%', display: 'table', tableLayout: 'fixed', width: '100%' }}>
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell>
-                                        <Typography
-                                          component="a"
-                                          href="#"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            requestSort('created_at', true);
-                                          }}
-                                          sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
-                                        >
-                                          Timestamp {subTableSortConfig.key === 'created_at' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Typography
-                                          component="a"
-                                          href="#"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            requestSort('payment_id', true);
-                                          }}
-                                          sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
-                                        >
-                                          Payment Id {subTableSortConfig.key === 'payment_id' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Typography
-                                          component="a"
-                                          href="#"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            requestSort('completed', true);
-                                          }}
-                                          sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
-                                        >
-                                          Used {subTableSortConfig.key === 'completed' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                                        </Typography>
-                                      </TableCell>
-                                      <TableCell>
-                                        <Typography
-                                          component="a"
-                                          href="#"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            requestSort('description', true);
-                                          }}
-                                          sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
-                                        >
-                                          Description {subTableSortConfig.key === 'description' && (subTableSortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
-                                        </Typography>
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {sortPayments(button.payments, subTableSortConfig).map((payment, paymentIndex) => {
-                                      logWithTimestamp(F, `Rendering payment for button ${button.button_id}:`, {
-                                        payment_id: payment.payment_id,
-                                        completed: payment.completed,
-                                        timestamp: formatTimeLocal(payment.created_at),
-                                      });
-                                      return (
-                                        <TableRow key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}>
-                                          <TableCell>{formatTimeLocal(payment.created_at)}</TableCell>
-                                          <TableCell>{formatId(payment.payment_id)}</TableCell>
-                                          <TableCell>{payment.completed ? 'Yes' : 'No'}</TableCell>
-                                          <TableCell>{payment.description || `Payment using paymentId: ${formatId(payment.payment_id)}`}</TableCell>
-                                        </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                              </Box>
-                            </Collapse>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                      {expandedButton === button.button_id && button.multi_use && button.payments.length > 0 &&
+                        sortPayments(button.payments, subTableSortConfig).map((payment, paymentIndex) => {
+                          const topBorder = paymentIndex === 0 ? { borderTop: `1px solid ${theme.palette.divider}` } : {};
+                          logWithTimestamp(F, `Rendering payment for button ${button.button_id}:`, {
+                            payment_id: payment.payment_id,
+                            completed: payment.completed,
+                            timestamp: formatTimeLocal(payment.created_at),
+                          });
+                          return (
+                            <TableRow key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`} sx={{ backgroundColor: expandedRowBg }}>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{formatTimeLocal(payment.created_at)}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{''}</TableCell>
+                              <TableCell
+                                sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}
+                                onMouseEnter={() => handleMouseEnter(payment.payment_id, 'Payment Id', 0)}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={() => handleClick(payment.payment_id, 'Payment Id')}
+                              >
+                                {formatId(payment.payment_id)}
+                              </TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{payment.amount ?? '—'}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{'—'}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{'—'}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{payment.completed ? 'Yes' : 'No'}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{'—'}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{payment.description || `Payment using paymentId: ${formatId(payment.payment_id)}`}</TableCell>
+                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>{'—'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
                     </React.Fragment>
                   );
                 })}
