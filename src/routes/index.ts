@@ -17,7 +17,8 @@ import invoice from './invoice'
 import listButtons from './listButtons'
 import listPayments from './listPayments'
 import pay from './pay'
-import initializeIds from './initializeIds' // Import the new route
+import initializeIds from './initializeIds'
+import cleanupIds from './cleanupIds'
 
 export default [
   createButton,
@@ -28,5 +29,6 @@ export default [
   listButtons,
   listPayments,
   pay,
-  initializeIds
+  initializeIds,
+  cleanupIds
 ]

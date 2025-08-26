@@ -79,19 +79,44 @@ export function formatId(id: string): string {
 }
 
 /**
- * Formats a timestamp string into a human-readable YYYY-MM-DD HH:MM:SS format.
+ * Formats a timestamp string into a human-readable format in the user's local timezone.
+ * @param dateStr The timestamp string (e.g., ISO string or Unix timestamp) or null/undefined.
+ * @returns Formatted date string (e.g., "26 Aug 2025 14:30:45") or 'N/A' if invalid.
+ */
+export function formatTimeLocal(dateStr: string | null | undefined): string {
+  if (!dateStr) {
+    return 'N/A';
+  }
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).replace(',', '');
+  } catch (error) {
+    return 'N/A';
+  }
+}
+
+/**
+ * Formats a timestamp string into a human-readable YYYY-MM-DD HH:MM:SS format (UTC).
  * @param dateStr The timestamp string (e.g., ISO string or Unix timestamp).
  * @returns Formatted date string or 'N/A' if invalid.
  */
 export function formatTimestamp(dateStr: string | undefined): string {
   if (!dateStr) {
-    return 'N/A'
+    return 'N/A';
   }
   try {
-    const date = new Date(dateStr)
-    return date.toISOString().replace('T', ' ').slice(0, 19)
+    const date = new Date(dateStr);
+    return date.toISOString().replace('T', ' ').slice(0, 19);
   } catch (error) {
-    return 'N/A'
+    return 'N/A';
   }
 }
 

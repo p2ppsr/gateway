@@ -1,18 +1,16 @@
 /**
  * @file src/components/Navbar/index.tsx
- *
- * Renders the main navigation bar for the Gateway application.
- *
- * This component provides responsive navigation links including "Create a Button",
- * "Your Buttons", "Actions", "Payments", and optionally "Admin Dashboard" if the user is an admin.
- * On smaller screens, it collapses into a hamburger menu using MUI's Drawer component.
- * The active route is highlighted, and visual styling adapts to light/dark themes.
- *
- * NOTE: This file uses strict TypeScript linting rules.
- *       All function expressions must declare an explicit return type.
+ * @description Renders the main navigation bar for the Gateway application, providing responsive navigation links
+ *              including 'Create a Button', 'Your Buttons', 'Actions', 'Payments', and an optional 'Admin Dashboard'
+ *              for admins. Utilizes a drawer menu on mobile devices and adapts to light/dark themes.
+ * @version 1.0.1
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - @mui/material: For UI components (AppBar, Button, etc.)
+ * - @mui/icons-material: For Menu and AccountBalanceWallet icons
+ * - react-router-dom: For navigation routing
  */
-
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react';
 import {
   Typography,
   AppBar,
@@ -24,60 +22,97 @@ import {
   ListItem,
   ListItemText,
   useTheme,
-  useMediaQuery
-} from '@mui/material'
-import { Menu as MenuIcon, AccountBalanceWallet } from '@mui/icons-material'
-import { Link as RouterLink, useLocation } from 'react-router-dom'
+  useMediaQuery,
+} from '@mui/material';
+import { Menu as MenuIcon, AccountBalanceWallet } from '@mui/icons-material';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
 
-const ListItemLink = (props: { to: string; primary: string; onClick: () => void }): JSX.Element => {
-  const { to, primary, onClick } = props
-  return (
-    <ListItem button component={RouterLink as any} to={to} onClick={onClick}>
-      <ListItemText primary={primary} />
-    </ListItem>
-  )
+/**
+ * Props interface for the ListItemLink component.
+ * @interface ListItemLinkProps
+ * @property {string} to - The route path for navigation.
+ * @property {string} primary - The text displayed for the link.
+ * @property {React.MouseEventHandler<HTMLAnchorElement>} onClick - Handler for click events on the link.
+ */
+interface ListItemLinkProps {
+  to: string;
+  primary: string;
+  onClick: React.MouseEventHandler<HTMLAnchorElement>;
 }
 
 /**
+ * Renders a navigable list item as a link.
+ * @param {ListItemLinkProps} props - The properties for the link component.
+ * @returns {JSX.Element} A ListItem component styled as a navigable link.
+ */
+const ListItemLink = ({ to, primary, onClick }: ListItemLinkProps): JSX.Element => {
+  return (
+    <ListItem button component={RouterLink} to={to} onClick={onClick}>
+      <ListItemText primary={primary} />
+    </ListItem>
+  );
+};
+
+/**
  * Navigation bar component for the Gateway frontend.
- *
  * Displays the site logo and routes for creating buttons, viewing buttons, actions,
- * payments, and admin dashboard. Adjusts layout based on mobile viewport using a drawer menu.
- *
+ * payments, and an optional admin dashboard. Adjusts layout based on mobile viewport
+ * using a drawer menu and adapts to theme changes.
  * @component
- * @param {boolean} isAdmin - Whether the user is an admin. Admins see the "Admin Dashboard" link.
+ * @param {Object} props - The component props.
+ * @param {boolean} props.isAdmin - Indicates if the user is an admin, enabling the Admin Dashboard link.
  * @returns {JSX.Element} The rendered Navbar component.
  */
 const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
-  const theme = useTheme()
-  const location = useLocation()
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const theme = useTheme(); // Retrieves the current MUI theme
+  const location = useLocation(); // Gets the current route location
+  const isMobile = useMediaQuery(theme.breakpoints.down('md')); // Detects mobile viewport
+  const [drawerOpen, setDrawerOpen] = useState(false); // Manages drawer state
 
-  const handleDrawerToggle = (): void => {
-    setDrawerOpen(!drawerOpen)
-  }
+  /**
+   * Toggles the drawer open/closed state with error handling.
+   * @returns {void}
+   */
+  const handleDrawerToggle = useCallback((): void => {
+    try {
+      setDrawerOpen((prev) => !prev); // ✅ Toggles drawer state
+    } catch (error) {
+      console.error('❌ Failed to toggle drawer:', error instanceof Error ? error.message : 'Unknown error');
+      setDrawerOpen(false); // ✅ Fallback to closed state
+    }
+  }, [setDrawerOpen]); // Added setDrawerOpen to dependency array
 
-  const getLinkStyle = (path: string): object =>
-    location.pathname === path
-      ? {
-          color: theme.palette.primary.light,
-          fontWeight: 'bold'
-        }
-      : {
-          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-          '&:hover': { color: theme.palette.primary.light }
-        }
+  /**
+   * Generates style object for navigation links based on the current route.
+   * @param {string} path - The route path to compare with the current location.
+   * @returns {object} Style object for the link based on active/inactive state.
+   */
+  const getLinkStyle = useCallback((path: string): object => {
+    try {
+      return location.pathname === path
+        ? {
+            color: theme.palette.primary.light,
+            fontWeight: 'bold',
+          }
+        : {
+            color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
+            '&:hover': { color: theme.palette.primary.light },
+          };
+    } catch (error) {
+      console.error('❌ Failed to generate link style:', error instanceof Error ? error.message : 'Unknown error');
+      return { color: '#000000' }; // ✅ Fallback style
+    }
+  }, [location.pathname, theme.palette.mode, theme.palette.primary.light]);
 
   const paymentsButtonStyle = {
     color: '#ffffff',
     backgroundColor: theme.palette.primary.main,
-    padding: theme.spacing(0.5, 1),
+    padding: `${theme.spacing(0.5)} ${theme.spacing(1)}`,
     borderRadius: theme.shape.borderRadius,
     '&:hover': {
-      backgroundColor: theme.palette.primary.light
-    }
-  }
+      backgroundColor: theme.palette.primary.light,
+    },
+  };
 
   return (
     <AppBar
@@ -87,7 +122,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
         boxShadow: 3,
         mb: 1,
         maxWidth: '1920px',
-        mx: 'auto'
+        mx: 'auto',
       }}
     >
       <Toolbar
@@ -95,16 +130,15 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          position: 'relative'
+          position: 'relative',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/gatewaycash.svg" height="50px" style={{ paddingRight: '0.5em' }} />
+          <img src="/gatewaycash.svg" height="50px" style={{ paddingRight: '0.5em' }} alt="Gateway Logo" />
           <Typography variant="h5" sx={{ fontWeight: 'bold', cursor: 'pointer' }}>
             Gateway
           </Typography>
         </div>
-
         {isMobile ? (
           <>
             <IconButton edge="start" color="inherit" aria-label="menu" onClick={handleDrawerToggle}>
@@ -112,11 +146,11 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
             </IconButton>
             <Drawer anchor="left" open={drawerOpen} onClose={handleDrawerToggle}>
               <List>
-                <ListItemLink to="/" primary="Create a Button" onClick={() => setDrawerOpen(false)} />
-                <ListItemLink to="/buttons" primary="Your Buttons" onClick={() => setDrawerOpen(false)} />
-                <ListItemLink to="/actions" primary="Actions" onClick={() => setDrawerOpen(false)} />
-                <ListItemLink to="/payments" primary="Payments" onClick={() => setDrawerOpen(false)} />
-                {isAdmin && <ListItemLink to="/admin" primary="Admin Dashboard" onClick={() => setDrawerOpen(false)} />}
+                <ListItemLink to="/" primary="Create a Button" onClick={handleDrawerToggle} />
+                <ListItemLink to="/buttons" primary="Your Buttons" onClick={handleDrawerToggle} />
+                <ListItemLink to="/actions" primary="Actions" onClick={handleDrawerToggle} />
+                <ListItemLink to="/payments" primary="Payments" onClick={handleDrawerToggle} />
+                {isAdmin && <ListItemLink to="/admin" primary="Admin Dashboard" onClick={handleDrawerToggle} />}
               </List>
             </Drawer>
           </>
@@ -127,7 +161,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
                 display: 'flex',
                 flex: 1,
                 justifyContent: 'center',
-                position: 'relative'
+                position: 'relative',
               }}
             >
               <div style={{ display: 'flex', gap: theme.spacing(4) }}>
@@ -161,7 +195,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
         )}
       </Toolbar>
     </AppBar>
-  )
-}
+  );
+};
 
-export default Navbar
+export default Navbar;

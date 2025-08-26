@@ -11,7 +11,7 @@
  * Added table existence check to prevent migration errors.
  * Added /api/resetState to clear database state for session and ID issues.
  *
- * Version: v1.8 (Updated 18Aug2025_1004 BST to add /api/resetState for stale ID cleanup)
+ * Version: v1.10 (Updated 26Aug2025_1010 BST to fix TypeScript error for listPayments and remove redundant routes)
  */
 const F = 'server';
 import dotenv from 'dotenv';
@@ -29,6 +29,8 @@ import helmet from 'helmet';
 import { MAX_PAYMENT_SATS } from './utils/constants';
 import { logWithTimestamp } from './utils/logging';
 import util from 'util';
+import listPaymentsModule, { testListPaymentsVersion } from './routes/listPayments';
+
 dotenv.config();
 
 interface Route {
@@ -45,6 +47,7 @@ const WALLET_STORAGE_URL = process.env.WALLET_STORAGE_URL ?? '';
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? 'http://localhost:3000';
 
 const app = express();
+
 app.use(bodyParser.json({ limit: '1gb' }));
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
@@ -55,6 +58,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   const originalJson = res.json.bind(res);
   res.json = (data: any) => {
@@ -85,6 +89,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       chain: 'main'
     });
     logWithTimestamp(F, '🔍 [server] Wallet initialized:', util.inspect(wallet, { depth: 2, colors: true }));
+
     if (!process.env.SERVER_PRIVATE_KEY || process.env.SERVER_PRIVATE_KEY.length !== 64) {
       throw new Error('❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex characters)');
     }
@@ -116,25 +121,28 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     );
 
     app.use(express.static('build'));
+
     const spaPaths = ['/', '/buttons', '/payments', '/actions', '/money', '/admin'];
     spaPaths.forEach(p => {
       app.get(p, (_, res) => res.sendFile(path.join(__dirname, '../build', 'index.html')));
     });
 
     const apiRouter: Router = express.Router();
+
     try {
       const routeModules = await routes;
+      // Register testListPaymentsVersion explicitly
+      apiRouter.get('/testListPaymentsVersion', testListPaymentsVersion);
+      logWithTimestamp(F, '🔍 [server] Registered explicit route: GET /api/testListPaymentsVersion');
+
       routeModules.forEach((route: any) => {
         if (typeof route?.type === 'string' && typeof route?.path === 'string' && typeof route?.func === 'function') {
           const method = route.type.toLowerCase() as 'get' | 'post';
           const fullPath = `${ROUTING_PREFIX}${route.path}`;
           logWithTimestamp(F, `🔍 [server] Registering route: ${method.toUpperCase()} ${fullPath}`);
-          const handler = route.func;
-          if (typeof apiRouter[method] === 'function') {
-            apiRouter[method](route.path, (req: Request, res: Response, next: NextFunction) => {
-              handler(req, res).catch(next);
-            });
-          }
+          apiRouter[method](route.path, (req: Request, res: Response, next: NextFunction) => {
+            route.func(req, res).catch(next);
+          });
         }
       });
       logWithTimestamp(F, '✅ [server] All routes registered successfully');
@@ -209,3 +217,5 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     throw new Error(`❌ Failed to initialize server: ${message}`);
   }
 })();
+
+export default app;

@@ -3,92 +3,69 @@
  *
  * GET route to list all payments for the authenticated merchant.
  * Retrieves payment records from the database, including button details,
- * with pagination support via query parameters (limit and offset).
+ * with pagination support via query parameters (limit, offset, status).
  *
  * Used by the Gateway frontend to display the Payments page.
  *
- * Version: v2.5 (Updated 14Aug2025_0145 BST to fix db runtime initialization)
+ * Version: v2.8 (Updated 26Aug2025_0952 BST)
  * Change Log:
- * - 05Aug2025_0500 BST (v1.0): Initial creation with basic payment listing.
- * - 12Aug2025_2250 BST (v1.1): Added join with payment_buttons and ids, fixed 500 error, added query debugging.
- * - 12Aug2025_2315 BST (v1.2): Removed invalid payment_button_id reference, adjusted join, enhanced error logging.
- * - 12Aug2025_2330 BST (v1.3): Added AuthRequest interface to fix TypeScript 'auth' property error.
- * - 12Aug2025_2359 BST (v1.4): Added txid extraction from transaction_info, ensured transaction_id for Payment Id.
- * - 13Aug2025_0030 BST (v1.5): Updated for new txid column, added button description for user context.
- * - 13Aug2025_0100 BST (v1.6): Switched to txid as primary key, removed transaction_id.
- * - 13Aug2025_0130 BST (v1.7): Switched to payment_id as primary key, renamed button_id_ref to button_id, payer_identity to payer_id.
- * - 13Aug2025_0135 BST (v1.8): Ensured payment_id and button_id reference ids.id consistently.
- * - 13Aug2025_0315 BST (v1.9): Updated Payment interface for latest schema, improved pagination handling and logging.
- * - 13Aug2025_0315 BST (v2.0): Fixed TypeScript const reassignment errors for limitNum and offsetNum.
- * - 13Aug2025_1240 BST (v2.1): Added completed filter, fixed join logic, and enhanced logging.
- * - 14Aug2025_0120 BST (v2.2): Removed currency and exchange_rate, corrected join to payment_id, aligned interfaces with schema.
- * - 14Aug2025_0125 BST (v2.3): Fixed db scoping issue to resolve TS2304 errors.
- * - 14Aug2025_0130 BST (v2.4): Fixed F scoping issue to resolve TS2304 errors in logWithTimestamp calls.
+ * - 26Aug2025_0952 BST (v2.8): Used const F for logWithTimestamp, included testListPaymentsVersion in default export.
+ * - 26Aug2025_0934 BST (v2.7): Removed completed=1 filter, added status query parameter for filtering (all, completed, new).
+ * - 26Aug2025_0923 BST (v2.6): Changed innerJoin to leftJoin on payments.button_id = payment_buttons.button_id, added version logging.
  * - 14Aug2025_0145 BST (v2.5): Fixed db runtime initialization to resolve "db is not a function" error.
+ * ... [Previous changelog entries]
  */
-import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
-import { Request, Response } from 'express'
-import { logWithTimestamp } from '../utils/logging'
-const db: Knex = knex(knexConfig)
+import knex, { Knex } from 'knex';
+import knexConfig from '../../knexfile';
+import { Request, Response } from 'express';
+import { logWithTimestamp } from '../utils/logging';
 
-// Extend Request type to include auth property
+const db: Knex = knex(knexConfig);
+const F = 'routes/listPayments';
+
 interface AuthRequest extends Request {
   auth: {
-    identityKey: string
-  }
+    identityKey: string;
+  };
 }
 
 interface Payment {
-  payment_id: string
-  txid: string | null
-  payer_id: string | null
-  amount: number
-  completed: boolean
-  is_new: boolean
-  created_at: string | null
-  button_id: string
-  description: string
+  payment_id: string;
+  txid: string | null;
+  payer_id: string | null;
+  amount: number;
+  completed: boolean;
+  is_new: boolean;
+  created_at: string | null;
+  button_id: string | null;
+  description: string | null;
 }
 
-interface PaymentButton {
-  button_id: string
-  payment_id: string | null
-  amount: number
-  variable_amount: boolean
-  multi_use: boolean
-  used: boolean
-  total_paid: number | null
-  description: string
-  html_code: string
-  created_at: string | null
-  updated_at: string | null
-}
+export const testListPaymentsVersion = async (req: Request, res: Response): Promise<void> => {
+  logWithTimestamp(F, '🔍 [testListPaymentsVersion] Version check');
+  res.status(200).json({ version: 'v2.8', timestamp: new Date().toISOString() });
+};
 
 export default {
   type: 'get' as const,
   path: '/listPayments',
-  F: 'routes/listPayments', // File identifier for logging
   func: async (req: AuthRequest, res: Response): Promise<void> => {
-    logWithTimestamp('routes/listPayments', '🔍 [listPayments] Received request with query:', req.query)
-    const { limit = '10', offset = '0' } = req.query // Default as strings to handle query params
-    let limitNum = parseInt(limit as string, 10)
-    let offsetNum = parseInt(offset as string, 10)
+    logWithTimestamp(F, '🔍 [listPayments] Starting listPayments execution v2.8', req.query);
+    const { limit = '500', offset = '0', status = 'all' } = req.query;
+    let limitNum = parseInt(limit as string, 10);
+    let offsetNum = parseInt(offset as string, 10);
 
-    // Validate pagination parameters
     if (isNaN(limitNum) || limitNum <= 0 || limitNum > 1000) {
-      logWithTimestamp('routes/listPayments', '⚠️ [listPayments] Invalid limit parameter, using default 10:', { limit })
-      limitNum = 10
+      logWithTimestamp(F, '⚠️ [listPayments] Invalid limit parameter, using default 500:', { limit });
+      limitNum = 500;
     }
     if (isNaN(offsetNum) || offsetNum < 0) {
-      logWithTimestamp('routes/listPayments', '⚠️ [listPayments] Invalid offset parameter, using default 0:', {
-        offset
-      })
-      offsetNum = 0
+      logWithTimestamp(F, '⚠️ [listPayments] Invalid offset parameter, using default 0:', { offset });
+      offsetNum = 0;
     }
 
     try {
-      const sqlQuery = db('payments')
+      let sqlQuery = db('payments')
         .select(
           'payments.payment_id as payment_id',
           'payments.txid as txid',
@@ -100,57 +77,76 @@ export default {
           'payment_buttons.button_id as button_id',
           'payment_buttons.description as description'
         )
-        .innerJoin('payment_buttons', 'payments.payment_id', 'payment_buttons.payment_id') // Corrected join
+        .leftJoin('payment_buttons', 'payments.button_id', 'payment_buttons.button_id')
         .where('payments.merchant_id', req.auth.identityKey)
-        .where('payments.completed', 1) // Filter for completed payments
-        .limit(limitNum)
-        .offset(offsetNum)
+        .orderBy('payments.created_at', 'desc');
 
-      logWithTimestamp('routes/listPayments', '🔍 [listPayments] Executing SQL query:', { sql: sqlQuery.toString() })
-      const payments: Payment[] = await sqlQuery
-      logWithTimestamp('routes/listPayments', '🔍 [listPayments] Query result:', {
+      if (status === 'completed') {
+        sqlQuery = sqlQuery.where('payments.completed', 1);
+      } else if (status === 'new') {
+        sqlQuery = sqlQuery.where('payments.is_new', 1);
+      }
+
+      sqlQuery = sqlQuery.limit(limitNum).offset(offsetNum);
+
+      logWithTimestamp(F, '🔍 [listPayments] Executing SQL query:', { sql: sqlQuery.toString() });
+      const payments: Payment[] = await sqlQuery;
+
+      logWithTimestamp(F, '🔍 [listPayments] Query result:', {
         payments,
         limit: limitNum,
-        offset: offsetNum
-      })
+        offset: offsetNum,
+        status,
+      });
 
       if (payments.length === 0) {
-        logWithTimestamp('routes/listPayments', '⚠️ [listPayments] No payments found for merchant:', {
-          merchantId: req.auth.identityKey
-        })
+        logWithTimestamp(F, '⚠️ [listPayments] No payments found for merchant:', {
+          merchantId: req.auth.identityKey,
+          status,
+        });
       }
 
       const total = await db('payments')
-        .where('merchant_id', req.auth.identityKey)
-        .where('completed', 1)
+        .where('payments.merchant_id', req.auth.identityKey)
+        .modify(queryBuilder => {
+          if (status === 'completed') {
+            queryBuilder.where('completed', 1);
+          } else if (status === 'new') {
+            queryBuilder.where('is_new', 1);
+          }
+        })
         .count('* as count')
-        .first()
-      const totalCount = total ? parseInt(total.count as string, 10) : 0
+        .first();
 
-      logWithTimestamp('routes/listPayments', '✅ [listPayments] Payments fetched successfully:', {
+      const totalCount = total ? parseInt(total.count as string, 10) : 0;
+
+      logWithTimestamp(F, '✅ [listPayments] Payments fetched successfully:', {
         total: totalCount,
         returned: payments.length,
         limit: limitNum,
-        offset: offsetNum
-      })
+        offset: offsetNum,
+        status,
+      });
+
       res.status(200).json({
         status: 'success',
         message: 'Payments fetched successfully',
         data: payments,
-        total: totalCount
-      })
+        total: totalCount,
+      });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '❌ Unknown error'
-      logWithTimestamp('routes/listPayments', '❌ [listPayments] Error fetching payments:', {
+      const message = error instanceof Error ? error.message : '❌ Unknown error';
+      logWithTimestamp(F, '❌ [listPayments] Error fetching payments:', {
         message,
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         query: req.query,
-        sql: (error as any).sql || 'No SQL available'
-      })
+        sql: (error as any).sql || 'No SQL available',
+      });
       res.status(500).json({
         status: 'error',
-        message: `❌ ${message}`
-      })
+        message: `❌ ${message}`,
+      });
     }
-  }
-}
+  },
+  testListPaymentsVersion,
+};

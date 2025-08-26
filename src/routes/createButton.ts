@@ -11,20 +11,12 @@
  * - All amounts are handled as BSV satoshis internally.
  * - IDs are client-generated 12-character Base58-encoded strings, pre-validated by initializeIds.
  *
- * Version: v2.37 (Updated 13Aug2025_2315 BST to align with schema changes)
+ * Version: v2.41 (Updated 24Aug2025_1246 BST (v2.41): Added check to ensure payments.amount matches request amount for fixed buttons.)
  * Change Log:
- * - 09Aug2025_2350 BST (v2.23): Return generated ID in response.
- * - 10Aug2025_1155 BST (v2.24): Aligned path to /api/createButton and added middleware logging for diagnostics.
- * - 10Aug2025_1200 BST (v2.25): Fixed routing path to /createButton and enhanced diagnostic logging.
- * - 10Aug2025_1205 BST (v2.26): Reverted path to /createButton for prefix handling and added path registration logging.
- * - 10Aug2025_1210 BST (v2.27): Added default values for incomplete payloads and improved validation.
- * - 10Aug2025_1215 BST (v2.28): Returned generated id for client use and improved integration.
- * - 10Aug2025_1735 BST (v2.29): Integrated client-provided IDs and initializeIds logic during button creation.
- * - 12Aug2025_0015 BST (v2.30): Aligned with initializeIds, removed redundant merchant logic, and clarified response fields.
- * - 12Aug2025_2000 BST (v2.34): Added duplicate check and prevent re-insertion.
- * - 13Aug2025_1720 BST (v2.35): Added dynamic ID initialization if not pre-existing.
- * - 13Aug2025_1740 BST (v2.36): Fixed TypeScript type mismatch (TS2367) in variableAmount and multiUse.
- * - 13Aug2025_2315 BST (v2.37): Updated to align with schema changes (removed id, currency, accepts; renamed customCSS to html_code; adjusted nullability).
+ * - 24Aug2025_1246 BST (v2.41): Added check to ensure payments.amount matches request amount for fixed buttons.
+ * - 24Aug2025_1156 BST (v2.40): Removed description from payment_buttons insert, as it’s stored in payments table; updated paymentId/buttonId validation to exactly 12 characters.
+ * - 24Aug2025_1024 BST (v2.39): Fixed payments insert to include all non-nullable fields (button_id, transaction_id, completed, is_new).
+ * - 24Aug2025_0315 BST (v2.38): Added insertion into payments table with payment_id and description from request payload.
  */
 const F = 'routes/createButton'
 import knex, { Knex } from 'knex'
@@ -34,7 +26,6 @@ import { body, validationResult } from 'express-validator'
 import { MAX_PAYMENT_SATS } from '../utils/constants'
 import { logWithTimestamp } from '../utils/logging'
 const db: Knex = knex(knexConfig)
-
 interface RequestBody {
   amount?: number
   variableAmount: boolean // Explicitly typed as boolean after validation
@@ -44,7 +35,6 @@ interface RequestBody {
   paymentId: string // Client-provided payment ID, pre-initialized
   buttonId: string // Client-provided button ID, pre-initialized
 }
-
 export default {
   type: 'post',
   path: '/createButton', // Handled by ROUTING_PREFIX in server.ts
@@ -75,16 +65,16 @@ export default {
       .isString()
       .notEmpty()
       .withMessage('paymentId must be a non-empty string')
-      .isLength({ min: 12, max: 24 })
-      .withMessage('paymentId must be between 12 and 24 characters'),
+      .isLength({ min: 12, max: 12 })
+      .withMessage('paymentId must be exactly 12 characters'),
     body('buttonId')
       .trim()
       .escape()
       .isString()
       .notEmpty()
       .withMessage('buttonId must be a non-empty string')
-      .isLength({ min: 12, max: 24 })
-      .withMessage('buttonId must be between 12 and 24 characters')
+      .isLength({ min: 12, max: 12 })
+      .withMessage('buttonId must be exactly 12 characters')
   ],
   func: async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req)
@@ -151,26 +141,49 @@ export default {
       })
       const amountInSats = variableAmount ? 0 : amount
       logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to sats:', amountInSats)
-      // Insert into payment_buttons
+      // Validate amount consistency for fixed buttons
+      if (!variableAmount && amountInSats !== amount) {
+        logWithTimestamp(F, '❌ [createButton] Amount mismatch for fixed button:', { amountInSats, amount })
+        res.status(400).json({
+          status: 'error',
+          message: 'Amount must match request amount for fixed buttons'
+        })
+        return
+      }
+      // Insert into payment_buttons and payments
       await db.transaction(async trx => {
         await db('payment_buttons')
           .transacting(trx)
           .insert({
             button_id: buttonId,
             merchant_id: merchantId,
-            payment_id: paymentId || null,
+            payment_id: paymentId,
             amount: amountInSats,
-            description,
             html_code: htmlCode,
             variable_amount: variableAmount,
             multi_use: multiUse,
             used: false,
-            total_paid: null
-          })
-        logWithTimestamp(F, '✅ [createButton] Inserted payment button:', { paymentId, buttonId })
+            total_paid: null,
+            created_at: trx.fn.now(),
+            updated_at: trx.fn.now()
+          });
+        await db('payments')
+          .transacting(trx)
+          .insert({
+            button_id: buttonId,
+            payment_id: paymentId,
+            merchant_id: merchantId,
+            transaction_id: '',
+            amount: amountInSats,
+            completed: 0,
+            is_new: 1,
+            created_at: trx.fn.now(),
+            updated_at: trx.fn.now()
+          });
+        logWithTimestamp(F, '✅ [createButton] Inserted payment button and payment:', { paymentId, buttonId, description });
         res.status(201).json({
           status: 'success',
-          message: 'Payment button created successfully',
+          message: 'Payment button and payment created successfully',
           paymentId,
           buttonId
         })

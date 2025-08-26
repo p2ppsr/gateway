@@ -2,13 +2,13 @@
  * @file src/routes/invoice.ts
  * @description POST route to create a payment invoice for a given paymentId and buttonId.
  * Validates the payment button, checks multi-use status, and generates a transaction output for payment processing.
- * For multi-use buttons, generates a new paymentId directly via database checks to avoid duplicate payment_id errors and authentication issues.
+ * For multi-use buttons, generates a new paymentId and updates the description accordingly.
  * Uses payment_buttons.description for the output description and generates a derived locking script.
  *
- * Version: v2.33 (Updated 21Aug2025_2231 BST to enable single-use buttons for first payment and disable after use)
- * Change Log:
+ * Version: v2.43 (Updated 25Aug2025_2130 BST to update transaction_id for first multi-use payment)
  * - 19Aug2025_1135 BST (v2.19): Replaced fetch call to /api/initializeIds with direct call to initializeIds handler.
- * - 19Aug2025_1145 BST (v2.20): Fixed TypeScript error with InitRequest interface, updated 'mock' to 'simulate frontend request'.
+ * - 19Aug202
+ * _1145 BST (v2.20): Fixed TypeScript error with InitRequest interface, updated 'mock' to 'simulate frontend request'.
  * - 19Aug2025_1155 BST (v2.21): Fixed initRes to exit early on 409 response to prevent overwriting with 200.
  * - 19Aug2025_1205 BST (v2.22): Replaced initializeIds.func call with direct duplicate check in ids table.
  * - 19Aug2025_1220 BST (v2.23): Reverted to calling initializeIds.func with proper response handling, added paymentId to response.
@@ -21,6 +21,16 @@
  * - 20Aug2025_1810 BST (v2.31): Generate new paymentId for multi-use buttons via direct database checks, bypassing /api/initializeIds to avoid 403 authentication errors.
  * - 20Aug2025_1850 BST (v2.32): Fixed timestamp format for ids table insertion to use MySQL-compatible DATETIME format (YYYY-MM-DD HH:MM:SS).
  * - 21Aug2025_2231 BST (v2.33): Enabled single-use buttons for first payment and disabled after use by updating 'used' flag.
+ * - 23Aug2025_1515 BST (v2.34): Used generateAndValidateUniqueId utility for ID generation.
+ * - 23Aug2025_1525 BST (v2.35): Updated generateAndValidateUniqueId to use generateBase58.
+ * - 23Aug2025_1530 BST (v2.36): Used 'id' instead of 'newId' for clarity.
+ * - 23Aug2025_1715 BST (v2.37): Required description and fixed argument error in generateAndValidateUniqueId call.
+ * - 25Aug2025_1058 BST (v2.38): Added check for existing payment records for single-use buttons to prevent duplicate entries.
+ * - 25Aug2025_1120 BST (v2.39): Explicitly handle ER_DUP_ENTRY errors during payment insertion to ensure correct response for single-use buttons.
+ * - 25Aug2025_1520 BST (v2.40): Aligned lockingScript generation with pay.ts using payer_id from payments table or hardcoded fallback.
+ * - 25Aug2025_2030 BST (v2.41): Removed payments insertion, relying on createButton.ts for auditability. 
+ * - 25Aug2025_2115 BST (v2.42): Removed redundant commented code at Step 3a and 6a, used existing paymentId for first multi-use payment, added payments insertion for subsequent multi-use payments.
+ * - 25Aug2025_2130 BST (v2.43): Updated payments record with transaction_id for first multi-use payment to fix locking script mismatch.
  */
 const F = 'routes/invoice';
 import knex, { Knex } from 'knex';
@@ -31,8 +41,9 @@ import { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { logWithTimestamp } from '../utils/logging';
 import { CONFIG } from '../utils/constants';
+import { generateAndValidateUniqueId } from '../utils/idGenerator';
 const db: Knex = knex(knexConfig);
-let transactionIdNew: string;
+let transactionIdNew: string = randomBytes(12).toString('hex').slice(0, 12);
 
 interface PaymentButton {
   button_id: string;
@@ -48,14 +59,13 @@ interface PaymentButton {
   created_at: string | null;
   updated_at: string | null;
 }
-
 interface RequestBody {
   paymentId: string;
   buttonId: string;
   merchantId: string;
   amount: number;
+  description: string;
 }
-
 export default {
   type: 'post',
   path: '/invoice',
@@ -76,8 +86,24 @@ export default {
       .withMessage('buttonId must be a non-empty string')
       .isLength({ min: 12, max: 24 })
       .withMessage('buttonId must be between 12 and 24 characters'),
-    body('merchantId').trim().escape().isString().notEmpty().withMessage('merchantId must be a non-empty string'),
-    body('amount').isInt({ min: 0 }).withMessage('Amount must be a non-negative integer').toInt(),
+    body('merchantId')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('merchantId must be a non-empty string'),
+    body('amount')
+      .isInt({ min: 0 })
+      .withMessage('Amount must be a non-negative integer')
+      .toInt(),
+    body('description')
+      .trim()
+      .escape()
+      .isString()
+      .notEmpty()
+      .withMessage('description is required')
+      .isLength({ max: 80 })
+      .withMessage('description exceeds maximum length of 80 characters'),
   ],
   func: async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req);
@@ -97,8 +123,9 @@ export default {
       res.status(401).json({ status: 'error', message: '❌ Unauthorized: Missing sender identity' });
       return;
     }
-    let { paymentId, buttonId, merchantId, amount }: RequestBody = req.body;
-    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, buttonId, merchantId, amount });
+    let { paymentId, buttonId, merchantId, amount, description }: RequestBody = req.body;
+    let paymentDescription = description;
+    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', { paymentId, buttonId, merchantId, amount, description });
     try {
       // Verify the payment button exists and belongs to the specified merchant
       logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', { paymentId, merchantId });
@@ -140,62 +167,85 @@ export default {
         });
         return;
       }
-      // For multi-use buttons, generate a new paymentId to avoid duplicates
-      if (button.multi_use) {
-        logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
-        let newPaymentId = randomBytes(12).toString('hex').slice(0, 12);
-        let attempts = 0;
-        const maxAttempts = 5;
-        while (attempts < maxAttempts) {
-          const existingPayment = await db('payments')
-            .where({ payment_id: newPaymentId })
-            .first();
-          const existingId = await db('ids')
-            .where({ id: newPaymentId, type: 'payment', merchant_id: merchantId })
-            .first();
-          logWithTimestamp(F, '🔍 [invoice] [Step 4] Checking new paymentId:', {
-            newPaymentId,
-            attempt: attempts + 1,
-            existsInPayments: !!existingPayment,
-            existsInIds: !!existingId,
-          });
-          if (!existingPayment && !existingId) {
-            paymentId = newPaymentId;
-            break;
-          }
-          newPaymentId = randomBytes(12).toString('hex').slice(0, 12);
-          attempts++;
-        }
-        if (attempts >= maxAttempts) {
-          logWithTimestamp(F, '❌ [invoice] Failed to generate unique paymentId after max attempts:', { maxAttempts });
-          res.status(500).json({
+      // Check for existing payment record
+      const checkExistingPayment = await db('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
+      if (!checkExistingPayment || checkExistingPayment.completed) {
+        if (button.multi_use) {
+          logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
+          const { id, description: generatedDescription } = await generateAndValidateUniqueId(merchantId, 'payment', description, paymentId);
+          paymentId = id;
+          paymentDescription = generatedDescription;
+          logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId and description:', { paymentId, description: paymentDescription });
+        } else {
+          logWithTimestamp(F, '❌ [invoice] Single-use button has no valid payment or is already completed:', { paymentId });
+          res.status(400).json({
             status: 'error',
-            message: 'Failed to generate unique paymentId',
+            message: 'This single-use button has already been used or has no valid payment'
           });
           return;
         }
-        logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId:', paymentId);
-        // Format timestamp for MySQL DATETIME
-        const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-        logWithTimestamp(F, '🔍 [invoice] [Step 4] Formatted timestamp for ids table:', { timestamp });
-        // Insert new paymentId into ids table
-        try {
-          await db('ids').insert({
-            id: paymentId,
-            type: 'payment',
-            merchant_id: merchantId,
-            timestamp,
-          }).onConflict(['id', 'type', 'merchant_id']).merge();
-          logWithTimestamp(F, '✅ [invoice] [Step 4] New paymentId inserted into ids table:', paymentId);
-        } catch (insertError) {
-          logWithTimestamp(F, '❌ [invoice] Failed to insert paymentId into ids table:', {
-            error: insertError instanceof Error ? insertError.message : 'Unknown error',
-            stack: insertError instanceof Error ? insertError.stack : 'No stack trace',
-            paymentId,
-          });
-          throw insertError;
-        }
-      }
+        await db('payments').insert({
+          transaction_id: transactionIdNew,
+          payment_id: paymentId,
+          button_id: buttonId,
+          payer_id: senderIdentityKey,
+          merchant_id: merchantId,
+          completed: false,
+          blockchain_transaction: '',
+          amount,
+          description: paymentDescription,
+          created_at: new Date(),
+          updated_at: new Date(),
+          is_new: 1
+        });
+        logWithTimestamp(F, '✅ [invoice] [Step 4] Inserted payment for paymentId:', { paymentId, buttonId });
+      } else {
+        logWithTimestamp(F, '🔍 [invoice] [Step 4] Using existing paymentId for first payment:', { paymentId });
+        await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
+          transaction_id: transactionIdNew,
+          payer_id: senderIdentityKey,
+          updated_at: new Date()
+        });
+        logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', { paymentId, transactionId: transactionIdNew, payer_id: senderIdentityKey });
+      }      
+      // // Check for existing payment record for single-use buttons
+      // if (!button.multi_use) {
+      //   const existingPayment = await db('payments')
+      //     .where({ payment_id: paymentId })
+      //     .first();
+      // }
+      // // For multi-use buttons, check if this is the first payment
+      // if (button.multi_use) {
+      //   const existingPayment = await db('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
+      //   if (!existingPayment || existingPayment.completed) {
+      //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
+      //     paymentId = await generateAndValidateUniqueId(merchantId, 'payment', description, paymentId);
+      //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId:', paymentId);
+      //     await db('payments').insert({
+      //       transaction_id: transactionIdNew,
+      //       payment_id: paymentId,
+      //       button_id: buttonId,
+      //       payer_id: senderIdentityKey,
+      //       merchant_id: merchantId,
+      //       completed: false,
+      //       blockchain_transaction: '',
+      //       amount,
+      //       description,
+      //       created_at: new Date(),
+      //       updated_at: new Date(),
+      //       is_new: 1
+      //     });
+      //     logWithTimestamp(F, '✅ [invoice] [Step 4] Inserted payment for new paymentId:', { paymentId, buttonId });
+      //   } else {
+      //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Using existing paymentId for first payment:', { paymentId });
+      //     await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
+      //       transaction_id: transactionIdNew,
+      //       payer_id: senderIdentityKey,
+      //       updated_at: new Date()
+      //     });
+      //     logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', { paymentId, transactionId: transactionIdNew, payer_id: senderIdentityKey });
+      //   }
+      // } 
       logWithTimestamp(F, '🔍 [invoice] [Step 5] Validating amount:', {
         requested: amount,
         buttonAmount: button.amount,
@@ -212,7 +262,6 @@ export default {
         });
         return;
       }
-      transactionIdNew = randomBytes(12).toString('hex').slice(0, 12);
       logWithTimestamp(F, '🔍 [invoice] [Step 6] Generating transaction ID:', transactionIdNew);
       const paymentsSchema = await db('information_schema.columns')
         .where({ table_name: 'payments' })
@@ -227,54 +276,66 @@ export default {
         existingPayments,
       });
       try {
-        await db('payments').insert({
-          transaction_id: transactionIdNew,
-          payment_id: paymentId,
-          button_id: buttonId,
-          payer_id: senderIdentityKey,
-          merchant_id: merchantId,
-          completed: false,
-          blockchain_transaction: '',
-          amount,
-          exchange_rate: 1,
-        });
-        // Update used flag for single-use buttons after first payment
-        if (!button.multi_use && !button.used) {
-          await db('payment_buttons')
-            .where({ button_id: buttonId, merchant_id: merchantId })
-            .update({ used: true, updated_at: db.fn.now() });
-          logWithTimestamp(F, '✅ [invoice] [Step 7] Marked single-use button as used:', { buttonId });
+        if (!button.multi_use) {
+          const existingPayment = await db('payments').where({ payment_id: paymentId }).first();
+          if (existingPayment && existingPayment.completed) {
+            logWithTimestamp(F, '❌ [invoice] [Step 7] Single-use payment already completed:', { paymentId });
+            await db('payment_buttons').where({ payment_id: paymentId, merchant_id: merchantId }).update({ used: true, updated_at: db.fn.now() });
+            res.status(400).json({ status: 'error', message: 'This single-use button has already been used' });
+            return;
+          }
         }
-        logWithTimestamp(F, '✅ [invoice] [Step 7] Payment invoice created:', {
-          paymentId,
-          buttonId,
-          transactionId: transactionIdNew,
-        });
+        logWithTimestamp(F, '✅ [invoice] [Step 7] Invoice prepared:', { paymentId, buttonId, transactionId: transactionIdNew });
       } catch (insertError) {
+        const errorMessage = insertError instanceof Error ? insertError.message : 'Unknown error';
         logWithTimestamp(F, '❌ [invoice] Failed to insert payment:', {
-          error: insertError instanceof Error ? insertError.message : 'Unknown error',
+          error: errorMessage,
           stack: insertError instanceof Error ? insertError.stack : 'No stack trace',
           paymentId,
           transactionId: transactionIdNew,
         });
-        throw insertError;
-      }
-      let senderPrivateKey: PrivateKey;
-      try {
-        const hasCreatedAt =
-          (await db('information_schema.columns')
-            .where({ table_name: 'payment_buttons', column_name: 'created_at' })
-            .first()) !== undefined;
-        if (!hasCreatedAt || !button.created_at || new Date(button.created_at) < new Date('2025-07-25T12:00:00Z')) {
-          senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
-          logWithTimestamp(F, '🔍 [invoice] Using hardcoded key for pre-v1.2 or missing created_at button:', paymentId);
-        } else {
-          senderPrivateKey = new PrivateKey(senderIdentityKey, 'hex');
-          logWithTimestamp(F, '🔍 [invoice] Using authenticated identity key for new button');
+        if (errorMessage.includes('Duplicate entry') && !button.multi_use) {
+          await db('payment_buttons')
+            .where({ payment_id: paymentId, merchant_id: merchantId })
+            .update({ used: true, updated_at: db.fn.now() });
+          logWithTimestamp(F, '✅ [invoice] [Step 7] Marked single-use button as used due to duplicate entry:', { paymentId });
+          res.status(400).json({
+            status: 'error',
+            message: 'This single-use button has already been used',
+          });
+          return;
         }
-      } catch (err) {
-        logWithTimestamp(F, '⚠️ [invoice] created_at column check failed, using hardcoded key as fallback:', err);
+        res.status(500).json({
+          status: 'error',
+          message: `Failed to create payment record: ${errorMessage}`,
+        });
+        return;
+      }
+      // let senderPrivateKey: PrivateKey;
+      // try {
+      //   const hasCreatedAt =
+      //     (await db('information_schema.columns')
+      //       .where({ table_name: 'payment_buttons', column_name: 'created_at' })
+      //       .first()) !== undefined;
+      //   if (!hasCreatedAt || !button.created_at || new Date(button.created_at) < new Date('2025-07-25T12:00:00Z')) {
+      //     senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
+      //     logWithTimestamp(F, '🔍 [invoice] Using hardcoded key for pre-v1.2 or missing created_at button:', paymentId);
+      //   } else {
+      //     senderPrivateKey = new PrivateKey(senderIdentityKey, 'hex');
+      //     logWithTimestamp(F, '🔍 [invoice] Using authenticated identity key for new button');
+      //   }
+      // } catch (err) {
+      //   logWithTimestamp(F, '⚠️ [invoice] created_at column check failed, using hardcoded key as fallback:', err);
+      //   senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
+      // }
+      let senderPrivateKey: PrivateKey;
+      const existingPayment = await db('payments').where({ payment_id: paymentId }).first();
+      if (existingPayment && existingPayment.payer_id) {
+        senderPrivateKey = new PrivateKey(existingPayment.payer_id, 'hex');
+        logWithTimestamp(F, '🔍 [invoice] Using payer_id from payments:', existingPayment.payer_id);
+      } else {
         senderPrivateKey = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex');
+        logWithTimestamp(F, '🔍 [invoice] Using hardcoded key as fallback');
       }
       const recipientPublicKey = PublicKey.fromString(button.merchant_id);
       const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`;
@@ -290,11 +351,12 @@ export default {
       logWithTimestamp(F, '🔍 [invoice] [Step 8] Generated derived script:', derivedScript);
       const satoshis = button.variable_amount ? amount : button.amount;
       logWithTimestamp(F, '🔍 [invoice] [Step 9] Calculated satoshis for output:', satoshis);
-      const outputDescription = button.description;
+      const outputDescription = paymentDescription;
       logWithTimestamp(F, '🔍 [invoice] [Step 10] Using output description:', outputDescription);
       const outputs = [
         {
           lockingScript: derivedScript,
+          customInstructions: JSON.stringify({ transactionid: transactionIdNew, payee: senderIdentityKey }),
           satoshis,
           outputDescription,
           merchantId,
@@ -316,6 +378,17 @@ export default {
         errorDetails: error,
         transaction_id: transactionIdNew ? transactionIdNew : 'N/A',
       });
+      if (message.includes('Duplicate entry') && !req.body.multi_use) {
+        await db('payment_buttons')
+          .where({ payment_id: req.body.paymentId, merchant_id: req.body.merchantId })
+          .update({ used: true, updated_at: db.fn.now() });
+        logWithTimestamp(F, '✅ [invoice] Marked single-use button as used due to duplicate entry:', { paymentId: req.body.paymentId });
+        res.status(400).json({
+          status: 'error',
+          message: 'This single-use button has already been used',
+        });
+        return;
+      }
       res.status(500).json({
         status: 'error',
         message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`,

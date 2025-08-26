@@ -13,7 +13,7 @@
  *
  * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
  *
- * Version: v4.21 (Updated 20Aug2025_1925 BST to validate against payments table only)
+ * Version: v4.24 (Updated 25Aug2025_2115 BST to remove redundant commented code) 
  * Change Log:
  * - 05Aug2025_0430 BST (v2.2): Fixed payment_button_id mapping and standardized route path.
  * - 05Aug2025_0600 BST (v2.3): Updated to use transaction_id in where clause (incomplete fix).
@@ -55,6 +55,9 @@
  * - 13Aug2025_1220 BST (v4.19): Refined P2PKH validation and ensured payer_id consistency.
  * - 14Aug2025_0040 BST (v4.20): Updated to use payment_id instead of id in payment button query.
  * - 20Aug2025_1925 BST (v4.21): Updated to validate against payments table only, removing payment_buttons query to fix 404 error for multi-use buttons.
+ * - 25Aug2025_2030 BST (v4.22): Updated to modify existing payments records from createButton.ts after validation.
+ * - 25Aug2025_2020 BST (v4.23): Used payment.amount for variable-amount buttons, added explicit lockingScript validation.
+ * - 25Aug2025_2115 BST (v4.24): Removed redundant commented code for clarity.
  */
 const F = 'routes/pay'
 import knex, { Knex } from 'knex'
@@ -182,67 +185,182 @@ export default {
       const derivedPublicKey: string = derivedPriv.toPublicKey().toString()
       const pkh: P2PKH = new P2PKH()
       const derivedScript: string = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex()
+      // const matchingOutput = bsvtx.outputs.find(
+      //   (x: Transaction['outputs'][number]): boolean => x.lockingScript.toHex() === lockingScript // Use client-provided lockingScript
+      // )
+      // if (!matchingOutput) {
+      //   bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
+      //     logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex())
+      //     logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis)
+      //   })
+      //   res.status(400).json({
+      //     status: 'error',
+      //     message: 'The transaction does not satisfy the invoice'
+      //   })
+      //   return
+      // }
+      // const expectedAmount: number = matchingOutput.satoshis || 0 // Use actual amount from transaction
+      // logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript)
+      // logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount)
+      // // Verify amount and proceed
+      // if (expectedAmount <= 0) {
+      //   logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount })
+      //   res.status(400).json({
+      //     status: 'error',
+      //     message: 'Invalid amount in transaction'
+      //   })
+      //   return
+      // }
+      // logWithTimestamp(F, '✅ [pay] Matching output found:', {
+      //   script: matchingOutput.lockingScript.toHex(),
+      //   satoshis: expectedAmount
+      // })
+      // let totalTransactionSatoshis = 0
+      // bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number) => {
+      //   logWithTimestamp(F, `🔍 Transaction Output ${i} script:`, out.lockingScript.toHex())
+      //   logWithTimestamp(F, `🔍 Transaction Output ${i} sats:`, out.satoshis)
+      //   totalTransactionSatoshis += out.satoshis || 0
+      // })
+      // logWithTimestamp(F, '🔍 Total transaction satoshis:', totalTransactionSatoshis.toString())
+      // if (totalTransactionSatoshis !== bsvtx.outputs.reduce((sum, out) => sum + (out.satoshis || 0), 0)) {
+      //   logWithTimestamp(F, '❌ Total satoshis mismatch')
+      // } else {
+      //   logWithTimestamp(F, '🔍 Verified: Total satoshis matches sum of outputs')
+      // }
+      // Validate button in payment_buttons
+      const button = await db('payment_buttons').where({ button_id: buttonId }).first();
+      if (!button) {
+        logWithTimestamp(F, '❌ [pay] Button not found:', { buttonId });
+        res.status(404).json({
+          status: 'error',
+          message: 'Button not found in payment_buttons'
+        });
+        return;
+      }
+      // Validate lockingScript
+      if (lockingScript !== derivedScript) {
+        logWithTimestamp(F, '❌ [pay] Locking script mismatch:', { client: lockingScript, server: derivedScript });
+        res.status(400).json({ status: 'error', message: 'Invalid lockingScript: does not match server-derived script' });
+        return;
+      }
+      // Validate transaction output
+      const expectedAmount = button.variable_amount ? paymentRec.amount : button.amount;
       const matchingOutput = bsvtx.outputs.find(
-        (x: Transaction['outputs'][number]): boolean => x.lockingScript.toHex() === lockingScript // Use client-provided lockingScript
-      )
+        (x: Transaction['outputs'][number]): boolean =>
+          x.lockingScript.toHex() === lockingScript && x.satoshis === expectedAmount
+      );
       if (!matchingOutput) {
         bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
-          logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex())
-          logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis)
-        })
+          logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex());
+          logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis);
+        });
         res.status(400).json({
           status: 'error',
-          message: 'The transaction does not satisfy the invoice'
-        })
-        return
+          message: 'The transaction does not satisfy the invoice or amount mismatch'
+        });
+        return;
       }
-      const expectedAmount: number = matchingOutput.satoshis || 0 // Use actual amount from transaction
-      logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript)
-      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount)
-      // Verify amount and proceed
+      logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript);
+      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount);
       if (expectedAmount <= 0) {
-        logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount })
+        logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount });
         res.status(400).json({
           status: 'error',
           message: 'Invalid amount in transaction'
-        })
-        return
+        });
+        return;
       }
       logWithTimestamp(F, '✅ [pay] Matching output found:', {
         script: matchingOutput.lockingScript.toHex(),
         satoshis: expectedAmount
-      })
-      let totalTransactionSatoshis = 0
-      bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number) => {
-        logWithTimestamp(F, `🔍 Transaction Output ${i} script:`, out.lockingScript.toHex())
-        logWithTimestamp(F, `🔍 Transaction Output ${i} sats:`, out.satoshis)
-        totalTransactionSatoshis += out.satoshis || 0
-      })
-      logWithTimestamp(F, '🔍 Total transaction satoshis:', totalTransactionSatoshis.toString())
-      if (totalTransactionSatoshis !== bsvtx.outputs.reduce((sum, out) => sum + (out.satoshis || 0), 0)) {
-        logWithTimestamp(F, '❌ Total satoshis mismatch')
-      } else {
-        logWithTimestamp(F, '🔍 Verified: Total satoshis matches sum of outputs')
-      }
+      });
+      // Validate transaction output
+      // const matchingOutput = bsvtx.outputs.find(
+      //   (x: Transaction['outputs'][number]): boolean =>
+      //     x.lockingScript.toHex() === lockingScript && x.satoshis === payment.amount
+      // );
+      // if (!matchingOutput) {
+      //   bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
+      //     logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex());
+      //     logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis);
+      //   });
+      //   res.status(400).json({
+      //     status: 'error',
+      //     message: 'The transaction does not satisfy the invoice or amount mismatch'
+      //   });
+      //   return;
+      // }
+
+      // const expectedAmount: number =button.amount;
+      // logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript);
+      // logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount);
+
+      // if (expectedAmount <= 0) {
+      //   logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount });
+      //   res.status(400).json({
+      //     status: 'error',
+      //     message: 'Invalid amount in transaction'
+      //   });
+      //   return;
+      // }
+
+      // logWithTimestamp(F, '✅ [pay] Matching output found:', {
+      //   script: matchingOutput.lockingScript.toHex(),
+      //   satoshis: expectedAmount
+      // });
       await db.transaction(async (trx: Knex.Transaction) => {
-        await trx('payments')
-          .where({
-            payment_id: paymentId,
-            button_id: buttonId,
-            transaction_id: paymentRec.transaction_id // Ensure update targets the existing record
-          })
-          .update({
-            completed: true,
-            blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
-            txid: txid,
-            amount: expectedAmount,
-            transaction_id: paymentRec.transaction_id // Preserve transaction_id
-          })
-        // Optional: Update total_paid in payment_buttons if needed
-        await trx('payment_buttons')
-          .where({ button_id: buttonId })
-          .increment('total_paid', expectedAmount)
+        const existingPayment = await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
+        if (!existingPayment) {
+          logWithTimestamp(F, '❌ [pay] Payment record not found:', { paymentId, buttonId });
+          res.status(404).json({ status: 'error', message: 'Payment record not found' });
+          return;
+        }
+        if (existingPayment.completed) {
+          logWithTimestamp(F, '❌ [pay] Payment already completed:', { paymentId, buttonId });
+          await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() });
+          res.status(400).json({ status: 'error', message: 'Payment already completed' });
+          return;
+        }
+        await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
+          completed: true,
+          blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
+          txid: txid,
+          amount: expectedAmount,
+          updated_at: new Date()
+        });
+        await trx('payment_buttons').where({ button_id: buttonId }).increment('total_paid', expectedAmount);
+        if (!button.multi_use) {
+          await trx('payment_buttons').where({ payment_id: paymentId }).update({ used: true, updated_at: trx.fn.now() });
+          logWithTimestamp(F, '✅ [pay] Marked single-use button as used:', { paymentId });
+        }
+        logWithTimestamp(F, '✅ [pay] Updated payment:', { paymentId, buttonId });
       })
+      // await db.transaction(async (trx: Knex.Transaction) => {
+      //   await trx('payments')
+      //     .where({
+      //       payment_id: paymentId,
+      //       button_id: buttonId,
+      //       transaction_id: paymentRec.transaction_id // Ensure update targets the existing record
+      //     })
+      //     .update({
+      //       completed: true,
+      //       blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
+      //       txid: txid,
+      //       amount: expectedAmount,
+      //       transaction_id: paymentRec.transaction_id // Preserve transaction_id
+      //     })
+
+      //   // Optional: Update total_paid in payment_buttons if needed
+      //   await trx('payment_buttons')
+      //     .where({ button_id: buttonId })
+      //     .increment('total_paid', expectedAmount)
+      //   // Mark single-use buttons as used within transaction
+      //   const button = await trx('payment_buttons').where({ payment_id: paymentId }).first();
+      //   if (!button.multi_use) {
+      //     await trx('payment_buttons').where({ payment_id: paymentId }).update({ used: true, updated_at: trx.fn.now() });
+      //     logWithTimestamp(F, '✅ [pay] Marked single-use button as used:', { paymentId });
+      //   }
+      // })
       logWithTimestamp(F, `✅ [pay] Payment successful. TXID: ${txid}`)
       const responseData = { status: 'success', message: 'Payment completed successfully', txid }
       logWithTimestamp(F, '🔍 [pay] Response data:', responseData)
