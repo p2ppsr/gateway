@@ -152,22 +152,20 @@ export default {
       }
       // Insert into payment_buttons and payments
       await db.transaction(async trx => {
-        await db('payment_buttons')
-          .transacting(trx)
-          .insert({
-            button_id: buttonId,
-            merchant_id: merchantId,
-            payment_id: paymentId,
-            amount: amountInSats,
-            html_code: htmlCode,
-            variable_amount: variableAmount,
-            multi_use: multiUse,
-            used: false,
-            total_paid: null,
-            created_at: trx.fn.now(),
-            updated_at: trx.fn.now()
-          });
-// Ensure description is set
+        await db('payment_buttons').transacting(trx).insert({
+          button_id: buttonId,
+          merchant_id: merchantId,
+          payment_id: paymentId,
+          amount: amountInSats,
+          html_code: htmlCode,
+          variable_amount: variableAmount,
+          multi_use: multiUse,
+          used: false,
+          total_paid: null,
+          created_at: trx.fn.now(),
+          updated_at: trx.fn.now()
+        })
+        // Ensure description is set
         const finalDescription = description || `Payment for paymentId: ${paymentId}`
         await db('payments')
           .transacting(trx)
@@ -205,7 +203,7 @@ export default {
     } catch (error) {
       logWithTimestamp(F, '[createButton] Error:', {
         message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
       })
       res.status(500).json({ status: 'error', message: 'Failed to create button' })
     }

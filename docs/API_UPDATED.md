@@ -18,6 +18,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `spendingDescription` (string, optional): A description of the item or purpose of payment that is displayed to the user within their Wallet/Metanet client.
 
 **Example Request:**
+
 ```json
 {
   "amount": 1000,
@@ -29,6 +30,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -52,6 +54,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `spendingDescription` (string, optional): A description of the item or purpose of payment that is displayed to the user within their Wallet/Metanet client.
 
 **Example Request:**
+
 ```json
 {
   "paymentButtonId": "btn_123456789",
@@ -62,6 +65,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -82,6 +86,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `transaction` (string): Transaction details.
 
 **Example Request:**
+
 ```json
 {
   "paymentId": "pay_987654321",
@@ -90,6 +95,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -111,11 +117,13 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `sort` (string, optional): Sort order (`asc` or `desc`).
 
 **Example Request:**
+
 ```
 /listPayments?buttonId=btn_123456789&limit=10&offset=0&sort=desc
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -151,11 +159,13 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `sort` (string, optional): Sort order (`asc` or `desc`).
 
 **Example Request:**
+
 ```
 /listButtons?excludeSingleUse=true&usage=unused&limit=10&offset=0&sort=desc
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -188,6 +198,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `paymentId` (string): ID of the payment to acknowledge.
 
 **Example Request:**
+
 ```json
 {
   "paymentId": "pay_987654321"
@@ -195,6 +206,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -214,6 +226,7 @@ The API uses standard HTTP status codes to indicate the success or failure of re
 - `500 Internal Server Error`: The server encountered an unexpected condition that prevented it from fulfilling the request.
 
 **Example Error Response:**
+
 ```json
 {
   "status": "error",

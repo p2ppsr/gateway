@@ -44,6 +44,7 @@ We define a new open-source ecosystem component, a Payment Server. It is similar
 ### Step-by-Step Instructions
 
 1. **Set Up the Server Environment**:
+
    ```sh
    sudo apt update && sudo apt upgrade -y
    sudo apt install -y nodejs npm mysql-server docker.io git
@@ -76,17 +77,20 @@ We define a new open-source ecosystem component, a Payment Server. It is similar
    ```
 
 3. **Clone the Repository**:
+
    ```sh
    git clone https://github.com/your-repo/gateway.git
    cd gateway
    ```
 
 4. **Install Dependencies**:
+
    ```sh
    npm install
    ```
 
 5. **Configure the Environment**:
+
    ```sh
    npm run setup
    ```
@@ -95,11 +99,13 @@ We define a new open-source ecosystem component, a Payment Server. It is similar
    Edit `.env` to set a secure `SERVER_PRIVATE_KEY` (e.g., a 64-character hex string).
 
 6. **Run Database Migrations**:
+
    ```sh
    npx knex migrate:latest
    ```
 
 7. **(Optional) Seed the database**:
+
    ```sh
    npx knex seed:run
    ```
@@ -153,19 +159,19 @@ We define a new open-source ecosystem component, a Payment Server. It is similar
 
 10. **Build and Run the Application**:
 
-   ```sh
-   npm run build:inject
-   npm run dev
-   ```
+```sh
+npm run build:inject
+npm run dev
+```
 
-   For production:
+For production:
 
-   ```sh
-   npm install -g pm2
-   pm2 start src/server.ts --name gateway
-   pm2 save
-   pm2 startup
-   ```
+```sh
+npm install -g pm2
+pm2 start src/server.ts --name gateway
+pm2 save
+pm2 startup
+```
 
 11. **Verify and Test**:
 

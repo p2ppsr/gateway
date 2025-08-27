@@ -187,76 +187,84 @@ export default {
       const derivedPublicKey: string = derivedPriv.toPublicKey().toString()
       const pkh: P2PKH = new P2PKH()
       const derivedScript: string = pkh.lock(PublicKey.fromString(derivedPublicKey).toHash()).toHex()
-      const button = await db('payment_buttons').where({ button_id: buttonId }).first();
+      const button = await db('payment_buttons').where({ button_id: buttonId }).first()
       if (!button) {
-        logWithTimestamp(F, '❌ [pay] Button not found:', { buttonId });
+        logWithTimestamp(F, '❌ [pay] Button not found:', { buttonId })
         res.status(404).json({
           status: 'error',
           message: 'Button not found in payment_buttons'
-        });
-        return;
+        })
+        return
       }
       // Validate lockingScript
       if (lockingScript !== derivedScript) {
-        logWithTimestamp(F, '❌ [pay] Locking script mismatch:', { client: lockingScript, server: derivedScript });
-        res.status(400).json({ status: 'error', message: 'Invalid lockingScript: does not match server-derived script' });
-        return;
+        logWithTimestamp(F, '❌ [pay] Locking script mismatch:', { client: lockingScript, server: derivedScript })
+        res
+          .status(400)
+          .json({ status: 'error', message: 'Invalid lockingScript: does not match server-derived script' })
+        return
       }
       // Validate transaction output
       // Line above: logWithTimestamp(F, '🔍 [pay] Using client-provided lockingScript:', lockingScript)
-      const expectedAmount = button.variable_amount ? (Number(req.body.amount) || paymentRec.amount) : button.amount;
-      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', { expectedAmount, providedAmount: req.body.amount, paymentAmount: paymentRec.amount });
+      const expectedAmount = button.variable_amount ? Number(req.body.amount) || paymentRec.amount : button.amount
+      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', {
+        expectedAmount,
+        providedAmount: req.body.amount,
+        paymentAmount: paymentRec.amount
+      })
       // Line below: if (expectedAmount <= 0)
       if (expectedAmount <= 0) {
-        logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount });
+        logWithTimestamp(F, '❌ [pay] Invalid amount from transaction:', { expectedAmount })
         res.status(400).json({
           status: 'error',
           message: 'Invalid amount in transaction'
-        });
-        return;
+        })
+        return
       }
-      logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript);
-      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount);
+      logWithTimestamp(F, '🔍 [pay] Derived locking script:', derivedScript)
+      logWithTimestamp(F, '🔍 [pay] Expected amount (sats):', expectedAmount)
       const matchingOutput = bsvtx.outputs.find(
         (x: Transaction['outputs'][number]): boolean =>
           x.lockingScript.toHex() === lockingScript && x.satoshis === expectedAmount
-      );
+      )
       if (!matchingOutput) {
         bsvtx.outputs.forEach((out: Transaction['outputs'][number], i: number): void => {
-          logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex());
-          logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis);
-        });
+          logWithTimestamp(F, `🔍 Output ${i} script:`, out.lockingScript.toHex())
+          logWithTimestamp(F, `🔍 Output ${i} sats:`, out.satoshis)
+        })
         res.status(400).json({
           status: 'error',
           message: 'The transaction does not satisfy the invoice or amount mismatch'
-        });
-        return;
+        })
+        return
       }
       logWithTimestamp(F, '✅ [pay] Matching output found:', {
         script: matchingOutput.lockingScript.toHex(),
         satoshis: expectedAmount
-      });
+      })
       await db.transaction(async (trx: Knex.Transaction) => {
-        const existingPayment = await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
+        const existingPayment = await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).first()
         if (!existingPayment) {
-          logWithTimestamp(F, '❌ [pay] Payment record not found:', { paymentId, buttonId });
-          res.status(404).json({ status: 'error', message: 'Payment record not found' });
-          return;
+          logWithTimestamp(F, '❌ [pay] Payment record not found:', { paymentId, buttonId })
+          res.status(404).json({ status: 'error', message: 'Payment record not found' })
+          return
         }
         if (existingPayment.completed) {
-          logWithTimestamp(F, '❌ [pay] Payment already completed:', { paymentId, buttonId });
-          await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() });
-          res.status(400).json({ status: 'error', message: 'Payment already completed' });
-          return;
+          logWithTimestamp(F, '❌ [pay] Payment already completed:', { paymentId, buttonId })
+          await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() })
+          res.status(400).json({ status: 'error', message: 'Payment already completed' })
+          return
         }
-        await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
-          completed: true,
-          blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
-          txid: txid,
-          amount: expectedAmount,
-          updated_at: trx.fn.now()
-        });
-        await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() });
+        await trx('payments')
+          .where({ payment_id: paymentId, button_id: buttonId })
+          .update({
+            completed: true,
+            blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
+            txid: txid,
+            amount: expectedAmount,
+            updated_at: trx.fn.now()
+          })
+        await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() })
         // await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
         //   completed: true,
         //   blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
@@ -269,7 +277,7 @@ export default {
         //   await trx('payment_buttons').where({ payment_id: paymentId }).update({ used: true, updated_at: trx.fn.now() });
         //   logWithTimestamp(F, '✅ [pay] Marked single-use button as used:', { paymentId });
         // }
-        logWithTimestamp(F, '✅ [pay] Updated payment:', { paymentId, buttonId });
+        logWithTimestamp(F, '✅ [pay] Updated payment:', { paymentId, buttonId })
       })
       logWithTimestamp(F, `✅ [pay] Payment successful. TXID: ${txid}`)
       const responseData = { status: 'success', message: 'Payment completed successfully', txid }

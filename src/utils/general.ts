@@ -48,25 +48,25 @@ export function isBase58(id: string): boolean {
 export const isMerchantId = (value: string): boolean => {
   // Check for 64 or 66 characters
   if (![64, 66].includes(value.length)) {
-    return false;
+    return false
   }
   // Check for valid hex string
-  const hexRegex = /^[0-9a-fA-F]+$/;
+  const hexRegex = /^[0-9a-fA-F]+$/
   if (!hexRegex.test(value)) {
-    return false;
+    return false
   }
   // If 66 characters, ensure it starts with '02' or '03' (compressed public key)
   if (value.length === 66 && !value.startsWith('02') && !value.startsWith('03')) {
-    return false;
+    return false
   }
   // Validate as secp256k1 public key
   try {
-    PublicKey.fromString(value);
-    return true;
+    PublicKey.fromString(value)
+    return true
   } catch {
-    return false;
+    return false
   }
-};
+}
 
 /**
  * Formats an ID (e.g., transaction_id or button_id) as 'first5...last5' with ellipses.
@@ -85,21 +85,23 @@ export function formatId(id: string): string {
  */
 export function formatTimeLocal(dateStr: string | null | undefined): string {
   if (!dateStr) {
-    return 'N/A';
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-GB', {
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).replace(',', '');
+    const date = new Date(dateStr)
+    return date
+      .toLocaleString('en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      })
+      .replace(',', '')
   } catch (error) {
-    return 'N/A';
+    return 'N/A'
   }
 }
 
@@ -110,13 +112,13 @@ export function formatTimeLocal(dateStr: string | null | undefined): string {
  */
 export function formatTimestamp(dateStr: string | undefined): string {
   if (!dateStr) {
-    return 'N/A';
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
-    return date.toISOString().replace('T', ' ').slice(0, 19);
+    const date = new Date(dateStr)
+    return date.toISOString().replace('T', ' ').slice(0, 19)
   } catch (error) {
-    return 'N/A';
+    return 'N/A'
   }
 }
 
@@ -135,81 +137,81 @@ export const fetchWithTimeout = async (
   wallet: WalletClient,
   timeoutMs: number = 15000
 ): Promise<Response> => {
-  const authFetch = new AuthFetch(wallet);
+  const authFetch = new AuthFetch(wallet)
   const timeoutId = setTimeout(() => {
-    throw new Error(`❌ Request timed out after ${timeoutMs}ms for URL: ${url}`);
-  }, timeoutMs);
+    throw new Error(`❌ Request timed out after ${timeoutMs}ms for URL: ${url}`)
+  }, timeoutMs)
   try {
-    const response = await authFetch.fetch(url, options);
+    const response = await authFetch.fetch(url, options)
     if (!response.ok) {
-      let errorDetail = '';
+      let errorDetail = ''
       try {
-        errorDetail = await response.text();
+        errorDetail = await response.text()
       } catch (textError) {
-        errorDetail = 'Failed to retrieve error details';
+        errorDetail = 'Failed to retrieve error details'
       }
       throw new Error(
         `Failed to fetch ${url} with method ${options.method || 'GET'}: Status ${response.status} ${response.statusText}, Details: ${errorDetail}`
-      );
+      )
     }
-    return response;
+    return response
   } catch (err: any) {
     throw new Error(
       `Failed to fetch ${url} with method ${options.method || 'GET'}: ${err.message}${
         err.status ? `, Status: ${err.status}` : ''
       }`
-    );
+    )
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timeoutId)
   }
-};
+}
 
 export const validateCSS = (css: string): boolean => {
   try {
     const rules = css
       .split('}')
       .map(rule => rule.trim())
-      .filter(rule => rule.length > 0);
+      .filter(rule => rule.length > 0)
     for (const rule of rules) {
-      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim());
-      if (!selectorPart || !propertiesPart) return false;
+      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim())
+      if (!selectorPart || !propertiesPart) return false
       const properties = propertiesPart
         .split(';')
         .map(prop => prop.trim())
-        .filter(prop => prop.length > 0);
+        .filter(prop => prop.length > 0)
       for (const prop of properties) {
-        const [key, value] = prop.split(':').map(part => part.trim());
-        if (!key || !value) return false;
+        const [key, value] = prop.split(':').map(part => part.trim())
+        if (!key || !value) return false
         // Allow hex colors of 3+ characters
         if (value.includes('#')) {
-          const hexMatch = value.match(/#[0-9a-fA-F]{3,}/g);
-          if (!hexMatch) return false;
+          const hexMatch = value.match(/#[0-9a-fA-F]{3,}/g)
+          if (!hexMatch) return false
         }
         // Check for balanced parentheses and valid linear-gradient syntax
         if (value.includes('(')) {
-          const openCount = (value.match(/\(/g) || []).length;
-          const closeCount = (value.match(/\)/g) || []).length;
-          if (openCount !== closeCount) return false;
+          const openCount = (value.match(/\(/g) || []).length
+          const closeCount = (value.match(/\)/g) || []).length
+          if (openCount !== closeCount) return false
           if (value.includes('linear-gradient')) {
             // Ensure linear-gradient ends with ')' and has at least two colors
-            if (!value.match(/linear-gradient\s*\([^)]*\)\s*$/)) return false;
-            const colorMatches = value.match(/#[0-9a-fA-F]{3,}/g);
-            if (!colorMatches || colorMatches.length < 2) return false;
+            if (!value.match(/linear-gradient\s*\([^)]*\)\s*$/)) return false
+            const colorMatches = value.match(/#[0-9a-fA-F]{3,}/g)
+            if (!colorMatches || colorMatches.length < 2) return false
           }
         }
       }
     }
-    return true;
+    return true
   } catch {
-    return false;
+    return false
   }
-};
+}
 
 export const extractCSS = (input: string): string => {
-  const match = input.match(/<style>([\s\S]*?)<\/style>/);
-  return match ? match[1].trim() : input.trim();
-};
+  const match = input.match(/<style>([\s\S]*?)<\/style>/)
+  return match ? match[1].trim() : input.trim()
+}
 
 export const sanitizeInput = (input: string): string => {
-  return input.replace(/[<>]/g, '');
-};
+  return input.replace(/[<>]/g, '')
+}
