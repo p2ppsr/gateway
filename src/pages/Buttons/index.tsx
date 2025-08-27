@@ -68,7 +68,7 @@ interface Button {
   variable_amount: boolean;
   multi_use: boolean;
   used: boolean;
-  total_paid: number | null;
+  calculated_total: number | null;
   created_at: string;
   updated_at: string;
   payment_id: string | null;
@@ -90,7 +90,7 @@ interface ButtonResponse {
     variableAmount: boolean;
     multiUse: boolean;
     used: boolean;
-    totalPaid: number | null;
+    calculated_total: number | null;
     createdAt: string;
     updatedAt: string;
     payments?: {
@@ -240,8 +240,10 @@ const PaymentButtonsList = () => {
             }))
           : [];
         logWithTimestamp(F, `Payments for button ${button.buttonId}:`, JSON.stringify(payments));
-        const totalPaid = button.totalPaid !== null && button.totalPaid !== undefined ? button.totalPaid : null;
-        logWithTimestamp(F, `Total paid for button ${button.buttonId}:`, totalPaid);
+        const calculated_total = button.calculated_total !== null && button.calculated_total !== undefined ? button.calculated_total : null;
+        logWithTimestamp(F, `Calculated total for button ${button.buttonId}:`, calculated_total);
+        //*const totalPaid = button.totalPaid !== null && button.totalPaid !== undefined ? button.totalPaid : null;
+        logWithTimestamp(F, `Total paid for button ${button.buttonId}:`, calculated_total);
         logWithTimestamp(F, `Raw used for button ${button.buttonId}:`, button.used, 'Mapped used:', !!button.used, 'Type:', typeof button.used);
         return {
           button_id: button.buttonId,
@@ -251,7 +253,7 @@ const PaymentButtonsList = () => {
           variable_amount: !!button.variableAmount,
           multi_use: !!button.multiUse,
           used: !!button.used,
-          total_paid: totalPaid,
+          calculated_total,
           created_at: button.createdAt,
           updated_at: button.updatedAt,
           payment_id: button.paymentId ?? null,
@@ -375,7 +377,7 @@ const PaymentButtonsList = () => {
         let bValue: string | number | Date | boolean | null | undefined = sortConfig.key ? b[sortConfig.key] : undefined;
         if (aValue === null || aValue === undefined) return 1;
         if (bValue === null || bValue === undefined) return -1;
-        if (sortConfig.key === 'amount' || sortConfig.key === 'total_paid') {
+        if (sortConfig.key === 'amount' || sortConfig.key === 'calculated_total') {
           aValue = (aValue as number) || 0;
           bValue = (bValue as number) || 0;
           return sortConfig.direction === 'asc'
@@ -621,11 +623,11 @@ const PaymentButtonsList = () => {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        requestSort('total_paid');
+                        requestSort('calculated_total');
                       }}
                       sx={{ cursor: 'pointer', textDecoration: 'underline', color: 'inherit', whiteSpace: 'nowrap' }}
                     >
-                      Total Paid {sortConfig.key === 'total_paid' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
+                      Total Paid {sortConfig.key === 'calculated_total' && (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
@@ -709,7 +711,7 @@ const PaymentButtonsList = () => {
                         <TableCell data-debug={`used-${fullButtonId}-${button.used ? 'Yes' : 'No'}`} sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>
                           {button.used ? 'Yes' : 'No'}
                         </TableCell>
-                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.total_paid !== null ? button.total_paid : 'N/A'}</TableCell>
+                        <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.calculated_total !== null ? button.calculated_total : 'N/A'}</TableCell>
                         <TableCell sx={{ ...cellStyle, borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}` }}>{button.description}</TableCell>
                         <TableCell
                           onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index * 2 + 1)}

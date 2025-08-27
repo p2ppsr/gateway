@@ -70,12 +70,12 @@ export default {
           'payments.payment_id as payment_id',
           'payments.txid as txid',
           'payments.payer_id as payer_id',
-          'payments.amount as amount',
+          db.raw('CASE WHEN payments.completed = 1 THEN payments.amount ELSE 0 END as amount'),
           'payments.completed as completed',
           'payments.is_new as is_new',
           'payments.created_at as created_at',
           'payment_buttons.button_id as button_id',
-          'payment_buttons.description as description'
+          db.raw('COALESCE(payments.description, CONCAT("Payment using paymentId: ", payments.payment_id)) as description')
         )
         .leftJoin('payment_buttons', 'payments.button_id', 'payment_buttons.button_id')
         .where('payments.merchant_id', req.auth.identityKey)

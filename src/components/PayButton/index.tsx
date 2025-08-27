@@ -550,7 +550,9 @@ const PayButton = ({
       } catch (e) {
         throw new Error('Failed to serialize transaction');
       }
-      const payPayload = { paymentId: invoice.paymentId, buttonId, transaction: { txid, atomicBeefTx }, lockingScript: outputsWithSats[0]?.lockingScript };
+      const payPayload = { paymentId: invoice.paymentId, buttonId, transaction: { txid, atomicBeefTx }, lockingScript: outputsWithSats[0]?.lockingScript, amount: effectiveAmount };
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`, server, payPayload);
+      // //*const payPayload = { paymentId: invoice.paymentId, buttonId, transaction: { txid, atomicBeefTx }, lockingScript: outputsWithSats[0]?.lockingScript };
       console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`, server, payPayload);
       const resPay = await authFetch.fetch(`${server}/api/pay`, {
         method: 'POST',

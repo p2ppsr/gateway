@@ -54,8 +54,8 @@ interface Payment {
   completed: boolean | null;
   is_new: boolean | null;
   created_at: string | null;
+  description: string | null;
 }
-
 interface PaymentResponse {
   status: string;
   message: string;
@@ -69,9 +69,37 @@ interface PaymentResponse {
     completed: number | null;
     is_new: number | null;
     created_at: string | null;
+    description: string | null;
   }[];
   total?: number;
 }
+// interface Payment {
+//   payment_id: string | null;
+//   button_id: string | null;
+//   payer_id: string | null;
+//   txid: string | null;
+//   amount: number | null;
+//   completed: boolean | null;
+//   is_new: boolean | null;
+//   created_at: string | null;
+// }
+
+// interface PaymentResponse {
+//   status: string;
+//   message: string;
+//   title?: string;
+//   data: {
+//     payment_id: string | null;
+//     txid: string | null;
+//     payer_id: string | null;
+//     button_id: string | null;
+//     amount: string | number | null;
+//     completed: number | null;
+//     is_new: number | null;
+//     created_at: string | null;
+//   }[];
+//   total?: number;
+// }
 
 interface SortConfig {
   key: keyof Payment | null;
@@ -154,6 +182,15 @@ const PaymentsList = () => {
           completed: payment.completed === null ? false : !!payment.completed,
           is_new: payment.is_new === null ? false : !!payment.is_new,
           created_at: payment.created_at || null,
+          description: payment.description || null,
+          // payment_id: payment.payment_id || null,
+          // button_id: payment.button_id || null,
+          // payer_id: payment.payer_id || null,
+          // txid: payment.txid || null,
+          // amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
+          // completed: payment.completed === null ? false : !!payment.completed,
+          // is_new: payment.is_new === null ? false : !!payment.is_new,
+          // created_at: payment.created_at || null,
         };
         logWithTimestamp(F, `Mapped payment ${index}:`, {
           payment_id: mappedPayment.payment_id,
@@ -272,6 +309,10 @@ const PaymentsList = () => {
 
   const requestSort = (key: keyof Payment) => {
     if (key === 'completed' || key === 'is_new') return;
+    if (key === 'description') {
+      setSortConfig({ key, direction: sortConfig.key === key && sortConfig.direction === 'asc' ? 'desc' : 'asc' });
+      return;
+    }
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig.key === key && sortConfig.direction === 'asc') {
       direction = 'desc';
@@ -594,6 +635,21 @@ const PaymentsList = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
+                    <Typography
+                      sx={{
+                        whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      onClick={() => requestSort('description')}
+                    >
+                      Description
+                      {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
                     <Typography sx={{ whiteSpace: 'nowrap' }}>Complete</Typography>
                   </TableCell>
                   <TableCell>
@@ -656,6 +712,7 @@ const PaymentsList = () => {
                         {formatPayerId(payment.payer_id)}
                       </TableCell>
                       <TableCell>{payment.amount !== null ? payment.amount : 'N/A'}</TableCell>
+                      <TableCell>{payment.description || 'N/A'}</TableCell>
                       <TableCell data-debug={`completed-${fullPaymentId}-${renderedComplete}`}>
                         {renderedComplete}
                       </TableCell>

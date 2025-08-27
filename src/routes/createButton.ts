@@ -167,6 +167,8 @@ export default {
             created_at: trx.fn.now(),
             updated_at: trx.fn.now()
           });
+// Ensure description is set
+        const finalDescription = description || `Payment for paymentId: ${paymentId}`
         await db('payments')
           .transacting(trx)
           .insert({
@@ -175,27 +177,37 @@ export default {
             merchant_id: merchantId,
             transaction_id: '',
             amount: amountInSats,
+            description: finalDescription.slice(0, 80),
             completed: 0,
             is_new: 1,
             created_at: trx.fn.now(),
             updated_at: trx.fn.now()
-          });
-        logWithTimestamp(F, '✅ [createButton] Inserted payment button and payment:', { paymentId, buttonId, description });
-        res.status(201).json({
-          status: 'success',
-          message: 'Payment button and payment created successfully',
+          })
+          .onConflict(['payment_id', 'button_id'])
+          .merge({
+            amount: amountInSats,
+            description: finalDescription.slice(0, 80),
+            updated_at: trx.fn.now()
+          })
+        logWithTimestamp(F, '✅ [createButton] Payment and button records created/updated:', {
           paymentId,
-          buttonId
+          buttonId,
+          description: finalDescription,
+          amount: amountInSats
         })
       })
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '❌ Unknown error'
-      logWithTimestamp(F, '❌ [createButton] Error creating payment button:', {
-        message: errorMessage,
-        stack: err instanceof Error ? err.stack : '❌ No stack trace',
-        requestBody: req.body
+      res.status(201).json({
+        status: 'success',
+        message: 'Payment button and payment created successfully',
+        paymentId,
+        buttonId
       })
-      res.status(500).json({ status: 'error', message: `❌ ${errorMessage}` })
+    } catch (error) {
+      logWithTimestamp(F, '[createButton] Error:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+      })
+      res.status(500).json({ status: 'error', message: 'Failed to create button' })
     }
   }
 }

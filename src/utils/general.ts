@@ -75,7 +75,7 @@ export const isMerchantId = (value: string): boolean => {
  */
 export function formatId(id: string): string {
   if (id.length < 10) return id // Fallback for short IDs
-  return `${id.slice(0, 5)}...${id.slice(-5)}`
+  return `${id.slice(0, 4)}...${id.slice(-4)}`
 }
 
 /**

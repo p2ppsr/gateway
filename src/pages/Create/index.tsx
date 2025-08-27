@@ -1220,7 +1220,7 @@ const Create: React.FC = () => {
       await navigator.clipboard.writeText(codeToCopy);
       setCopySuccess('success');
       setTimeout(() => setCopySuccess(''), 2000);
-      toast.success(`Button copied to clipboard (${multiUse ? 'Multi Use' : 'Single Use'})`, { autoClose: 5000 });
+      toast.success(`${paymentType === 'fixed' ? 'Fixed' : 'Variable'} button copied to clipboard (${multiUse ? 'Multi Use' : 'Single Use'})`, { autoClose: 5000 });
       logWithTimestamp(F, 'handleCopyCode: Copied to clipboard successfully, multiUse:', multiUse);
     } catch (err: any) {
       setCopySuccess('failed');

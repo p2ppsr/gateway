@@ -5,8 +5,9 @@
  * Retrieves paginated payment buttons from the payment_buttons table, joined with payments,
  * filtered by merchant_id and optional usage/excludeSingleUse parameters.
  *
- * Version: v2.49 (Updated 26Aug2025_2000 BST)
+ * Version: v2.50 (Updated 27Aug2025_1421 BST)
  * Change Log:
+ * - 27Aug2025_1421 BST (v2.50): Renamed totalPaid to calculated_total; removed payment_buttons.description selection.
  * - 26Aug2025_2000 BST (v2.49): Added fallback for empty rows; enhanced error logging; ensured all completed payments in button.payments; fixed used computation.
  * - 26Aug2025_1920 BST (v2.48): Ensured all completed payments in button.payments; added payment validation; enhanced logging.
  * ... [Previous changelog entries]
@@ -38,7 +39,7 @@ export default {
       .toBoolean(),
   ],
   func: async (req: Request, res: Response): Promise<void> => {
-    logWithTimestamp(F, '🔍 [listButtons] Starting listButtons execution v2.49');
+    logWithTimestamp(F, '🔍 [listButtons] Starting listButtons execution v2.50');
     const errors = (req as any).validationErrors;
     if (errors && errors.length > 0) {
       logWithTimestamp(F, '❌ [listButtons] Validation errors:', errors);
@@ -91,7 +92,7 @@ export default {
           'pb.html_code as htmlCode',
           db.raw(`COALESCE(pb.created_at, CURRENT_TIMESTAMP) as "createdAt"`),
           db.raw(`COALESCE(pb.updated_at, pb.created_at, CURRENT_TIMESTAMP) as "updatedAt"`),
-          db.raw(`COALESCE(pa.paidSum, 0) as "totalPaid"`)
+          db.raw(`COALESCE(pa.paidSum, 0) as "calculated_total"`)
         )
         .orderBy('pb.created_at', 'desc')
         .limit(500);
@@ -169,8 +170,7 @@ export default {
         logWithTimestamp(F, `Computed used field for button ${button.buttonId}:`, {
           computedUsed: button.used,
           dbUsed: button.dbUsed,
-          totalPaid: button.totalPaid,
-          totalPaidCheck: totalPaidCheck?.total ?? 0,
+          calculated_total: totalPaidCheck?.total ?? 0,
           paymentCount,
           payments: button.payments.map((p: any) => ({
             paymentId: p.paymentId,
@@ -178,14 +178,23 @@ export default {
             completed: p.completed
           }))
         });
-        // Fetch first completed payment description
-        const firstPaymentDesc = await db('payments')
-          .select('description', 'payment_id')
-          .where({ button_id: button.buttonId, completed: 1 })
-          .orderBy('created_at', 'asc')
+                const paymentDesc = await db('payments')
+          .select('description')
+          .where({ payment_id: button.paymentId })
           .first();
-        logWithTimestamp(F, `First payment for button ${button.buttonId}:`, { firstPaymentDesc });
-        button.description = firstPaymentDesc?.description || `Payment using paymentId: ${formatId(button.paymentId)}`;
+        button.description = paymentDesc?.description || `Payment using paymentId: ${formatId(button.paymentId)}`;
+        logWithTimestamp(F, `Description for button ${button.buttonId}:`, {
+          description: button.description,
+          paymentId: button.paymentId
+        });
+        // // Fetch first completed payment description
+        // const firstPaymentDesc = await db('payments')
+        //   .select('description', 'payment_id')
+        //   .where({ button_id: button.buttonId, completed: 1 })
+        //   .orderBy('created_at', 'asc')
+        //   .first();
+        // logWithTimestamp(F, `First payment for button ${button.buttonId}:`, { firstPaymentDesc });
+        // button.description = firstPaymentDesc?.description || `Payment using paymentId: ${formatId(button.paymentId)}`;
         logWithTimestamp(F, `Description for button ${button.buttonId}:`, {
           description: button.description
         });
@@ -201,18 +210,18 @@ export default {
         .first();
       const total = Number(totalRow?.total ?? 0);
       logWithTimestamp(F, '🧮 [listButtons] Total buttons:', { total });
-      // ---------- normalize + quick sanity on totalPaid ----------
+      // ---------- normalize + quick sanity on calculated_total ----------
       const safeButtons = rows.map((b: any) => ({
         buttonId: b.buttonId,
         merchantId,
         paymentId: b.paymentId ?? null,
         amount: b.amount ?? 0,
-        description: b.description ?? `Payment using paymentId: ${formatId(b.paymentId)}`,
+        description: b.description || `Payment using paymentId: ${b.paymentId}`,
         htmlCode: b.htmlCode ?? '<div>Pay Now</div>',
         variableAmount: !!b.variableAmount,
         multiUse: !!b.multiUse,
         used: b.used,
-        totalPaid: Number(b.totalPaid ?? 0),
+        calculated_total: Number(b.calculated_total ?? 0),
         createdAt: b.createdAt,
         updatedAt: b.updatedAt,
         payments: b.payments
@@ -227,18 +236,18 @@ export default {
             }))
           : [],
       }));
-      logWithTimestamp(F, '🔍 [listButtons] Verified totalPaid and payments for buttons:', {
+      logWithTimestamp(F, '🔍 [listButtons] Verified calculated_total and payments for buttons:', {
         buttons: safeButtons.map((b: any) => ({
           buttonId: b.buttonId,
-          totalPaid: b.totalPaid,
+          calculated_total: b.calculated_total,
           used: b.used,
           multiUse: b.multiUse,
           paymentCount: b.payments.length,
-          description: b.description
+          description: b.description || `Payment using paymentId: ${b.paymentId}`,
         }))
       });
-      const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.totalPaid) || 0), 0);
-      logWithTimestamp(F, '💰 [listButtons] Sum totalPaid (page):', { paidSum });
+      const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.calculated_total) || 0), 0);
+      logWithTimestamp(F, '💰 [listButtons] Sum calculated_total (page):', { paidSum });
       logWithTimestamp(F, '✅ [listButtons] Buttons fetched successfully', { total, pagePaidSum: paidSum });
       res.status(200).json({
         status: 'success',

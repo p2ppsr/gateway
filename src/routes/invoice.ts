@@ -43,7 +43,6 @@ import { logWithTimestamp } from '../utils/logging';
 import { CONFIG } from '../utils/constants';
 import { generateAndValidateUniqueId } from '../utils/idGenerator';
 const db: Knex = knex(knexConfig);
-let transactionIdNew: string = randomBytes(12).toString('hex').slice(0, 12);
 
 interface PaymentButton {
   button_id: string;
@@ -106,6 +105,7 @@ export default {
       .withMessage('description exceeds maximum length of 80 characters'),
   ],
   func: async (req: Request, res: Response): Promise<void> => {
+    let transactionIdNew: string = randomBytes(12).toString('hex').slice(0, 12);
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       logWithTimestamp(F, '❌ [invoice] Validation errors:', errors.array());
@@ -169,21 +169,36 @@ export default {
       }
       // Check for existing payment record
       const checkExistingPayment = await db('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
-      if (!checkExistingPayment || checkExistingPayment.completed) {
-        if (button.multi_use) {
-          logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
-          const { id, description: generatedDescription } = await generateAndValidateUniqueId(merchantId, 'payment', description, paymentId);
-          paymentId = id;
-          paymentDescription = generatedDescription;
-          logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId and description:', { paymentId, description: paymentDescription });
-        } else {
-          logWithTimestamp(F, '❌ [invoice] Single-use button has no valid payment or is already completed:', { paymentId });
-          res.status(400).json({
-            status: 'error',
-            message: 'This single-use button has already been used or has no valid payment'
-          });
-          return;
-        }
+      if (!checkExistingPayment) {
+        logWithTimestamp(F, '❌ [invoice] No existing payment found for paymentId:', { paymentId, buttonId });
+        res.status(404).json({
+          status: 'error',
+          message: 'No valid payment record found for this button'
+        });
+        return;
+      }
+      if (checkExistingPayment.completed) {
+        logWithTimestamp(F, '❌ [invoice] Payment already completed:', { paymentId, buttonId });
+        res.status(400).json({
+          status: 'error',
+          message: 'This payment has already been completed'
+        });
+        return;
+      }
+      if (!button.multi_use) {
+        logWithTimestamp(F, '🔍 [invoice] Single-use button, using existing payment:', { paymentId, buttonId });
+        await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
+          transaction_id: transactionIdNew,
+          payer_id: senderIdentityKey,
+          updated_at: db.fn.now()
+        });
+        logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', { paymentId, transactionId: transactionIdNew, payer_id: senderIdentityKey });
+      } else {
+        logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
+        const { id, description: generatedDescription } = await generateAndValidateUniqueId(merchantId, 'payment', description, paymentId);
+        paymentId = id;
+        paymentDescription = generatedDescription;
+        logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId and description:', { paymentId, description: paymentDescription });
         await db('payments').insert({
           transaction_id: transactionIdNew,
           payment_id: paymentId,
@@ -194,58 +209,53 @@ export default {
           blockchain_transaction: '',
           amount,
           description: paymentDescription,
-          created_at: new Date(),
-          updated_at: new Date(),
+          created_at: db.fn.now(),
+          updated_at: db.fn.now(),
           is_new: 1
         });
         logWithTimestamp(F, '✅ [invoice] [Step 4] Inserted payment for paymentId:', { paymentId, buttonId });
-      } else {
-        logWithTimestamp(F, '🔍 [invoice] [Step 4] Using existing paymentId for first payment:', { paymentId });
-        await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
-          transaction_id: transactionIdNew,
-          payer_id: senderIdentityKey,
-          updated_at: new Date()
-        });
-        logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', { paymentId, transactionId: transactionIdNew, payer_id: senderIdentityKey });
       }      
-      // // Check for existing payment record for single-use buttons
-      // if (!button.multi_use) {
-      //   const existingPayment = await db('payments')
-      //     .where({ payment_id: paymentId })
-      //     .first();
-      // }
-      // // For multi-use buttons, check if this is the first payment
-      // if (button.multi_use) {
-      //   const existingPayment = await db('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
-      //   if (!existingPayment || existingPayment.completed) {
+      // // Check for existing payment record
+      // const checkExistingPayment = await db('payments').where({ payment_id: paymentId, button_id: buttonId }).first();
+      // if (!checkExistingPayment || checkExistingPayment.completed) {
+      //   if (button.multi_use) {
       //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Generating new paymentId for multi-use button:', { originalPaymentId: paymentId });
-      //     paymentId = await generateAndValidateUniqueId(merchantId, 'payment', description, paymentId);
-      //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId:', paymentId);
-      //     await db('payments').insert({
-      //       transaction_id: transactionIdNew,
-      //       payment_id: paymentId,
-      //       button_id: buttonId,
-      //       payer_id: senderIdentityKey,
-      //       merchant_id: merchantId,
-      //       completed: false,
-      //       blockchain_transaction: '',
-      //       amount,
-      //       description,
-      //       created_at: new Date(),
-      //       updated_at: new Date(),
-      //       is_new: 1
-      //     });
-      //     logWithTimestamp(F, '✅ [invoice] [Step 4] Inserted payment for new paymentId:', { paymentId, buttonId });
+      //     const { id, description: generatedDescription } = await generateAndValidateUniqueId(merchantId, 'payment', description, paymentId);
+      //     paymentId = id;
+      //     paymentDescription = generatedDescription;
+      //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Generated new paymentId and description:', { paymentId, description: paymentDescription });
       //   } else {
-      //     logWithTimestamp(F, '🔍 [invoice] [Step 4] Using existing paymentId for first payment:', { paymentId });
-      //     await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
-      //       transaction_id: transactionIdNew,
-      //       payer_id: senderIdentityKey,
-      //       updated_at: new Date()
+      //     logWithTimestamp(F, '❌ [invoice] Single-use button has no valid payment or is already completed:', { paymentId });
+      //     res.status(400).json({
+      //       status: 'error',
+      //       message: 'This single-use button has already been used or has no valid payment'
       //     });
-      //     logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', { paymentId, transactionId: transactionIdNew, payer_id: senderIdentityKey });
+      //     return;
       //   }
-      // } 
+      //   await db('payments').insert({
+      //     transaction_id: transactionIdNew,
+      //     payment_id: paymentId,
+      //     button_id: buttonId,
+      //     payer_id: senderIdentityKey,
+      //     merchant_id: merchantId,
+      //     completed: false,
+      //     blockchain_transaction: '',
+      //     amount,
+      //     description: paymentDescription,
+      //     created_at: db.fn.now(),
+      //     updated_at: db.fn.now(),
+      //     is_new: 1
+      //   });
+      //   logWithTimestamp(F, '✅ [invoice] [Step 4] Inserted payment for paymentId:', { paymentId, buttonId });
+      // } else {
+      //   logWithTimestamp(F, '🔍 [invoice] [Step 4] Using existing paymentId for first payment:', { paymentId });
+      //   await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
+      //     transaction_id: transactionIdNew,
+      //     payer_id: senderIdentityKey,
+      //     updated_at: db.fn.now()
+      //   });
+      //   logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', { paymentId, transactionId: transactionIdNew, payer_id: senderIdentityKey });
+      // }     
       logWithTimestamp(F, '🔍 [invoice] [Step 5] Validating amount:', {
         requested: amount,
         buttonAmount: button.amount,
