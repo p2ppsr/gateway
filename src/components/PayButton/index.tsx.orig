@@ -1,12 +1,19 @@
 /**
  * @file src/components/PayButton/index.tsx
- * @description Renders a PayButton component for initiating blockchain payments using the Metanet client. Executes a multi-step flow: server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and single-use/multi-use buttons.
- * @version 2.58.10
+ * @description Renders a PayButton component for initiating blockchain payments using the Metanet client.
+ * and payment submission, with support for variable amounts and single-use/multi-use buttons.
+ * @version 2.58.7
  * @changelog
- * - 28Aug2025_1500 BST (v2.58.10): Added invoice failure logging in handleClick; added paid state logging to debug multi-use button disabling.
- * - 28Aug2025_1435 BST (v2.58.9): Added logging in fetchButtonStatus to diagnose incorrect disabling of multi-use buttons.
- * - 28Aug2025_1410 BST (v2.58.8): Fixed incomplete JSDoc description for clarity.
- * - Previous changes omitted for brevity...
+ * - 28Aug2025_1401 BST (v2.58.7): Fixed TypeScript error in fetchButtonStatus by removing invalid invoice.message log; reset paid state for multi-use buttons to allow subsequent payments.
+ * - 28Aug2025_1348 BST (v2.58.6): Reset paymentId to initialPaymentId after successful payment to allow subsequent multi-use payments; added error logging for invoice failures.
+ * - 28Aug2025_1315 BST (v2.58.5): Removed redundant log in handleClick; updated JSDoc to include multi-use buttons.
+ * - 28Aug2025_1315 BST (v2.58.4): Removed default multiUse = false to prevent overriding data-multi-use prop from pay.js, fixing multi-use button disabling issue.
+ * - Previous changes omitted for brevity... * 
+ * @dependencies
+ * - @bsv/sdk: For WalletClient, AuthFetch, Transaction, and Utils
+ * - react-toastify: For toast notifications
+ * - react: For hooks and component rendering
+ * - ../../utils/constants: For CONFIG and MAX_PAYMENT_SATS
  */
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ReactElement } from 'react'
 import { toast } from 'react-toastify'
@@ -224,11 +231,6 @@ const PayButton = ({
         })
         if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
         const data: ButtonCodeResponse = await response.json()
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button status response:`, {
-          multi_use: data.multi_use,
-          used: data.used,
-          paymentId
-        })
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 Fetched button status:`, data)
         if (data.status === 'success') {
           const isMultiUse = data.multi_use === true // Handle boolean or numeric
@@ -605,16 +607,9 @@ const PayButton = ({
             description: containerRef.current?.parentElement?.getAttribute('data-description') || 'Default Description'
           })
         })
-        if (!resInv.ok) {
-          console.log(`[${new Date().toISOString()}] [${F}] ❌ Invoice request failed:`, {
-            status: resInv.status,
-            statusText: resInv.statusText
-          })
-          throw new Error('Invoice request failed')
-        }
+        if (!resInv.ok) throw new Error('Invoice request failed')
         const invoice: InvoiceResponse = await resInv.json()
         if (invoice.status !== 'success') {
-          console.log(`[${new Date().toISOString()}] [${F}] ❌ Invoice creation failed:`, invoice.message)
           if (invoice.message?.includes('This single-use button has already been used')) {
             setDisabled(true)
             toast.error('This button is single-use and has been used.')
@@ -625,13 +620,6 @@ const PayButton = ({
         // Update paymentId to the new one from the invoice
         if (invoice.paymentId && invoice.paymentId !== paymentId) {
           setPaymentId(invoice.paymentId)
-          //const isMultiUse = data.multi_use === true // Handle boolean or numeric
-          const isMultiUse = multiUse === 'true' || multiUse === true
-          console.log(`[${new Date().toISOString()}] [${F}] 🔍 Setting paid state:`, {
-            paid: true,
-            isMultiUse,
-            resettingTo: isMultiUse ? false : true
-          })
           console.log(`[${new Date().toISOString()}] [${F}] 🔍 Updated paymentId to:`, invoice.paymentId)
         }
         let outputsWithSats =
@@ -685,30 +673,21 @@ const PayButton = ({
         if (!resPay.ok) throw new Error('Payment request failed')
         const pay: PayResponse = await resPay.json()
         if (pay.status !== 'success') throw new Error(`Payment processing failed: ${pay.message ?? ''}`)
-        console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 10] Payment processed by server:`, pay)
+console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 10] Payment processed by server:`, pay)
         setPaid(true)
         setTxid(pay.txid)
-        setPaymentId(initialPaymentId) // Reset paymentId for next payment
-        const isMultiUse = multiUse === 'true' || multiUse === true
-        if (isMultiUse) setPaid(false) // Reset paid state for multi-use buttons
+setPaymentId(initialPaymentId) // Reset paymentId for next payment
+const isMultiUse = multiUse === 'true' || multiUse === true
+if (isMultiUse) setPaid(false) // Reset paid state for multi-use buttons
         // Disable button if single-use after successful payment
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Evaluating multiUse before check:`, {
-          multiUse,
-          type: typeof multiUse
-        })
-        if (!isMultiUse && !variable && amount > 0) {
-          setDisabled(true)
-          console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use payment completed`, {
-            multiUse,
-            isMultiUse
-          })
-          toast.info('This single-use button has been used and is now disabled.')
-        } else if (isMultiUse) {
-          console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button remains enabled: multi-use button`, {
-            multiUse,
-            isMultiUse
-          })
-        }
+        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Evaluating multiUse before check:`, { multiUse, type: typeof multiUse })
+if (!isMultiUse && !variable && amount > 0) {
+  setDisabled(true)
+  console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use payment completed`, { multiUse, isMultiUse })
+  toast.info('This single-use button has been used and is now disabled.')
+} else if (isMultiUse) {
+  console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button remains enabled: multi-use button`, { multiUse, isMultiUse })
+}
         console.log(`[${new Date().toISOString()}] [${F}] ✅ Payment successful:`, pay)
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unexpected error'

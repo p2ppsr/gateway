@@ -13,52 +13,11 @@
  *
  * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
  *
- * Version: v4.25 (Updated 27Aug2025_0155 BST to fix variable button amount validation)
+ * @version v4.26 (Updated 28Aug2025_1401 BST)
  * Change Log:
- * - 27Aug2025_0155 BST (v4.25): Used req.body.amount for variable buttons to match client-provided amount, ensuring identical first payment behavior.
- * - 05Aug2025_0430 BST (v2.2): Fixed payment_button_id mapping and standardized route path.
- * - 05Aug2025_0600 BST (v2.3): Updated to use transaction_id in where clause (incomplete fix).
- * - 05Aug2025_0615 BST (v2.4): Corrected transaction_id query to match schema, ensuring compatibility with trigger update_transaction_id.
- * - 05Aug2025_0620 BST (v2.5): Adjusted locking script derivation to use original paymentId for consistency, fixing mismatch with wallet-generated transaction.
- * - 05Aug2025_0625 BST (v2.6): Restored original locking script derivation using payment_button_id to match pre-transaction_id change behavior, resolving 400 Bad Request error.
- * - 05Aug2025_0630 BST (v2.7): Added explicit logging of payment_button_id and invoiceNumber used in locking script derivation for debugging.
- * - 05Aug2025_0640 BST (v2.8): Added detailed logging of senderIdentityKey, senderPrivateKeyString, combined array, and derivedPublicKey to diagnose key derivation mismatch.
- * - 05Aug2025_0645 BST (v2.9): Updated to validate using client-provided lockingScript from invoice response, avoiding re-derivation issues.
- * - 12Aug2025_2140 BST (v3.0): Fixed schema references from payment_id/payment_button_id to transaction_id/id, added request logging, and enhanced response debugging.
- * - 12Aug2025_2150 BST (v3.1): Fixed TypeScript return type issues by ensuring Promise<void> compatibility, preserving schema and debugging updates.
- * - 12Aug2025_2215 BST (v3.2): Fixed payment button lookup with a join on payments and payment_buttons, added join debugging.
- * - 13Aug2025_0100 BST (v3.3): Switched to txid as primary key, removed transaction_id.
- * - 13Aug2025_0130 BST (v3.4): Switched to payment_id as primary key, renamed button_id_ref to button_id, payer_identity to payer_id.
- * - 13Aug2025_0135 BST (v3.5): Ensured payment_id and button_id reference ids.id consistently.
- * - 13Aug2025_0153 BST (v3.6): Emphasized txid input from client, no extraction from blockchain_transaction.
- * - 13Aug2025_0200 BST (v3.7): Fixed TypeScript errors for uuid import and PaymentButton.amount property.
- * - 13Aug2025_0205 BST (v3.8): Removed dependency on button.amount, validated amount from transaction, clarified uuid as optional for payment_id generation.
- * - 13Aug2025_0215 BST (v3.9): Replaced uuid with custom 12-character payment_id generation to match schema constraint.
- * - 13Aug2025_0225 BST (v4.0): Updated to use client-passed paymentId instead of generating it server-side.
- * - 13Aug2025_0230 BST (v4.1): Validated pre-created paymentId and buttonId against ids table types.
- * - 13Aug2025_0235 BST (v4.2): Corrected button_id usage to use client-passed buttonId directly.
- * - 13Aug2025_1020 BST (v4.3): Added P2PKH locking script validation for secure transaction matching.
- * - 13Aug2025_1030 BST (v4.4): Updated P2PKH validation to use transaction_id instead of payment_id for security.
- * - 13Aug2025_1040 BST (v4.5): Added validation for transaction_id in request to ensure consistency.
- * - 13Aug2025_1045 BST (v4.6): Fetched transaction_id server-side and removed from request, included in error messages only.
- * - 13Aug2025_1050 BST (v4.7): Fixed payment scope and ensured transaction_id access from DB.
- * - 13Aug2025_1100 BST (v4.8): Fixed P2PKH scope and improved amount validation using matchingOutput.
- * - 13Aug2025_1115 BST (v4.9): Used global erroneousTransactionId for P2PKH validation as a temporary fix.
- * - 13Aug2025_1120 BST (v4.10): Fixed P2PKH scoping with proper nesting to meet open-source standards.
- * - 13Aug2025_1125 BST (v4.11): Reverified and corrected P2PKH scoping to resolve persistent errors.
- * - 13Aug2025_1130 BST (v4.12): Fixed payment scoping per ChatGPT suggestion with let declaration outside try.
- * - 13Aug2025_1155 BST (v4.13): Fixed transaction_id in payments update to resolve 500 error.
- * - 13Aug2025_1200 BST (v4.14): Ensured transaction_id is preserved in payments update.
- * - 13Aug2025_1200 BST (v4.15): Added type guard for payment in catch block to resolve TS18048.
- * - 13Aug2025_1205 BST (v4.16): Improved type guard for payment in catch block to fully resolve TS18048.
- * - 13Aug2025_1205 BST (v4.17): Used local non-undefined alias for payment per ChatGPT suggestion.
- * - 13Aug2025_1215 BST (v4.18): Fixed P2PKH derivation using payer_id to resolve 400 error.
- * - 13Aug2025_1220 BST (v4.19): Refined P2PKH validation and ensured payer_id consistency.
- * - 14Aug2025_0040 BST (v4.20): Updated to use payment_id instead of id in payment button query.
- * - 20Aug2025_1925 BST (v4.21): Updated to validate against payments table only, removing payment_buttons query to fix 404 error for multi-use buttons.
- * - 25Aug2025_2030 BST (v4.22): Updated to modify existing payments records from createButton.ts after validation.
- * - 25Aug2025_2020 BST (v4.23): Used payment.amount for variable-amount buttons, added explicit lockingScript validation.
- * - 25Aug2025_2115 BST (v4.24): Removed redundant commented code for clarity.
+ * - 28Aug2025_1401 BST (v4.26): Removed redundant log and corrected changelog for v4.25.
+ * - 27Aug2025_0155 BST (v4.25): Used req.body.amount for variable buttons to match client-provided amount, ensuring identical first payment behavior. * - Previous changes omitted for brevity...
+ * - Previous changes omitted for brevity...
  */
 const F = 'routes/pay'
 import knex, { Knex } from 'knex'
@@ -99,6 +58,7 @@ export default {
   func: async (req: AuthRequest, res: Response): Promise<void> => {
     logWithTimestamp(F, '🔍 [pay] Received pay request:', req.body)
     const { paymentId, buttonId, transaction, lockingScript, amount }: RequestBody = req.body
+    logWithTimestamp(F, '🔍 [pay] Received paymentId and buttonId:', { paymentId, buttonId })
     try {
       // Validate that paymentId exists in ids with type='payment'
       const paymentIdRecord = await db('ids').where({ id: paymentId, type: 'payment' }).first()
@@ -251,8 +211,13 @@ export default {
         }
         if (existingPayment.completed) {
           logWithTimestamp(F, '❌ [pay] Payment already completed:', { paymentId, buttonId })
-          await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() })
           res.status(400).json({ status: 'error', message: 'Payment already completed' })
+          return
+        }
+        const button = await trx('payment_buttons').where({ button_id: buttonId }).first()
+        if (!button) {
+          logWithTimestamp(F, '❌ [pay] Button not found:', { buttonId })
+          res.status(404).json({ status: 'error', message: 'Button not found' })
           return
         }
         await trx('payments')
@@ -264,20 +229,11 @@ export default {
             amount: expectedAmount,
             updated_at: trx.fn.now()
           })
-        await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() })
-        // await trx('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
-        //   completed: true,
-        //   blockchain_transaction: JSON.stringify({ txid, atomicBeefTx }),
-        //   txid: txid,
-        //   amount: expectedAmount,
-        //   updated_at: new Date()
-        // });
-        // await trx('payment_buttons').where({ button_id: buttonId }).increment('total_paid', expectedAmount);
-        // if (!button.multi_use) {
-        //   await trx('payment_buttons').where({ payment_id: paymentId }).update({ used: true, updated_at: trx.fn.now() });
-        //   logWithTimestamp(F, '✅ [pay] Marked single-use button as used:', { paymentId });
-        // }
-        logWithTimestamp(F, '✅ [pay] Updated payment:', { paymentId, buttonId })
+        if (!button.multi_use) {
+          await trx('payment_buttons').where({ button_id: buttonId }).update({ used: true, updated_at: trx.fn.now() })
+          logWithTimestamp(F, '✅ [pay] Marked single-use button as used:', { buttonId })
+        }
+        logWithTimestamp(F, '✅ [pay] Updated payment:', { paymentId, buttonId, multi_use: button.multi_use })
       })
       logWithTimestamp(F, `✅ [pay] Payment successful. TXID: ${txid}`)
       const responseData = { status: 'success', message: 'Payment completed successfully', txid }

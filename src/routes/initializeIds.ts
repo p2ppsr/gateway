@@ -154,13 +154,11 @@ export default {
         senderIdentityKey,
         merchantId
       })
-      res
-        .status(403)
-        .json({
-          status: 'error',
-          message: 'Sender identity does not match merchantId',
-          request: { body: req.body, headers: req.headers }
-        })
+      res.status(403).json({
+        status: 'error',
+        message: 'Sender identity does not match merchantId',
+        request: { body: req.body, headers: req.headers }
+      })
       return
     }
     logWithTimestamp(F, '✅ [initializeIds] MerchantId validated:', { merchantId })

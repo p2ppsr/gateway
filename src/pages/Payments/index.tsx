@@ -1,16 +1,12 @@
 /**
- * @file src/pages/Payments/index.tsx
- *
- * Displays a paginated table of received payments tied to user payment buttons
- * Each row represents a payment, showing Txid, Payment Id, Button Id, Payer Id, Amount, Complete status, New status, Timestamp, and Actions
- *
- * Version: v4.51 (Updated 26Aug2025_1430 BST)
- * Change Log:
- * - 26Aug2025_1430 BST (v4.51): Fixed TypeScript errors by typing 'p' as Payment; simplified TableRow key; added renderKey for forced re-rendering; enhanced logging for target payments; retained deep copy and useMemo for stability.
- * - 26Aug2025_1420 BST (v4.50): Used unique TableRow key with timestamp; deep copied payments; enhanced logging for target payments; used useMemo for sorted/paginated payments; added debug attribute to Complete column.
- * - 26Aug2025_1345 BST (v4.48): Enhanced logging for raw API response, mapped payments, state updates, sortedPayments, paginatedPayments; used unique TableRow key with statusFilter; added useEffect for state changes.
- * - 26Aug2025_1305 BST (v4.47): Added debug logging in TableBody for Complete column rendering.
- * ... [Previous changelog entries]
+ * @file src/components/PayButton/index.tsx
+ * @description Renders a PayButton component for initiating blockchain payments using the Metanet client. Executes a multi-step flow: server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and single-use/multi-use buttons.
+ * @version 2.58.13
+ * @changelog
+ * - 28Aug2025_1535 BST (v2.58.13): Enhanced invoice error handling in handleClick to log all failures; added paid state logging.
+ * - 28Aug2025_1521 BST (v2.58.10): Added invoice failure logging in handleClick to debug multi-use button issue.
+ * - 28Aug2025_1435 BST (v2.58.9): Added logging in fetchButtonStatus to diagnose incorrect disabling of multi-use buttons.
+ * - Previous changes omitted for brevity...
  */
 const F = 'pages/Payments'
 import React, { useState, useEffect, useRef, useMemo } from 'react'

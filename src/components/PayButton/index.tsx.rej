@@ -1,0 +1,15 @@
+@@ -2,10 +2,11 @@
+ * @file src/components/PayButton/index.tsx
+ * @description Renders a PayButton component for initiating blockchain payments using the Metanet client.
+- * and payment submission, with support for variable amounts and single-use/multi-use buttons.
+- * @version 2.58.7
++ * Executes a multi-step flow: server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and single-use/multi-use buttons.
++ * @version 2.58.8
+ * @changelog
++ * - 28Aug2025_1410 BST (v2.58.8): Fixed incomplete JSDoc description for clarity.
+ * - 28Aug2025_1401 BST (v2.58.7): Fixed TypeScript error in fetchButtonStatus by removing invalid invoice.message log; reset paid state for multi-use buttons to allow subsequent payments.
+ * - 28Aug2025_1348 BST (v2.58.6): Reset paymentId to initialPaymentId after successful payment to allow subsequent multi-use payments; added error logging for invoice failures.
+ * - Previous changes omitted for brevity...
+\ No newline at end of line
+ 
+ 

@@ -5,12 +5,11 @@
  * Retrieves paginated payment buttons from the payment_buttons table, joined with payments,
  * filtered by merchant_id and optional usage/excludeSingleUse parameters.
  *
- * Version: v2.50 (Updated 27Aug2025_1421 BST)
+ * Version: v2.64 (Updated 28Aug2025_0300 BST)
  * Change Log:
- * - 27Aug2025_1421 BST (v2.50): Renamed totalPaid to calculated_total; removed payment_buttons.description selection.
- * - 26Aug2025_2000 BST (v2.49): Added fallback for empty rows; enhanced error logging; ensured all completed payments in button.payments; fixed used computation.
- * - 26Aug2025_1920 BST (v2.48): Ensured all completed payments in button.payments; added payment validation; enhanced logging.
- * ... [Previous changelog entries]
+ * - 28Aug2025_0300 BST (v2.64): Fixed Used computation to rely on completed payments; removed paymentDesc query; kept button_id join.
+ * - 28Aug2025_0200 BST (v2.63): Fixed logWithTimestamp syntax error; simplified used computation; removed paymentDesc query; ensured correct button_id join.
+ * - 28Aug2025_0130 BST (v2.62): Simplified used computation; removed paymentDesc query; ensured correct button_id join; addressed duplicate entry issue.
  */
 const F = 'routes/listButtons'
 import knex, { Knex } from 'knex'
@@ -35,7 +34,7 @@ export default {
     query('excludeSingleUse').optional().isBoolean().withMessage('excludeSingleUse must be a boolean').toBoolean()
   ],
   func: async (req: Request, res: Response): Promise<void> => {
-    logWithTimestamp(F, '🔍 [listButtons] Starting listButtons execution v2.50')
+    logWithTimestamp(F, '🔍 [listButtons] Starting listButtons execution v2.64')
     const errors = (req as any).validationErrors
     if (errors && errors.length > 0) {
       logWithTimestamp(F, '❌ [listButtons] Validation errors:', errors)
@@ -62,38 +61,36 @@ export default {
       excludeSingleUse
     })
     try {
-      // ---------- helpers ----------
       const logSql = (label: string, qb: Knex.QueryBuilder) => {
         const s = qb.clone().toSQL()
         logWithTimestamp(F, `📜 ${label} SQL:`, { sql: s.sql, bindings: s.bindings })
       }
-      // ---------- pre-aggregate payments by button_id for completed payments only ----------
       const paymentsAgg = db('payments')
         .select('button_id')
         .sum<{ paidSum: number }>({ paidSum: 'amount' })
         .where('completed', 1)
         .groupBy('button_id')
       logSql('paymentsAgg', paymentsAgg)
-      // Main query
       let buttonQuery = db({ pb: 'payment_buttons' })
         .leftJoin(paymentsAgg.as('pa'), 'pb.button_id', 'pa.button_id')
         .where('pb.merchant_id', merchantId)
+        .whereNotNull('pb.button_id')
         .select(
           'pb.button_id as buttonId',
           'pb.payment_id as paymentId',
           'pb.amount',
+          'pb.description',
           'pb.variable_amount as variableAmount',
           'pb.multi_use as multiUse',
           'pb.used as dbUsed',
           'pb.html_code as htmlCode',
+          db.raw(`COALESCE(pa.paidSum, 0) as "calculated_total"`),
           db.raw(`COALESCE(pb.created_at, CURRENT_TIMESTAMP) as "createdAt"`),
-          db.raw(`COALESCE(pb.updated_at, pb.created_at, CURRENT_TIMESTAMP) as "updatedAt"`),
-          db.raw(`COALESCE(pa.paidSum, 0) as "calculated_total"`)
+          db.raw(`COALESCE(pb.updated_at, pb.created_at, CURRENT_TIMESTAMP) as "updatedAt"`)
         )
         .orderBy('pb.created_at', 'desc')
         .limit(500)
       logSql('buttonQuery', buttonQuery)
-      // ---------- filters ----------
       if (excludeSingleUse) {
         buttonQuery = buttonQuery.where('pb.multi_use', true)
       }
@@ -104,14 +101,12 @@ export default {
           db('payments').where({ button_id: db.raw('pb.button_id'), completed: 1 })
         )
       }
-      // ---------- preview final SQL ----------
       const preview = buttonQuery
         .clone()
         .orderBy('pb.created_at', sort as 'asc' | 'desc')
         .limit(Number(limit))
         .offset(Number(offset))
       logSql('listButtons(final)', preview)
-      // ---------- execute ----------
       const rows = await buttonQuery
         .orderBy('pb.created_at', sort as 'asc' | 'desc')
         .limit(Number(limit))
@@ -134,7 +129,6 @@ export default {
         return
       }
       if (rows[0]) logWithTimestamp(F, '🔎 [listButtons] Sample row[0]:', rows[0])
-      // Fetch all completed payments
       for (const button of rows) {
         const paymentsQuery = db('payments')
           .select(
@@ -146,25 +140,20 @@ export default {
             'created_at as createdAt',
             'description'
           )
-          .where({ button_id: button.buttonId, completed: 1 })
+          .where({ button_id: button.buttonId })
           .orderBy('created_at', 'desc')
         logSql(`payments for button ${button.buttonId}`, paymentsQuery)
         button.payments = await paymentsQuery
-        // Compute used based on all completed payments
         const allPayments = await db('payments')
           .where({ button_id: button.buttonId, completed: 1 })
           .count<{ count: number }>('payment_id as count')
           .first()
         const paymentCount = allPayments?.count ?? 0
-        const totalPaidCheck = await db('payments')
-          .where({ button_id: button.buttonId, completed: 1 })
-          .sum<{ total: number }>({ total: 'amount' })
-          .first()
-        button.used = paymentCount > 0 || button.dbUsed === 1 || (totalPaidCheck?.total ?? 0) > 0
+        button.used = paymentCount > 0
         logWithTimestamp(F, `Computed used field for button ${button.buttonId}:`, {
           computedUsed: button.used,
           dbUsed: button.dbUsed,
-          calculated_total: totalPaidCheck?.total ?? 0,
+          calculated_total: button.calculated_total,
           paymentCount,
           payments: button.payments.map((p: any) => ({
             paymentId: p.paymentId,
@@ -172,36 +161,22 @@ export default {
             completed: p.completed
           }))
         })
-        const paymentDesc = await db('payments').select('description').where({ payment_id: button.paymentId }).first()
-        button.description = paymentDesc?.description || `Payment using paymentId: ${formatId(button.paymentId)}`
+        button.description = button.description || `Payment using paymentId: ${formatId(button.paymentId)}`
         logWithTimestamp(F, `Description for button ${button.buttonId}:`, {
           description: button.description,
           paymentId: button.paymentId
-        })
-        // // Fetch first completed payment description
-        // const firstPaymentDesc = await db('payments')
-        //   .select('description', 'payment_id')
-        //   .where({ button_id: button.buttonId, completed: 1 })
-        //   .orderBy('created_at', 'asc')
-        //   .first();
-        // logWithTimestamp(F, `First payment for button ${button.buttonId}:`, { firstPaymentDesc });
-        // button.description = firstPaymentDesc?.description || `Payment using paymentId: ${formatId(button.paymentId)}`;
-        logWithTimestamp(F, `Description for button ${button.buttonId}:`, {
-          description: button.description
         })
         logWithTimestamp(F, `Payments for button ${button.buttonId}:`, {
           paymentCount: button.payments.length,
           payments: button.payments
         })
       }
-      // ---------- count ----------
       const totalRow = await db('payment_buttons')
         .where('merchant_id', merchantId)
         .count<{ total: number }>('button_id as total')
         .first()
       const total = Number(totalRow?.total ?? 0)
       logWithTimestamp(F, '🧮 [listButtons] Total buttons:', { total })
-      // ---------- normalize + quick sanity on calculated_total ----------
       const safeButtons = rows.map((b: any) => ({
         buttonId: b.buttonId,
         merchantId,
@@ -234,7 +209,7 @@ export default {
           used: b.used,
           multiUse: b.multiUse,
           paymentCount: b.payments.length,
-          description: b.description || `Payment using paymentId: ${b.paymentId}`
+          description: b.description
         }))
       })
       const paidSum = safeButtons.reduce((acc: number, x: any) => acc + (Number(x.calculated_total) || 0), 0)

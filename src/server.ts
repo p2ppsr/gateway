@@ -67,7 +67,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   }
   next()
 })
-
 ;(async () => {
   let db: knex.Knex
   try {
