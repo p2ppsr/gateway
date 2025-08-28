@@ -72,10 +72,10 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
 
       <Typography gutterBottom>
         <Link
-          href="https://github.com/bsv-blockchain/metanet-desktop/releases"
-          underline="hover"
-          target="_blank"
-          rel="noopener noreferrer"
+          href='https://metanet.bsvb.tech'
+          underline='hover'
+          target='_blank'
+          rel='noopener noreferrer'
           sx={{ color: '#3aa0ff' }}
         >
           All Metanet clients

@@ -260,7 +260,7 @@ const PaymentButtonsList = () => {
           amount: button.variableAmount ? 0 : (button.amount ?? 0),
           description: button.description ?? 'No description',
           html_code: button.htmlCode ?? '<div>Pay Now</div>',
-          variable_amount: !!button.variableAmount,
+          variable_amount: Number(button.variableAmount || 0),
           multi_use: !!button.multiUse,
           used: !!button.used,
           calculated_total,
