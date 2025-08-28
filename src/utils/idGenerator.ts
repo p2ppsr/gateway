@@ -13,6 +13,7 @@ import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
 import { generateBase58 } from './general'
 import { logWithTimestamp } from './logging'
+import { ensureMerchantExists } from './merchant'
 const db: Knex = knex(knexConfig)
 const F = 'utils/idGenerator'
 export async function generateAndValidateUniqueId(
@@ -25,6 +26,7 @@ export async function generateAndValidateUniqueId(
   if (!description || typeof description !== 'string' || description.length > 80) {
     throw new Error('Description is required and must not exceed 80 characters')
   }
+  await ensureMerchantExists(db, merchantId)
   let id = generateBase58(12)
   let attempts = 0
   let finalDescription = description

@@ -41,6 +41,7 @@ import { body, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
 import { generateBase58, getBase58Regex, isBase58, isMerchantId } from '../utils/general'
 import { generateAndValidateUniqueId } from '../utils/idGenerator'
+import { ensureMerchantExists } from '../utils/merchant'
 const db: Knex = knex(knexConfig)
 interface Ids {
   buttonId?: string
@@ -161,6 +162,7 @@ export default {
       })
       return
     }
+    await ensureMerchantExists(db, merchantId)
     logWithTimestamp(F, '✅ [initializeIds] MerchantId validated:', { merchantId })
     let id =
       paymentId ||
