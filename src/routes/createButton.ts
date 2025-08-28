@@ -25,6 +25,7 @@ import type { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
 import { MAX_PAYMENT_SATS } from '../utils/constants'
 import { logWithTimestamp } from '../utils/logging'
+import { ensureMerchantExists } from '../utils/merchant'
 const db: Knex = knex(knexConfig)
 interface RequestBody {
   amount?: number
@@ -104,6 +105,7 @@ export default {
       buttonId
     })
     try {
+      await ensureMerchantExists(db, merchantId)
       // Verify or initialize IDs in ids table
       const initializeId = async (id: string, type: 'payment' | 'button') => {
         const exists = await db('ids').where({ id, type }).first()

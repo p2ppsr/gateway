@@ -22,6 +22,7 @@ import { body, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
 import { CONFIG } from '../utils/constants'
 import { generateAndValidateUniqueId } from '../utils/idGenerator'
+import { ensureMerchantExists } from '../utils/merchant'
 const db: Knex = knex(knexConfig)
 
 interface PaymentButton {
@@ -105,6 +106,7 @@ export default {
       description
     })
     try {
+      await ensureMerchantExists(db, merchantId)
       // Verify the payment button exists and belongs to the specified merchant
       logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', { paymentId, merchantId })
       const button: PaymentButton | undefined = await db('payment_buttons')
