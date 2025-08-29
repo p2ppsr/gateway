@@ -5,6 +5,9 @@ import CopyWebpackPlugin from 'copy-webpack-plugin'
 import { Configuration } from 'webpack'
 
 const common: Configuration = {
+  watchOptions: {
+    ignored: ['**/public/**', '**/node_modules/**', '**/logs/**']
+  },
   output: {
     path: path.join(__dirname, '/public'),
     filename: 'pay.js',

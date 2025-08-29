@@ -569,6 +569,13 @@ const Create: React.FC = () => {
           validPaymentID = paymentResponse.id || generateBase58(12)
           localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
           localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
+          // CPR enable-copy: ensure state even on fallback init
+          setButtonID(validButtonID)
+          setPaymentID(validPaymentID)
+          // CPR enable-copy: final guarantee UI reflects chosen IDs
+          setButtonID(validButtonID)
+          setPaymentID(validPaymentID)
+          setIds({ buttonId: validButtonID, paymentId: validPaymentID })
           logWithTimestamp(F, 'useEffect: Payment ID initialized:', validPaymentID)
         } catch (err: any) {
           logWithTimestamp(F, '❌ useEffect: Failed to initialize IDs:', err.message)

@@ -46,36 +46,30 @@ exports.seed = function (knex) {
         {
           button_id: 'button1',
           amount: 50.0,
-          currency: 'USD',
+          currency: 'SATS',
           variable_amount: false,
           merchant_id: 'merchant1',
           multi_use: false,
           used: false,
-          total_paid: 0,
-          accepts: 'BSV'
-        },
+          total_paid: 0,        },
         {
           button_id: 'button2',
           amount: 100.0,
-          currency: 'BSV',
+          currency: 'SATS',
           variable_amount: true,
           merchant_id: 'merchant2',
           multi_use: true,
           used: true,
-          total_paid: 100.0,
-          accepts: 'both'
-        },
+          total_paid: 100.0,        },
         {
           button_id: 'button3',
           amount: 75.0,
-          currency: 'USD',
+          currency: 'SATS',
           variable_amount: false,
           merchant_id: 'merchant3',
           multi_use: false,
           used: false,
-          total_paid: 0,
-          accepts: 'fiat'
-        }
+          total_paid: 0,        }
       ])
     })
     .then(() => {
@@ -87,7 +81,7 @@ exports.seed = function (knex) {
           completed: true,
           transaction_info: 'Transaction 1 info',
           amount: 50.0,
-          currency: 'USD',
+          currency: 'SATS',
           exchange_rate: 1,
           payment_button_id: 'button1'
         },
@@ -97,7 +91,7 @@ exports.seed = function (knex) {
           completed: false,
           transaction_info: 'Transaction 2 info',
           amount: 1.0,
-          currency: 'BSV',
+          currency: 'SATS',
           exchange_rate: 100,
           payment_button_id: 'button2'
         }
@@ -114,7 +108,7 @@ exports.seed = function (knex) {
           stripe_api_key: 'sk_test_123',
           sendgrid_credentials: 'sg_test_456',
           default_fee_rate: 0.5,
-          setup_complete: false
+          setup_complete: true
         }
       ])
     })
