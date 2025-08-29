@@ -1,5 +1,4 @@
 #!/bin/bash
-#!/bin/bash
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Script Name: generate-knative-service.sh
