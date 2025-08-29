@@ -45,21 +45,36 @@ export default {
       .escape()
       .isLength({ min: 1, max: 80 })
       .withMessage('Description must be a string between 1 and 80 characters'),
-    body('variableAmount').optional().isBoolean().withMessage('variableAmount must be a boolean'),
-    body('multiUse').optional().isBoolean().withMessage('multiUse must be a boolean'),
+    body('variableAmount')
+      .optional()
+      .isBoolean()
+      .withMessage('variableAmount must be a boolean'),
+    body('multiUse')
+      .optional()
+      .isBoolean()
+      .withMessage('multiUse must be a boolean'),
     body('amount')
       .optional()
       .custom((value, { req }) => {
         const { variableAmount = false } = req.body as Partial<RequestBody> // Type assertion
-        if (!variableAmount && (!Number.isInteger(value) || value < 1 || value > MAX_PAYMENT_SATS)) {
-          throw new Error(`❌ Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons`)
+        if (
+          !variableAmount &&
+          (!Number.isInteger(value) || value < 1 || value > MAX_PAYMENT_SATS)
+        ) {
+          throw new Error(
+            `❌ Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons`
+          )
         }
         return true
       })
       .withMessage(
         `Amount must be an integer between 1 and ${MAX_PAYMENT_SATS} Sats for fixed buttons, or 0 for variable`
       ),
-    body('htmlCode').optional().trim().isString().withMessage('htmlCode must be a string'),
+    body('htmlCode')
+      .optional()
+      .trim()
+      .isString()
+      .withMessage('htmlCode must be a string'),
     body('paymentId')
       .trim()
       .escape()
@@ -80,8 +95,16 @@ export default {
   func: async (req: Request, res: Response): Promise<void> => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
-      logWithTimestamp(F, '❌ [createButton] Validation errors:', errors.array())
-      res.status(400).json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() })
+      logWithTimestamp(
+        F,
+        '❌ [createButton] Validation errors:',
+        errors.array()
+      )
+      res.status(400).json({
+        status: 'error',
+        message: '❌ Invalid parameters',
+        errors: errors.array()
+      })
       return
     }
     const merchantId = (req as any).auth?.identityKey || 'unknown' // Default to 'unknown' if not authenticated
@@ -94,41 +117,61 @@ export default {
       paymentId,
       buttonId
     }: RequestBody = req.body as RequestBody // Type assertion to match validated structure
-    logWithTimestamp(F, '🔍 [createButton] [Step 1] Create button request (sats):', {
-      merchantId,
-      amount,
-      variableAmount,
-      multiUse,
-      description,
-      htmlCode,
-      paymentId,
-      buttonId
-    })
+    logWithTimestamp(
+      F,
+      '🔍 [createButton] [Step 1] Create button request (sats):',
+      {
+        merchantId,
+        amount,
+        variableAmount,
+        multiUse,
+        description,
+        htmlCode,
+        paymentId,
+        buttonId
+      }
+    )
     try {
       await ensureMerchantExists(db, merchantId)
       // Verify or initialize IDs in ids table
       const initializeId = async (id: string, type: 'payment' | 'button') => {
         const exists = await db('ids').where({ id, type }).first()
         if (!exists) {
-          await db('ids').insert({ id, merchant_id: merchantId, timestamp: db.fn.now(), type })
-          logWithTimestamp(F, `✅ [createButton] Initialized ${type} ID:`, { id, merchantId })
+          await db('ids').insert({
+            id,
+            merchant_id: merchantId,
+            timestamp: db.fn.now(),
+            type
+          })
+          logWithTimestamp(F, `✅ [createButton] Initialized ${type} ID:`, {
+            id,
+            merchantId
+          })
         }
         return true
       }
       await initializeId(paymentId, 'payment')
       await initializeId(buttonId, 'button')
       // Check for existing payment button to avoid duplicates
-      logWithTimestamp(F, '🔍 [createButton] [Step 3] Checking for existing payment button:', { paymentId, buttonId })
+      logWithTimestamp(
+        F,
+        '🔍 [createButton] [Step 3] Checking for existing payment button:',
+        { paymentId, buttonId }
+      )
       const existingButton = await db('payment_buttons')
         .where({ button_id: buttonId })
         .orWhere({ payment_id: paymentId })
         .first()
       if (existingButton) {
-        logWithTimestamp(F, '✅ [createButton] Button already exists, skipping insert:', {
-          paymentId,
-          buttonId,
-          existingButton
-        })
+        logWithTimestamp(
+          F,
+          '✅ [createButton] Button already exists, skipping insert:',
+          {
+            paymentId,
+            buttonId,
+            existingButton
+          }
+        )
         res.status(200).json({
           status: 'success',
           message: 'Button already exists',
@@ -137,15 +180,27 @@ export default {
         })
         return
       }
-      logWithTimestamp(F, '🔍 [createButton] [Step 4] No duplicate found, proceeding with insert:', {
-        paymentId,
-        buttonId
-      })
+      logWithTimestamp(
+        F,
+        '🔍 [createButton] [Step 4] No duplicate found, proceeding with insert:',
+        {
+          paymentId,
+          buttonId
+        }
+      )
       const amountInSats = variableAmount ? 0 : amount
-      logWithTimestamp(F, '🔍 [createButton] [Step 5] Converted amount to sats:', amountInSats)
+      logWithTimestamp(
+        F,
+        '🔍 [createButton] [Step 5] Converted amount to sats:',
+        amountInSats
+      )
       // Validate amount consistency for fixed buttons
       if (!variableAmount && amountInSats !== amount) {
-        logWithTimestamp(F, '❌ [createButton] Amount mismatch for fixed button:', { amountInSats, amount })
+        logWithTimestamp(
+          F,
+          '❌ [createButton] Amount mismatch for fixed button:',
+          { amountInSats, amount }
+        )
         res.status(400).json({
           status: 'error',
           message: 'Amount must match request amount for fixed buttons'
@@ -163,12 +218,12 @@ export default {
           variable_amount: variableAmount,
           multi_use: multiUse,
           used: false,
-          total_paid: null,
           created_at: trx.fn.now(),
           updated_at: trx.fn.now()
         })
         // Ensure description is set
-        const finalDescription = description || `Payment for paymentId: ${paymentId}`
+        const finalDescription =
+          description || `Payment for paymentId: ${paymentId}`
         await db('payments')
           .transacting(trx)
           .insert({
@@ -189,12 +244,16 @@ export default {
             description: finalDescription.slice(0, 80),
             updated_at: trx.fn.now()
           })
-        logWithTimestamp(F, '✅ [createButton] Payment and button records created/updated:', {
-          paymentId,
-          buttonId,
-          description: finalDescription,
-          amount: amountInSats
-        })
+        logWithTimestamp(
+          F,
+          '✅ [createButton] Payment and button records created/updated:',
+          {
+            paymentId,
+            buttonId,
+            description: finalDescription,
+            amount: amountInSats
+          }
+        )
       })
       res.status(201).json({
         status: 'success',
@@ -207,7 +266,9 @@ export default {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : 'No stack trace'
       })
-      res.status(500).json({ status: 'error', message: 'Failed to create button' })
+      res
+        .status(500)
+        .json({ status: 'error', message: 'Failed to create button' })
     }
   }
 }
