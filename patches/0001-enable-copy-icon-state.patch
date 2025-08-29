@@ -1,0 +1,36 @@
+diff --git a/src/pages/Create/index.tsx b/src/pages/Create/index.tsx
+--- a/src/pages/Create/index.tsx
++++ b/src/pages/Create/index.tsx
+@@ -320,12 +320,18 @@ const Create: React.FC = () => {
+         } catch (err: any) {
+           logWithTimestamp(F, '❌ useEffect: Failed to initialize IDs:', err.message)
+           validButtonID = generateBase58(12)
+           validPaymentID = generateBase58(12)
+           localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
+           localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
+           localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
+-          localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
++          localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
++          // CPR enable-copy: ensure state even on fallback init
++          setButtonID(validButtonID)
++          setPaymentID(validPaymentID)
++          setIds({ buttonId: validButtonID, paymentId: validPaymentID })
+           toast.error(`❌ Failed to initialize IDs: ${err.message}`)
+         }
+       } else {
+         logWithTimestamp(F, 'useEffect: Validating persisted IDs', {
+           merchant: merchantId,
+           validButtonID,
+           validPaymentID
+@@ -408,7 +414,10 @@ const Create: React.FC = () => {
+         }
+         validateIds()
+       }
+-      setIds({ buttonId: validButtonID, paymentId: validPaymentID })
++      // CPR enable-copy: final guarantee UI reflects chosen IDs
++      setButtonID(validButtonID)
++      setPaymentID(validPaymentID)
++      setIds({ buttonId: validButtonID, paymentId: validPaymentID })
+       logWithTimestamp(F, 'useEffect: Using validated IDs:', { validButtonID, validPaymentID })
+       logWithTimestamp(F, 'useEffect: Evaluating Copy icon disabled state:', !validButtonID || !validPaymentID)
+       logWithTimestamp(F, 'useEffect: Completed initialization process', {

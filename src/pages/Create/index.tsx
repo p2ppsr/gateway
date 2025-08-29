@@ -9,7 +9,13 @@
  * - 24Aug2025_2341 BST (v1.0.1): Fixed handleCopyCode to generate new buttonId and paymentId for each copy action, removing showCode condition to prevent ID reuse.
  */
 const F = 'pages/Create'
-import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useLayoutEffect
+} from 'react'
 import {
   Typography,
   Container,
@@ -29,7 +35,10 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient } from '@bsv/sdk'
 import { Root, ContentWrap, CenteredHeader, TextFieldStyled } from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { atomDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import {
+  atomDark,
+  oneLight
+} from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { toast, ToastContainer } from 'react-toastify'
@@ -98,7 +107,8 @@ const Create: React.FC = () => {
   const [buttonText_fixed, setButtonText_fixed] = useState('Pay Now')
   const [buttonText_variable, setButtonText_variable] = useState('Pay Now')
   const [spendingDescription_fixed, setSpendingDescription_fixed] = useState('')
-  const [spendingDescription_variable, setSpendingDescription_variable] = useState('')
+  const [spendingDescription_variable, setSpendingDescription_variable] =
+    useState('')
   const [paymentType, setPaymentType] = useState<'fixed' | 'variable'>('fixed')
   const [fixedSatAmount, setFixedSatAmount] = useState('5')
   const [isSingleUse, setIsSingleUse] = useState(false) // Checkbox state: true = single-use, false = multi-use
@@ -109,7 +119,8 @@ const Create: React.FC = () => {
   const [showCode, setShowCode] = useState(false)
   const [hasMetanet, setHasMetanet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
-  const [customCSS_fixed, setCustomCSS_fixed] = useState<string>(`<style>.gateway-paybutton-fixed {
+  const [customCSS_fixed, setCustomCSS_fixed] =
+    useState<string>(`<style>.gateway-paybutton-fixed {
     border-radius: 2em;
     border: none;
     padding: 0.7em 1em 0.7em 1em;
@@ -135,7 +146,8 @@ const Create: React.FC = () => {
     pointer-events: none;
   }
   </style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`)
-  const [customCSS_variable, setCustomCSS_variable] = useState<string>(`<style>.gateway-paybutton-variable {
+  const [customCSS_variable, setCustomCSS_variable] =
+    useState<string>(`<style>.gateway-paybutton-variable {
     border-radius: 2em;
     border: none;
     padding: 0.7em 1em 0.7em 1em;
@@ -161,19 +173,28 @@ const Create: React.FC = () => {
     pointer-events: none;
   }
   </style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`)
-  const [lastValidCSS_fixed, setLastValidCSS_fixed] = useState(extractCSS(customCSS_fixed))
-  const [lastValidCSS_variable, setLastValidCSS_variable] = useState(extractCSS(customCSS_variable))
+  const [lastValidCSS_fixed, setLastValidCSS_fixed] = useState(
+    extractCSS(customCSS_fixed)
+  )
+  const [lastValidCSS_variable, setLastValidCSS_variable] = useState(
+    extractCSS(customCSS_variable)
+  )
   const [previewCode_fixed, setPreviewCode_fixed] = useState('')
   const [previewCode_variable, setPreviewCode_variable] = useState('')
   const [previewFixedHtml, setPreviewFixedHtml] = useState('')
   const [previewVariableHtml, setPreviewVariableHtml] = useState('')
-  const [styleElement_fixed, setStyleElement_fixed] = useState<HTMLStyleElement | null>(null)
-  const [styleElement_variable, setStyleElement_variable] = useState<HTMLStyleElement | null>(null)
+  const [styleElement_fixed, setStyleElement_fixed] =
+    useState<HTMLStyleElement | null>(null)
+  const [styleElement_variable, setStyleElement_variable] =
+    useState<HTMLStyleElement | null>(null)
   const [renderKey, setRenderKey] = useState(0)
   const [isCopyHovered, setIsCopyHovered] = useState(false)
   const [updateCounter, setUpdateCounter] = useState(0)
   const [isWalletReady, setIsWalletReady] = useState(!!wallet)
-  const [ids, setIds] = useState<{ buttonId: string; paymentId: string }>({ buttonId: '', paymentId: '' })
+  const [ids, setIds] = useState<{ buttonId: string; paymentId: string }>({
+    buttonId: '',
+    paymentId: ''
+  })
 
   const generatePreviewHtml = useCallback(
     (type: 'fixed' | 'variable', description: string) => {
@@ -193,36 +214,86 @@ const Create: React.FC = () => {
           ? `${sanitizeInput(buttonText_fixed)} ${fixedSatAmount} Sats`
           : sanitizeInput(buttonText_variable)
       const previewClassName =
-        type === 'fixed' ? `gateway-paybutton gateway-paybutton-fixed` : `gateway-paybutton gateway-paybutton-variable`
+        type === 'fixed'
+          ? `gateway-paybutton gateway-paybutton-fixed`
+          : `gateway-paybutton gateway-paybutton-variable`
       const codeClassName =
         type === 'fixed'
-          ? `gateway-paybutton gateway-paybutton-fixed${isSingleUse ? ' disabled' : ''}`
-          : `gateway-paybutton gateway-paybutton-variable${isSingleUse ? ' disabled' : ''}`
-      const safeDescription = sanitizeInput(description || `Payment using paymentId: ${ids.paymentId || ''}`)
+          ? `gateway-paybutton gateway-paybutton-fixed${
+              isSingleUse ? ' disabled' : ''
+            }`
+          : `gateway-paybutton gateway-paybutton-variable${
+              isSingleUse ? ' disabled' : ''
+            }`
+      const safeDescription = sanitizeInput(
+        description || `Payment using paymentId: ${ids.paymentId || ''}`
+      )
       const cssToUse =
         type === 'fixed'
           ? validateCSS(extractCSS(customCSS_fixed))
             ? extractCSS(customCSS_fixed)
             : lastValidCSS_fixed
           : validateCSS(extractCSS(customCSS_variable))
-            ? extractCSS(customCSS_variable)
-            : lastValidCSS_variable
+          ? extractCSS(customCSS_variable)
+          : lastValidCSS_variable
       let previewHtml = ''
       let codeHtml = ''
       if (type === 'fixed') {
-        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-multi-use="${!isSingleUse}">${text}</div>`
-        codeHtml = `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${ids.buttonId}"\n class="${codeClassName}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${ids.buttonId}"\n data-paymentId="${ids.paymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${text}"\n data-description="${safeDescription}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${!isSingleUse}">${text}</div>`
+        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${text}" data-description="${safeDescription}" data-buttonId="${
+          ids.buttonId
+        }" data-paymentId="${
+          ids.paymentId
+        }" data-multi-use="${!isSingleUse}">${text}</div>`
+        codeHtml = `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${
+          ids.buttonId
+        }"\n class="${codeClassName}"\n data-merchant="${
+          merchant || 'temp-merchant'
+        }"\n data-buttonId="${ids.buttonId}"\n data-paymentId="${
+          ids.paymentId
+        }"\n data-amount="${fixedSatAmount}"\n data-text="${text}"\n data-description="${safeDescription}"\n data-width="fit-content"\n data-server="${
+          location.protocol
+        }//${location.host}"\n data-multi-use="${!isSingleUse}">${text}</div>`
         setPreviewFixedHtml(previewHtml)
         setPreviewCode_fixed(codeHtml)
-        logWithTimestamp(F, 'generatePreviewHtml: Fixed preview HTML set:', previewHtml, 'code HTML:', codeHtml)
+        logWithTimestamp(
+          F,
+          'generatePreviewHtml: Fixed preview HTML set:',
+          previewHtml,
+          'code HTML:',
+          codeHtml
+        )
       } else {
-        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-variable="true" data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-        codeHtml = `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${ids.buttonId}"\n class="${codeClassName}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${ids.buttonId}"\n data-paymentId="${ids.paymentId}"\n data-text="${text}"\n data-description="${safeDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-text="${text}" data-description="${safeDescription}" data-buttonId="${
+          ids.buttonId
+        }" data-paymentId="${
+          ids.paymentId
+        }" data-variable="true" data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        codeHtml = `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${
+          ids.buttonId
+        }"\n class="${codeClassName}"\n data-merchant="${
+          merchant || 'temp-merchant'
+        }"\n data-buttonId="${ids.buttonId}"\n data-paymentId="${
+          ids.paymentId
+        }"\n data-text="${text}"\n data-description="${safeDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
+          location.protocol
+        }//${
+          location.host
+        }"\n data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
         setPreviewVariableHtml(previewHtml)
         setPreviewCode_variable(codeHtml)
-        logWithTimestamp(F, 'generatePreviewHtml: Variable preview HTML set:', previewHtml, 'code HTML:', codeHtml)
+        logWithTimestamp(
+          F,
+          'generatePreviewHtml: Variable preview HTML set:',
+          previewHtml,
+          'code HTML:',
+          codeHtml
+        )
       }
-      logWithTimestamp(F, 'generatePreviewHtml: Completed generation for type:', type)
+      logWithTimestamp(
+        F,
+        'generatePreviewHtml: Completed generation for type:',
+        type
+      )
     },
     [
       paymentType,
@@ -260,11 +331,35 @@ const Create: React.FC = () => {
       'paymentID:',
       paymentID
     )
-    const fixedDescription = spendingDescription_fixed || `Payment using paymentId: ${paymentID}`
-    const variableDescription = spendingDescription_variable || `Payment using paymentId: ${paymentID}`
+    const fixedDescription =
+      spendingDescription_fixed || `Payment using paymentId: ${paymentID}`
+    const variableDescription =
+      spendingDescription_variable || `Payment using paymentId: ${paymentID}`
     const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
-    const fixedCode = `<style>\n${validateCSS(extractCSS(customCSS_fixed)) ? extractCSS(customCSS_fixed).trim() : lastValidCSS_fixed.trim()}\n</style>\n<div id="${buttonID}"\n class="gateway-paybutton gateway-paybutton-fixed${isSingleUse ? ' disabled' : ''}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${fixedDescription}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${!isSingleUse}">${fixedText}</div>`
-    const variableCode = `<style>\n${validateCSS(extractCSS(customCSS_variable)) ? extractCSS(customCSS_variable).trim() : lastValidCSS_variable.trim()}\n</style>\n<div id="${buttonID}"\n class="gateway-paybutton gateway-paybutton-variable${isSingleUse ? ' disabled' : ''}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${variableDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+    const fixedCode = `<style>\n${
+      validateCSS(extractCSS(customCSS_fixed))
+        ? extractCSS(customCSS_fixed).trim()
+        : lastValidCSS_fixed.trim()
+    }\n</style>\n<div id="${buttonID}"\n class="gateway-paybutton gateway-paybutton-fixed${
+      isSingleUse ? ' disabled' : ''
+    }"\n data-merchant="${
+      merchant || 'temp-merchant'
+    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${fixedDescription}"\n data-width="fit-content"\n data-server="${
+      location.protocol
+    }//${location.host}"\n data-multi-use="${!isSingleUse}">${fixedText}</div>`
+    const variableCode = `<style>\n${
+      validateCSS(extractCSS(customCSS_variable))
+        ? extractCSS(customCSS_variable).trim()
+        : lastValidCSS_variable.trim()
+    }\n</style>\n<div id="${buttonID}"\n class="gateway-paybutton gateway-paybutton-variable${
+      isSingleUse ? ' disabled' : ''
+    }"\n data-merchant="${
+      merchant || 'temp-merchant'
+    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${variableDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
+      location.protocol
+    }//${
+      location.host
+    }"\n data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
     logWithTimestamp(
       F,
       'updatePreviewCodes: Generated HTML code - fixed:',
@@ -282,12 +377,16 @@ const Create: React.FC = () => {
       logWithTimestamp(
         F,
         'updatePreviewCodes: Re-applied fixed CSS to style element:',
-        (validateCSS(extractCSS(customCSS_fixed)) ? extractCSS(customCSS_fixed) : lastValidCSS_fixed).substring(0, 50) +
-          '...'
+        (validateCSS(extractCSS(customCSS_fixed))
+          ? extractCSS(customCSS_fixed)
+          : lastValidCSS_fixed
+        ).substring(0, 50) + '...'
       )
     }
     if (styleElement_variable) {
-      styleElement_variable.textContent = validateCSS(extractCSS(customCSS_variable))
+      styleElement_variable.textContent = validateCSS(
+        extractCSS(customCSS_variable)
+      )
         ? extractCSS(customCSS_variable)
         : lastValidCSS_variable
       logWithTimestamp(
@@ -301,7 +400,11 @@ const Create: React.FC = () => {
     }
     generatePreviewHtml('fixed', fixedDescription)
     generatePreviewHtml('variable', variableDescription)
-    logWithTimestamp(F, 'updatePreviewCodes: Previews generated for paymentType:', paymentType)
+    logWithTimestamp(
+      F,
+      'updatePreviewCodes: Previews generated for paymentType:',
+      paymentType
+    )
   }, [
     customCSS_fixed,
     customCSS_variable,
@@ -326,30 +429,52 @@ const Create: React.FC = () => {
   ])
 
   useEffect(() => {
-    logWithTimestamp(F, 'useEffect: Loading initial values for merchant:', merchant)
+    logWithTimestamp(
+      F,
+      'useEffect: Loading initial values for merchant:',
+      merchant
+    )
     if (merchant) {
-      const loadedButtonText_fixed = localStorage.getItem(`buttonText_fixed_${merchant}`) || 'Pay Now'
-      const loadedButtonText_variable = localStorage.getItem(`buttonText_variable_${merchant}`) || 'Pay Now'
-      const loadedSpendingDescription_fixed = localStorage.getItem(`spendingDescription_fixed_${merchant}`) || ''
-      const loadedSpendingDescription_variable = localStorage.getItem(`spendingDescription_variable_${merchant}`) || ''
-      const loadedPaymentType = (localStorage.getItem(`paymentType_${merchant}`) as 'fixed' | 'variable') || 'fixed'
-      const loadedFixedSatAmount = localStorage.getItem(`fixedSatAmount_${merchant}`) || '5'
-      const loadedIsSingleUse = localStorage.getItem(`isSingleUse_${merchant}`) === 'true'
-      const loadedCustomCSS_fixed = localStorage.getItem(`customCSS_fixed_${merchant}`) || customCSS_fixed
-      const loadedCustomCSS_variable = localStorage.getItem(`customCSS_variable_${merchant}`) || customCSS_variable
+      const loadedButtonText_fixed =
+        localStorage.getItem(`buttonText_fixed_${merchant}`) || 'Pay Now'
+      const loadedButtonText_variable =
+        localStorage.getItem(`buttonText_variable_${merchant}`) || 'Pay Now'
+      const loadedSpendingDescription_fixed =
+        localStorage.getItem(`spendingDescription_fixed_${merchant}`) || ''
+      const loadedSpendingDescription_variable =
+        localStorage.getItem(`spendingDescription_variable_${merchant}`) || ''
+      const loadedPaymentType =
+        (localStorage.getItem(`paymentType_${merchant}`) as
+          | 'fixed'
+          | 'variable') || 'fixed'
+      const loadedFixedSatAmount =
+        localStorage.getItem(`fixedSatAmount_${merchant}`) || '5'
+      const loadedIsSingleUse =
+        localStorage.getItem(`isSingleUse_${merchant}`) === 'true'
+      const loadedCustomCSS_fixed =
+        localStorage.getItem(`customCSS_fixed_${merchant}`) || customCSS_fixed
+      const loadedCustomCSS_variable =
+        localStorage.getItem(`customCSS_variable_${merchant}`) ||
+        customCSS_variable
       const loadedButtonID = localStorage.getItem(`buttonID_${merchant}`) || ''
-      const loadedPaymentID = localStorage.getItem(`paymentID_${merchant}`) || ''
-      const loadedButtonInit = localStorage.getItem(`idsInitializedbutton_${merchant}`) === 'true'
-      const loadedPaymentInit = localStorage.getItem(`idsInitializedpayment_${merchant}`) === 'true'
+      const loadedPaymentID =
+        localStorage.getItem(`paymentID_${merchant}`) || ''
+      const loadedButtonInit =
+        localStorage.getItem(`idsInitializedbutton_${merchant}`) === 'true'
+      const loadedPaymentInit =
+        localStorage.getItem(`idsInitializedpayment_${merchant}`) === 'true'
 
-      if (loadedButtonText_fixed !== buttonText_fixed) setButtonText_fixed(loadedButtonText_fixed)
-      if (loadedButtonText_variable !== buttonText_variable) setButtonText_variable(loadedButtonText_variable)
+      if (loadedButtonText_fixed !== buttonText_fixed)
+        setButtonText_fixed(loadedButtonText_fixed)
+      if (loadedButtonText_variable !== buttonText_variable)
+        setButtonText_variable(loadedButtonText_variable)
       if (loadedSpendingDescription_fixed !== spendingDescription_fixed)
         setSpendingDescription_fixed(loadedSpendingDescription_fixed)
       if (loadedSpendingDescription_variable !== spendingDescription_variable)
         setSpendingDescription_variable(loadedSpendingDescription_variable)
       if (loadedPaymentType !== paymentType) setPaymentType(loadedPaymentType)
-      if (loadedFixedSatAmount !== fixedSatAmount) setFixedSatAmount(loadedFixedSatAmount)
+      if (loadedFixedSatAmount !== fixedSatAmount)
+        setFixedSatAmount(loadedFixedSatAmount)
       if (loadedIsSingleUse !== isSingleUse) setIsSingleUse(loadedIsSingleUse)
       if (loadedCustomCSS_fixed !== customCSS_fixed) {
         setCustomCSS_fixed(loadedCustomCSS_fixed)
@@ -362,14 +487,18 @@ const Create: React.FC = () => {
       if (loadedButtonID !== buttonID) setButtonID(loadedButtonID)
       if (loadedPaymentID !== paymentID) setPaymentID(loadedPaymentID)
 
-      logWithTimestamp(F, 'useEffect: Loaded initial values from localStorage', {
-        merchant,
-        loadedButtonID,
-        loadedPaymentID,
-        loadedButtonInit,
-        loadedPaymentInit,
-        loadedIsSingleUse
-      })
+      logWithTimestamp(
+        F,
+        'useEffect: Loaded initial values from localStorage',
+        {
+          merchant,
+          loadedButtonID,
+          loadedPaymentID,
+          loadedButtonInit,
+          loadedPaymentInit,
+          loadedIsSingleUse
+        }
+      )
     }
   }, [merchant])
 
@@ -388,7 +517,11 @@ const Create: React.FC = () => {
           await wallet.connectToSubstrate()
           logWithTimestamp(F, 'useEffect: Cleared client-side session data')
         } catch (err: any) {
-          logWithTimestamp(F, '❌ useEffect: Failed to clear client-side session:', err)
+          logWithTimestamp(
+            F,
+            '❌ useEffect: Failed to clear client-side session:',
+            err
+          )
         }
       }
       const substrates = [
@@ -400,26 +533,42 @@ const Create: React.FC = () => {
           skip: typeof window === 'undefined' || !(window as any).CWI
         },
         { type: 'XDMSubstrate', substrate: 'XDM' as const, skip: false },
-        { type: 'ReactNativeWebView', substrate: 'react-native' as const, skip: false }
+        {
+          type: 'ReactNativeWebView',
+          substrate: 'react-native' as const,
+          skip: false
+        }
       ]
       const initializeWallet = async (retry = false): Promise<boolean> => {
         if (retry) await clearClientSession()
         for (const { type, substrate, skip } of substrates) {
           if (skip) {
-            logWithTimestamp(F, `useEffect: Skipping ${type} substrate (not available)`)
+            logWithTimestamp(
+              F,
+              `useEffect: Skipping ${type} substrate (not available)`
+            )
             continue
           }
           try {
-            logWithTimestamp(F, `useEffect: Attempting wallet connection with ${type} on ${CONFIG.WALLET_ORIGIN}`)
+            logWithTimestamp(
+              F,
+              `useEffect: Attempting wallet connection with ${type} on ${CONFIG.WALLET_ORIGIN}`
+            )
             wallet = new WalletClient(substrate, CONFIG.WALLET_ORIGIN)
             await wallet.connectToSubstrate()
             const authResult = await wallet.isAuthenticated({})
             if (authResult.authenticated) {
-              logWithTimestamp(F, `useEffect: Wallet authenticated with ${type}`)
+              logWithTimestamp(
+                F,
+                `useEffect: Wallet authenticated with ${type}`
+              )
               return true
             }
             await wallet.waitForAuthentication({})
-            logWithTimestamp(F, `useEffect: Wallet authentication completed with ${type}`)
+            logWithTimestamp(
+              F,
+              `useEffect: Wallet authentication completed with ${type}`
+            )
             return true
           } catch (walletErr) {
             logWithTimestamp(
@@ -434,61 +583,114 @@ const Create: React.FC = () => {
       try {
         let walletConnected = await initializeWallet()
         if (!walletConnected) {
-          logWithTimestamp(F, '❌ useEffect: Initial wallet connection failed, retrying')
+          logWithTimestamp(
+            F,
+            '❌ useEffect: Initial wallet connection failed, retrying'
+          )
           for (let i = 0; i < 2; i++) {
             await new Promise(resolve => setTimeout(resolve, 1000))
             walletConnected = await initializeWallet(true)
             if (walletConnected) break
           }
-          if (!walletConnected) throw new Error('Failed to connect to wallet after retries')
+          if (!walletConnected)
+            throw new Error('Failed to connect to wallet after retries')
         }
         const identity = (await Promise.race([
-          wallet.getPublicKey({ identityKey: true }) as Promise<{ publicKey: string }>,
-          new Promise((_, reject) => setTimeout(() => reject(new Error('wallet.getPublicKey timed out')), 5000))
+          wallet.getPublicKey({ identityKey: true }) as Promise<{
+            publicKey: string
+          }>,
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error('wallet.getPublicKey timed out')),
+              5000
+            )
+          )
         ])) as { publicKey: string }
         logWithTimestamp(F, 'useEffect: Wallet public key response:', identity)
-        if (!identity || !identity.publicKey) throw new Error('Invalid identity returned from wallet')
+        if (!identity || !identity.publicKey)
+          throw new Error('Invalid identity returned from wallet')
         merchantId = identity.publicKey
         setMerchant(merchantId)
         setHasMetanet(true)
         logWithTimestamp(F, 'useEffect: Merchant identity fetched:', merchantId)
       } catch (walletError: any) {
-        logWithTimestamp(F, '❌ useEffect: Wallet fetch error:', walletError.message)
+        logWithTimestamp(
+          F,
+          '❌ useEffect: Wallet fetch error:',
+          walletError.message
+        )
         if (walletError.message.includes('Session not found for nonce')) {
-          logWithTimestamp(F, 'useEffect: Detected stale session, reinitializing wallet')
+          logWithTimestamp(
+            F,
+            'useEffect: Detected stale session, reinitializing wallet'
+          )
           const walletConnected = await initializeWallet(true)
           if (walletConnected) {
             try {
               const identity = (await Promise.race([
-                wallet.getPublicKey({ identityKey: true }) as Promise<{ publicKey: string }>,
-                new Promise((_, reject) => setTimeout(() => reject(new Error('wallet.getPublicKey timed out')), 5000))
+                wallet.getPublicKey({ identityKey: true }) as Promise<{
+                  publicKey: string
+                }>,
+                new Promise((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error('wallet.getPublicKey timed out')),
+                    5000
+                  )
+                )
               ])) as { publicKey: string }
-              if (!identity || !identity.publicKey) throw new Error('Invalid identity after retry')
+              if (!identity || !identity.publicKey)
+                throw new Error('Invalid identity after retry')
               merchantId = identity.publicKey
               setMerchant(merchantId)
               setHasMetanet(true)
-              logWithTimestamp(F, 'useEffect: Wallet reinitialized, merchant ID:', merchantId)
+              logWithTimestamp(
+                F,
+                'useEffect: Wallet reinitialized, merchant ID:',
+                merchantId
+              )
             } catch (retryError: any) {
-              logWithTimestamp(F, '❌ useEffect: Wallet reinitialization failed:', retryError.message)
+              logWithTimestamp(
+                F,
+                '❌ useEffect: Wallet reinitialization failed:',
+                retryError.message
+              )
               setHasMetanet(false)
               merchantId = generateBase58(12)
               setMerchant(merchantId)
-              logWithTimestamp(F, 'useEffect: Using temporary merchant ID:', merchantId)
-              toast.error(`❌ Failed to fetch wallet identity after retry: ${retryError.message}`)
+              logWithTimestamp(
+                F,
+                'useEffect: Using temporary merchant ID:',
+                merchantId
+              )
+              toast.error(
+                `❌ Failed to fetch wallet identity after retry: ${retryError.message}`
+              )
             }
           } else {
             setHasMetanet(false)
             merchantId = generateBase58(12)
             setMerchant(merchantId)
-            logWithTimestamp(F, 'useEffect: Using temporary merchant ID:', merchantId)
-            toast.error(`❌ Failed to connect to wallet: ${walletError.message}`)
+            logWithTimestamp(
+              F,
+              'useEffect: Using temporary merchant ID:',
+              merchantId
+            )
+            toast.error(
+              `❌ Failed to connect to wallet: ${walletError.message}`
+            )
           }
         } else {
           setHasMetanet(false)
           merchantId = generateBase58(12)
           setMerchant(merchantId)
-          logWithTimestamp(F, 'useEffect: Using temporary merchant ID:', merchantId)
-          toast.error(`❌ Failed to fetch wallet identity: ${walletError.message}`)
+          logWithTimestamp(
+            F,
+            'useEffect: Using temporary merchant ID:',
+            merchantId
+          )
+          toast.error(
+            `❌ Failed to fetch wallet identity: ${walletError.message}`
+          )
         }
       }
       if (!merchantId) throw new Error('Merchant ID not set')
@@ -508,8 +710,14 @@ const Create: React.FC = () => {
       }
       const validReferrers = ['/buttons', '/actions', '/payments']
       const referrer = document.referrer || ''
-      const isValidReferrer = validReferrers.some(path => referrer.includes(path))
-      const isServerRestart = !sessionFlag || navType === 0 || navType === 1 || serverStatus.isRestarted
+      const isValidReferrer = validReferrers.some(path =>
+        referrer.includes(path)
+      )
+      const isServerRestart =
+        !sessionFlag ||
+        navType === 0 ||
+        navType === 1 ||
+        serverStatus.isRestarted
       logWithTimestamp(
         F,
         'useEffect: Server restart check - sessionFlag:',
@@ -523,17 +731,27 @@ const Create: React.FC = () => {
       )
       let validButtonID = localStorage.getItem(`buttonID_${merchantId}`) || ''
       let validPaymentID = localStorage.getItem(`paymentID_${merchantId}`) || ''
-      const buttonInitialized = localStorage.getItem(`idsInitializedbutton_${merchantId}`) === 'true'
-      const paymentInitialized = localStorage.getItem(`idsInitializedpayment_${merchantId}`) === 'true'
+      const buttonInitialized =
+        localStorage.getItem(`idsInitializedbutton_${merchantId}`) === 'true'
+      const paymentInitialized =
+        localStorage.getItem(`idsInitializedpayment_${merchantId}`) === 'true'
       logWithTimestamp(F, 'useEffect: Loaded persisted IDs:', {
         validButtonID,
         validPaymentID,
         buttonInitialized,
         paymentInitialized
       })
-      if (!validButtonID || !validPaymentID || !buttonInitialized || !paymentInitialized || isServerRestart) {
+      if (
+        !validButtonID ||
+        !validPaymentID ||
+        !buttonInitialized ||
+        !paymentInitialized ||
+        isServerRestart
+      ) {
         try {
-          const defaultDescription = `Payment using ${'button'} ID: ${generateBase58(12)}` // Temporary description
+          const defaultDescription = `Payment using ${'button'} ID: ${generateBase58(
+            12
+          )}` // Temporary description
           const buttonResponse: InitializeIdsResponse = await initializeIds(
             'button',
             wallet,
@@ -546,12 +764,18 @@ const Create: React.FC = () => {
             false
           )
           if (buttonResponse.status !== 'success') {
-            throw new Error(`Button ID initialization failed: ${buttonResponse.message}`)
+            throw new Error(
+              `Button ID initialization failed: ${buttonResponse.message}`
+            )
           }
           validButtonID = buttonResponse.id || generateBase58(12)
           localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
           localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
-          logWithTimestamp(F, 'useEffect: Button ID initialized:', validButtonID)
+          logWithTimestamp(
+            F,
+            'useEffect: Button ID initialized:',
+            validButtonID
+          )
           const paymentResponse: InitializeIdsResponse = await initializeIds(
             'payment',
             wallet,
@@ -564,7 +788,9 @@ const Create: React.FC = () => {
             false
           )
           if (paymentResponse.status !== 'success') {
-            throw new Error(`Payment ID initialization failed: ${paymentResponse.message}`)
+            throw new Error(
+              `Payment ID initialization failed: ${paymentResponse.message}`
+            )
           }
           validPaymentID = paymentResponse.id || generateBase58(12)
           localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
@@ -572,13 +798,18 @@ const Create: React.FC = () => {
           // CPR enable-copy: ensure state even on fallback init
           setButtonID(validButtonID)
           setPaymentID(validPaymentID)
-          // CPR enable-copy: final guarantee UI reflects chosen IDs
-          setButtonID(validButtonID)
-          setPaymentID(validPaymentID)
           setIds({ buttonId: validButtonID, paymentId: validPaymentID })
-          logWithTimestamp(F, 'useEffect: Payment ID initialized:', validPaymentID)
+          logWithTimestamp(
+            F,
+            'useEffect: Payment ID initialized:',
+            validPaymentID
+          )
         } catch (err: any) {
-          logWithTimestamp(F, '❌ useEffect: Failed to initialize IDs:', err.message)
+          logWithTimestamp(
+            F,
+            '❌ useEffect: Failed to initialize IDs:',
+            err.message
+          )
           validButtonID = generateBase58(12)
           validPaymentID = generateBase58(12)
           localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
@@ -597,7 +828,10 @@ const Create: React.FC = () => {
           try {
             const response = await fetchWithTimeout(
               `${location.protocol}//${location.host}/api/buttonCode/${validButtonID}`,
-              { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+              {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+              },
               wallet
             )
             const data = await response.json()
@@ -606,11 +840,19 @@ const Create: React.FC = () => {
               buttonId: data.button_id,
               paymentId: data.payment_id
             })
-            if (data.status !== 'success' || data.button_id !== validButtonID || data.payment_id !== validPaymentID) {
-              logWithTimestamp(F, 'useEffect: Invalid persisted IDs, generating new ones', {
-                validButtonID,
-                validPaymentID
-              })
+            if (
+              data.status !== 'success' ||
+              data.button_id !== validButtonID ||
+              data.payment_id !== validPaymentID
+            ) {
+              logWithTimestamp(
+                F,
+                'useEffect: Invalid persisted IDs, generating new ones',
+                {
+                  validButtonID,
+                  validPaymentID
+                }
+              )
               localStorage.removeItem(`buttonID_${merchantId}`)
               localStorage.removeItem(`paymentID_${merchantId}`)
               localStorage.removeItem(`idsInitializedbutton_${merchantId}`)
@@ -620,33 +862,55 @@ const Create: React.FC = () => {
               localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
               localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
               localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
-              localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
+              localStorage.setItem(
+                `idsInitializedpayment_${merchantId}`,
+                'true'
+              )
               setButtonID(validButtonID)
               setPaymentID(validPaymentID)
               setIds({ buttonId: validButtonID, paymentId: validPaymentID })
               const newDescription = `Payment using paymentId: ${validPaymentID}`
               setSpendingDescription_fixed(newDescription)
               setSpendingDescription_variable(newDescription)
-              localStorage.setItem(`spendingDescription_fixed_${merchantId}`, newDescription)
-              localStorage.setItem(`spendingDescription_variable_${merchantId}`, newDescription)
+              localStorage.setItem(
+                `spendingDescription_fixed_${merchantId}`,
+                newDescription
+              )
+              localStorage.setItem(
+                `spendingDescription_variable_${merchantId}`,
+                newDescription
+              )
               const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
-              const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
-              const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+              const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+                newDescription
+              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
+              const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+                newDescription
+              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
               setPreviewFixedHtml(fixedPreviewHtml)
               setPreviewVariableHtml(variablePreviewHtml)
               generatePreviewHtml(paymentType, newDescription)
               setUpdateCounter(prev => prev + 1)
-              logWithTimestamp(F, 'useEffect: Reinitialized IDs and updated previews', {
-                validButtonID,
-                validPaymentID,
-                isSingleUse
-              })
+              logWithTimestamp(
+                F,
+                'useEffect: Reinitialized IDs and updated previews',
+                {
+                  validButtonID,
+                  validPaymentID,
+                  isSingleUse
+                }
+              )
             } else {
-              logWithTimestamp(F, 'useEffect: Valid persisted IDs', { validButtonID, validPaymentID })
+              logWithTimestamp(F, 'useEffect: Valid persisted IDs', {
+                validButtonID,
+                validPaymentID
+              })
               setIds({ buttonId: validButtonID, paymentId: validPaymentID })
             }
           } catch (err: any) {
-            logWithTimestamp(F, '❌ useEffect: Failed to validate IDs', { error: err.message })
+            logWithTimestamp(F, '❌ useEffect: Failed to validate IDs', {
+              error: err.message
+            })
             toast.error('❌ Failed to validate IDs', { autoClose: 5000 })
             validButtonID = generateBase58(12)
             validPaymentID = generateBase58(12)
@@ -660,27 +924,48 @@ const Create: React.FC = () => {
             const newDescription = `Payment using paymentId: ${validPaymentID}`
             setSpendingDescription_fixed(newDescription)
             setSpendingDescription_variable(newDescription)
-            localStorage.setItem(`spendingDescription_fixed_${merchantId}`, newDescription)
-            localStorage.setItem(`spendingDescription_variable_${merchantId}`, newDescription)
+            localStorage.setItem(
+              `spendingDescription_fixed_${merchantId}`,
+              newDescription
+            )
+            localStorage.setItem(
+              `spendingDescription_variable_${merchantId}`,
+              newDescription
+            )
             const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
-            const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
-            const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(newDescription)}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+            const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+              newDescription
+            )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
+            const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+              newDescription
+            )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
             setPreviewFixedHtml(fixedPreviewHtml)
             setPreviewVariableHtml(variablePreviewHtml)
             generatePreviewHtml(paymentType, newDescription)
             setUpdateCounter(prev => prev + 1)
-            logWithTimestamp(F, 'useEffect: Reinitialized IDs and updated previews after validation failure', {
-              validButtonID,
-              validPaymentID,
-              isSingleUse
-            })
+            logWithTimestamp(
+              F,
+              'useEffect: Reinitialized IDs and updated previews after validation failure',
+              {
+                validButtonID,
+                validPaymentID,
+                isSingleUse
+              }
+            )
           }
         }
         validateIds()
       }
       setIds({ buttonId: validButtonID, paymentId: validPaymentID })
-      logWithTimestamp(F, 'useEffect: Using validated IDs:', { validButtonID, validPaymentID })
-      logWithTimestamp(F, 'useEffect: Evaluating Copy icon disabled state:', !validButtonID || !validPaymentID)
+      logWithTimestamp(F, 'useEffect: Using validated IDs:', {
+        validButtonID,
+        validPaymentID
+      })
+      logWithTimestamp(
+        F,
+        'useEffect: Evaluating Copy icon disabled state:',
+        !validButtonID || !validPaymentID
+      )
       logWithTimestamp(F, 'useEffect: Completed initialization process', {
         finalButtonID: validButtonID,
         finalPaymentID: validPaymentID
@@ -695,9 +980,18 @@ const Create: React.FC = () => {
   useEffect(() => {
     if (merchant) {
       localStorage.setItem(`buttonText_fixed_${merchant}`, buttonText_fixed)
-      localStorage.setItem(`buttonText_variable_${merchant}`, buttonText_variable)
-      localStorage.setItem(`spendingDescription_fixed_${merchant}`, spendingDescription_fixed)
-      localStorage.setItem(`spendingDescription_variable_${merchant}`, spendingDescription_variable)
+      localStorage.setItem(
+        `buttonText_variable_${merchant}`,
+        buttonText_variable
+      )
+      localStorage.setItem(
+        `spendingDescription_fixed_${merchant}`,
+        spendingDescription_fixed
+      )
+      localStorage.setItem(
+        `spendingDescription_variable_${merchant}`,
+        spendingDescription_variable
+      )
       localStorage.setItem(`paymentType_${merchant}`, paymentType)
       localStorage.setItem(`fixedSatAmount_${merchant}`, fixedSatAmount)
       localStorage.setItem(`isSingleUse_${merchant}`, isSingleUse.toString())
@@ -733,15 +1027,27 @@ const Create: React.FC = () => {
   ])
 
   useLayoutEffect(() => {
-    logWithTimestamp(F, 'useLayoutEffect: Running with hasMetanet:', hasMetanet, 'isMounted:', isMounted.current)
+    logWithTimestamp(
+      F,
+      'useLayoutEffect: Running with hasMetanet:',
+      hasMetanet,
+      'isMounted:',
+      isMounted.current
+    )
     if (isMounted.current && hasMetanet) {
       if (copyIconRef.current) {
         copyIconRef.current.classList.add('preview-flash-copy')
-        logWithTimestamp(F, 'useLayoutEffect: Added flashCopy animation to Copy Icon')
+        logWithTimestamp(
+          F,
+          'useLayoutEffect: Added flashCopy animation to Copy Icon'
+        )
       }
     } else if (copyIconRef.current) {
       copyIconRef.current.classList.remove('preview-flash-copy')
-      logWithTimestamp(F, 'useLayoutEffect: Removed flashCopy animation from Copy Icon')
+      logWithTimestamp(
+        F,
+        'useLayoutEffect: Removed flashCopy animation from Copy Icon'
+      )
     }
     isMounted.current = true
     logWithTimestamp(F, 'useLayoutEffect: Completed, isMounted set to true')
@@ -772,7 +1078,14 @@ const Create: React.FC = () => {
       'Single ID set:',
       !!buttonID && !!paymentID
     )
-  }, [paymentType, merchant, hasMetanet, updatePreviewCodes, buttonID, paymentID])
+  }, [
+    paymentType,
+    merchant,
+    hasMetanet,
+    updatePreviewCodes,
+    buttonID,
+    paymentID
+  ])
 
   useEffect(() => {
     const newStyleElement = document.createElement('style')
@@ -785,17 +1098,29 @@ const Create: React.FC = () => {
     logWithTimestamp(
       F,
       'useEffect: Applied fixed CSS to document head:',
-      (validateCSS(extractCSS(customCSS_fixed)) ? extractCSS(customCSS_fixed) : lastValidCSS_fixed).substring(0, 50) +
-        '...'
+      (validateCSS(extractCSS(customCSS_fixed))
+        ? extractCSS(customCSS_fixed)
+        : lastValidCSS_fixed
+      ).substring(0, 50) + '...'
     )
     if (previewContainerRef.current) {
-      generatePreviewHtml('fixed', spendingDescription_fixed || `Payment using paymentId: ${paymentID || ''}`)
-      logWithTimestamp(F, 'useEffect: Generated fixed preview HTML in container')
+      generatePreviewHtml(
+        'fixed',
+        spendingDescription_fixed ||
+          `Payment using paymentId: ${paymentID || ''}`
+      )
+      logWithTimestamp(
+        F,
+        'useEffect: Generated fixed preview HTML in container'
+      )
     }
     return () => {
       if (styleElement_fixed) {
         document.head.removeChild(styleElement_fixed)
-        logWithTimestamp(F, 'useEffect: Removed fixed style element from document head')
+        logWithTimestamp(
+          F,
+          'useEffect: Removed fixed style element from document head'
+        )
       }
     }
   }, [customCSS_fixed, lastValidCSS_fixed, paymentID])
@@ -811,19 +1136,29 @@ const Create: React.FC = () => {
     logWithTimestamp(
       F,
       'useEffect: Applied variable CSS to document head:',
-      (validateCSS(extractCSS(customCSS_variable)) ? extractCSS(customCSS_variable) : lastValidCSS_variable).substring(
-        0,
-        50
-      ) + '...'
+      (validateCSS(extractCSS(customCSS_variable))
+        ? extractCSS(customCSS_variable)
+        : lastValidCSS_variable
+      ).substring(0, 50) + '...'
     )
     if (previewContainerRef.current) {
-      generatePreviewHtml('variable', spendingDescription_variable || `Payment using paymentId: ${paymentID || ''}`)
-      logWithTimestamp(F, 'useEffect: Generated variable preview HTML in container')
+      generatePreviewHtml(
+        'variable',
+        spendingDescription_variable ||
+          `Payment using paymentId: ${paymentID || ''}`
+      )
+      logWithTimestamp(
+        F,
+        'useEffect: Generated variable preview HTML in container'
+      )
     }
     return () => {
       if (styleElement_variable) {
         document.head.removeChild(styleElement_variable)
-        logWithTimestamp(F, 'useEffect: Removed variable style element from document head')
+        logWithTimestamp(
+          F,
+          'useEffect: Removed variable style element from document head'
+        )
       }
     }
   }, [customCSS_variable, lastValidCSS_variable, paymentID])
@@ -831,17 +1166,29 @@ const Create: React.FC = () => {
   useEffect(() => {
     if (copyIconRef.current && (!buttonID || !paymentID)) {
       copyIconRef.current.classList.add('preview-flash-copy')
-      logWithTimestamp(F, 'useEffect: Added preview-flash-copy class to Copy Icon for visibility')
+      logWithTimestamp(
+        F,
+        'useEffect: Added preview-flash-copy class to Copy Icon for visibility'
+      )
     } else if (copyIconRef.current && buttonID && paymentID) {
       copyIconRef.current.classList.remove('preview-flash-copy')
-      logWithTimestamp(F, 'useEffect: Removed preview-flash-copy class from Copy Icon')
+      logWithTimestamp(
+        F,
+        'useEffect: Removed preview-flash-copy class from Copy Icon'
+      )
     }
     if (previewContainerRef.current) {
       previewContainerRef.current.classList.add('create-page')
-      logWithTimestamp(F, 'useEffect: Applied create-page class to preview container for styling')
+      logWithTimestamp(
+        F,
+        'useEffect: Applied create-page class to preview container for styling'
+      )
     }
     updatePreviewCodes()
-    logWithTimestamp(F, 'useEffect: Completed effect for buttonID and preview container updates')
+    logWithTimestamp(
+      F,
+      'useEffect: Completed effect for buttonID and preview container updates'
+    )
   }, [buttonID, paymentID, previewContainerRef, updatePreviewCodes])
 
   useEffect(() => {
@@ -855,28 +1202,38 @@ const Create: React.FC = () => {
     )
     if (paymentID && merchant) {
       const persistedFixedDescription =
-        localStorage.getItem(`spendingDescription_fixed_${merchant}`) || `Payment using paymentId: ${paymentID}`
+        localStorage.getItem(`spendingDescription_fixed_${merchant}`) ||
+        `Payment using paymentId: ${paymentID}`
       const persistedVariableDescription =
-        localStorage.getItem(`spendingDescription_variable_${merchant}`) || `Payment using paymentId: ${paymentID}`
+        localStorage.getItem(`spendingDescription_variable_${merchant}`) ||
+        `Payment using paymentId: ${paymentID}`
       if (
         persistedFixedDescription !== spendingDescription_fixed ||
         persistedVariableDescription !== spendingDescription_variable
       ) {
         setSpendingDescription_fixed(persistedFixedDescription)
         setSpendingDescription_variable(persistedVariableDescription)
-        logWithTimestamp(F, 'useEffect: Updated descriptions from localStorage', {
-          persistedFixedDescription,
-          persistedVariableDescription
-        })
+        logWithTimestamp(
+          F,
+          'useEffect: Updated descriptions from localStorage',
+          {
+            persistedFixedDescription,
+            persistedVariableDescription
+          }
+        )
       }
       generatePreviewHtml('fixed', persistedFixedDescription)
       generatePreviewHtml('variable', persistedVariableDescription)
       updatePreviewCodes()
-      logWithTimestamp(F, 'useEffect: Regenerated previews for paymentID change', {
-        paymentID,
-        isSingleUse,
-        multiUse: !isSingleUse
-      })
+      logWithTimestamp(
+        F,
+        'useEffect: Regenerated previews for paymentID change',
+        {
+          paymentID,
+          isSingleUse,
+          multiUse: !isSingleUse
+        }
+      )
     }
   }, [
     paymentID,
@@ -888,7 +1245,9 @@ const Create: React.FC = () => {
     isSingleUse
   ])
 
-  const handleCustomCSSChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+  const handleCustomCSSChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
     const value = event.target.value
     if (paymentType === 'fixed') {
       setCustomCSS_fixed(value)
@@ -897,10 +1256,18 @@ const Create: React.FC = () => {
           '⚠️ Invalid CSS syntax detected (e.g., unbalanced parentheses or invalid linear-gradient). Preview may not render correctly.',
           { autoClose: 5000 }
         )
-        logWithTimestamp(F, 'handleCustomCSSChange: Invalid fixed CSS input:', value.substring(0, 50) + '...')
+        logWithTimestamp(
+          F,
+          'handleCustomCSSChange: Invalid fixed CSS input:',
+          value.substring(0, 50) + '...'
+        )
       } else {
         setLastValidCSS_fixed(extractCSS(value))
-        logWithTimestamp(F, 'handleCustomCSSChange: Valid fixed CSS input:', value.substring(0, 50) + '...')
+        logWithTimestamp(
+          F,
+          'handleCustomCSSChange: Valid fixed CSS input:',
+          value.substring(0, 50) + '...'
+        )
       }
     } else {
       setCustomCSS_variable(value)
@@ -909,19 +1276,37 @@ const Create: React.FC = () => {
           '⚠️ Invalid CSS syntax detected (e.g., unbalanced parentheses or invalid linear-gradient). Preview may not render correctly.',
           { autoClose: 5000 }
         )
-        logWithTimestamp(F, 'handleCustomCSSChange: Invalid variable CSS input:', value.substring(0, 50) + '...')
+        logWithTimestamp(
+          F,
+          'handleCustomCSSChange: Invalid variable CSS input:',
+          value.substring(0, 50) + '...'
+        )
       } else {
         setLastValidCSS_variable(extractCSS(value))
-        logWithTimestamp(F, 'handleCustomCSSChange: Valid variable CSS input:', value.substring(0, 50) + '...')
+        logWithTimestamp(
+          F,
+          'handleCustomCSSChange: Valid variable CSS input:',
+          value.substring(0, 50) + '...'
+        )
       }
     }
     updatePreviewCodes()
-    logWithTimestamp(F, 'handleCustomCSSChange: Completed update for paymentType:', paymentType)
+    logWithTimestamp(
+      F,
+      'handleCustomCSSChange: Completed update for paymentType:',
+      paymentType
+    )
   }
 
-  const validateCSSOnBlur = (value: string, type: 'fixed' | 'variable'): void => {
+  const validateCSSOnBlur = (
+    value: string,
+    type: 'fixed' | 'variable'
+  ): void => {
     if (!validateCSS(extractCSS(value))) {
-      toast.warn('⚠️ Invalid CSS syntax. Reverting to last valid CSS for generation.', { autoClose: 5000 })
+      toast.warn(
+        '⚠️ Invalid CSS syntax. Reverting to last valid CSS for generation.',
+        { autoClose: 5000 }
+      )
       if (type === 'fixed') {
         setCustomCSS_fixed(
           `<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
@@ -961,18 +1346,30 @@ const Create: React.FC = () => {
       }
     }
     updatePreviewCodes()
-    logWithTimestamp(F, 'validateCSSOnBlur: Completed validation for type:', type)
+    logWithTimestamp(
+      F,
+      'validateCSSOnBlur: Completed validation for type:',
+      type
+    )
   }
 
   const debouncedValidateCSS = debounce(validateCSSOnBlur, 500)
 
-  const handleCustomCSSBlur = (event: React.FocusEvent<HTMLInputElement>): void => {
+  const handleCustomCSSBlur = (
+    event: React.FocusEvent<HTMLInputElement>
+  ): void => {
     const value = event.target.value
     debouncedValidateCSS(value, paymentType)
-    logWithTimestamp(F, 'handleCustomCSSBlur: Triggered debounced validation for paymentType:', paymentType)
+    logWithTimestamp(
+      F,
+      'handleCustomCSSBlur: Triggered debounced validation for paymentType:',
+      paymentType
+    )
   }
 
-  const handleButtonTextChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+  const handleButtonTextChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
     const { name, value } = event.target
     if (name === 'buttonText') {
       const sanitizedValue = sanitizeInput(value.slice(0, 80))
@@ -1010,10 +1407,16 @@ const Create: React.FC = () => {
       )
     }
     updatePreviewCodes()
-    logWithTimestamp(F, 'handleButtonTextChange: Completed update for paymentType:', paymentType)
+    logWithTimestamp(
+      F,
+      'handleButtonTextChange: Completed update for paymentType:',
+      paymentType
+    )
   }
 
-  const handlePaymentTypeChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+  const handlePaymentTypeChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
     logWithTimestamp(
       F,
       'handlePaymentTypeChange: Before update - current paymentType:',
@@ -1024,18 +1427,32 @@ const Create: React.FC = () => {
     const newType = event.target.value as 'fixed' | 'variable'
     setPaymentType(newType)
     setShowCode(false)
-    logWithTimestamp(F, 'handlePaymentTypeChange: After update - new paymentType:', newType)
+    logWithTimestamp(
+      F,
+      'handlePaymentTypeChange: After update - new paymentType:',
+      newType
+    )
     updatePreviewCodes()
-    logWithTimestamp(F, 'handlePaymentTypeChange: Completed update for new paymentType:', newType)
+    logWithTimestamp(
+      F,
+      'handlePaymentTypeChange: Completed update for new paymentType:',
+      newType
+    )
   }
 
-  const handleFixedSatChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+  const handleFixedSatChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ): void => {
     const input = event.target.value.replace(/[^0-9]/g, '')
     const satValue = Math.max(1, Math.min(MAX_PAYMENT_SATS, Number(input) || 5))
     setFixedSatAmount(satValue.toString())
     logWithTimestamp(F, 'handleFixedSatChange: Updated to', satValue)
     updatePreviewCodes()
-    logWithTimestamp(F, 'handleFixedSatChange: Completed update for fixedSatAmount:', satValue)
+    logWithTimestamp(
+      F,
+      'handleFixedSatChange: Completed update for fixedSatAmount:',
+      satValue
+    )
   }
 
   const resetAll = async () => {
@@ -1125,8 +1542,14 @@ const Create: React.FC = () => {
         if (merchant) {
           localStorage.setItem(`buttonID_${merchant}`, newButtonId)
           localStorage.setItem(`paymentID_${merchant}`, newPaymentId)
-          localStorage.setItem(`spendingDescription_fixed_${merchant}`, newFixedDescription)
-          localStorage.setItem(`spendingDescription_variable_${merchant}`, newVariableDescription)
+          localStorage.setItem(
+            `spendingDescription_fixed_${merchant}`,
+            newFixedDescription
+          )
+          localStorage.setItem(
+            `spendingDescription_variable_${merchant}`,
+            newVariableDescription
+          )
           localStorage.setItem(`buttonText_fixed_${merchant}`, 'Pay Now')
           localStorage.setItem(`buttonText_variable_${merchant}`, 'Pay Now')
           localStorage.setItem(`paymentType_${merchant}`, 'fixed')
@@ -1137,26 +1560,34 @@ const Create: React.FC = () => {
         }
         // Regenerate previews to ensure multiUse consistency
         const fixedText = `Pay Now ${fixedSatAmount} Sats`
-        const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(newFixedDescription)}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-multi-use="true">${fixedText}</div>`
-        const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(newVariableDescription)}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+          newFixedDescription
+        )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-multi-use="true">${fixedText}</div>`
+        const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(
+          newVariableDescription
+        )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
         setPreviewFixedHtml(fixedPreviewHtml)
         setPreviewVariableHtml(variablePreviewHtml)
         setRenderKey(prev => prev + 1)
         updatePreviewCodes()
-        logWithTimestamp(F, 'resetAll: Successfully reset all fields and updated localStorage', {
-          newButtonId,
-          newPaymentId,
-          fixedSatAmount: '5',
-          paymentType: 'fixed',
-          isSingleUse: false,
-          multiUse: true,
-          fixedDescription: newFixedDescription,
-          variableDescription: newVariableDescription,
-          fixedCSS: fixedCSS.substring(0, 50) + '...',
-          variableCSS: variableCSS.substring(0, 50) + '...',
-          fixedPreviewHtml: fixedPreviewHtml.substring(0, 50) + '...',
-          variablePreviewHtml: variablePreviewHtml.substring(0, 50) + '...'
-        })
+        logWithTimestamp(
+          F,
+          'resetAll: Successfully reset all fields and updated localStorage',
+          {
+            newButtonId,
+            newPaymentId,
+            fixedSatAmount: '5',
+            paymentType: 'fixed',
+            isSingleUse: false,
+            multiUse: true,
+            fixedDescription: newFixedDescription,
+            variableDescription: newVariableDescription,
+            fixedCSS: fixedCSS.substring(0, 50) + '...',
+            variableCSS: variableCSS.substring(0, 50) + '...',
+            fixedPreviewHtml: fixedPreviewHtml.substring(0, 50) + '...',
+            variablePreviewHtml: variablePreviewHtml.substring(0, 50) + '...'
+          }
+        )
         toast.success('All fields reset successfully')
         return newState
       })
@@ -1177,26 +1608,45 @@ const Create: React.FC = () => {
       localStorage.getItem(`isSingleUse_${merchant}`)
     )
     if (!merchant) {
-      toast.error('❌ Merchant identity not available. Retrying initialization...', { autoClose: 5000 })
-      logWithTimestamp(F, 'handleCopyCode: Merchant identity not available', { merchant })
+      toast.error(
+        '❌ Merchant identity not available. Retrying initialization...',
+        { autoClose: 5000 }
+      )
+      logWithTimestamp(F, 'handleCopyCode: Merchant identity not available', {
+        merchant
+      })
       return
     }
     if (!buttonID || !paymentID) {
-      toast.error('❌ Button or payment ID not initialized', { autoClose: 5000 })
-      logWithTimestamp(F, 'handleCopyCode: Button or payment ID not initialized', { buttonID, paymentID })
+      toast.error('❌ Button or payment ID not initialized', {
+        autoClose: 5000
+      })
+      logWithTimestamp(
+        F,
+        'handleCopyCode: Button or payment ID not initialized',
+        { buttonID, paymentID }
+      )
       return
     }
     // Wait for DOM to update and target the correct preview div by class
     await new Promise(resolve => setTimeout(resolve, 0)) // Microtask delay
-    const previewDiv = previewContainerRef.current?.querySelector('.gateway-paybutton')
+    const previewDiv =
+      previewContainerRef.current?.querySelector('.gateway-paybutton')
     const dataDescription = previewDiv?.getAttribute('data-description') || ''
-    const description = paymentType === 'fixed' ? spendingDescription_fixed : spendingDescription_variable
+    const description =
+      paymentType === 'fixed'
+        ? spendingDescription_fixed
+        : spendingDescription_variable
     if (dataDescription !== description) {
-      logWithTimestamp(F, '❌ handleCopyCode: Mismatch between data-description and description variable', {
-        dataDescription,
-        description,
-        paymentType
-      })
+      logWithTimestamp(
+        F,
+        '❌ handleCopyCode: Mismatch between data-description and description variable',
+        {
+          dataDescription,
+          description,
+          paymentType
+        }
+      )
       toast.error(
         `❌ Description mismatch: data-description (${dataDescription}) does not match ${paymentType} description (${description})`
       )
@@ -1205,7 +1655,9 @@ const Create: React.FC = () => {
     // Use current IDs from state
     let currentButtonId = buttonID
     let currentPaymentId = paymentID
-    let updatedDescription = sanitizeInput(description || `Payment using paymentId: ${currentPaymentId}`).slice(0, 80)
+    let updatedDescription = sanitizeInput(
+      description || `Payment using paymentId: ${currentPaymentId}`
+    ).slice(0, 80)
     logWithTimestamp(F, 'handleCopyCode: Using current IDs and description', {
       currentButtonId,
       currentPaymentId,
@@ -1218,15 +1670,21 @@ const Create: React.FC = () => {
           ? extractCSS(customCSS_fixed)
           : lastValidCSS_fixed
         : validateCSS(extractCSS(customCSS_variable))
-          ? extractCSS(customCSS_variable)
-          : lastValidCSS_variable
-    logWithTimestamp(F, 'handleCopyCode: Using CSS:', { cssToUse: cssToUse.substring(0, 50) + '...' })
+        ? extractCSS(customCSS_variable)
+        : lastValidCSS_variable
+    logWithTimestamp(F, 'handleCopyCode: Using CSS:', {
+      cssToUse: cssToUse.substring(0, 50) + '...'
+    })
     const multiUse = !isSingleUse
     const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
     const buttonClass =
       paymentType === 'fixed'
-        ? `gateway-paybutton gateway-paybutton-fixed${isSingleUse ? ' disabled' : ''}`
-        : `gateway-paybutton gateway-paybutton-variable${isSingleUse ? ' disabled' : ''}`
+        ? `gateway-paybutton gateway-paybutton-fixed${
+            isSingleUse ? ' disabled' : ''
+          }`
+        : `gateway-paybutton gateway-paybutton-variable${
+            isSingleUse ? ' disabled' : ''
+          }`
     logWithTimestamp(
       F,
       'handleCopyCode: Generated buttonClass:',
@@ -1238,8 +1696,22 @@ const Create: React.FC = () => {
     )
     let htmlCode =
       paymentType === 'fixed'
-        ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${currentButtonId}"\n class="${buttonClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${currentButtonId}"\n data-paymentId="${currentPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(updatedDescription)}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${multiUse}">${fixedText}</div>`
-        : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${currentButtonId}"\n class="${buttonClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${currentButtonId}"\n data-paymentId="${currentPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(updatedDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${currentButtonId}"\n class="${buttonClass}"\n data-merchant="${
+            merchant || 'temp-merchant'
+          }"\n data-buttonId="${currentButtonId}"\n data-paymentId="${currentPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
+            updatedDescription
+          )}"\n data-width="fit-content"\n data-server="${location.protocol}//${
+            location.host
+          }"\n data-multi-use="${multiUse}">${fixedText}</div>`
+        : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${currentButtonId}"\n class="${buttonClass}"\n data-merchant="${
+            merchant || 'temp-merchant'
+          }"\n data-buttonId="${currentButtonId}"\n data-paymentId="${currentPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(
+            updatedDescription
+          )}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
+            location.protocol
+          }//${
+            location.host
+          }"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
     const payload = {
       variableAmount: paymentType === 'variable',
       multiUse,
@@ -1247,11 +1719,15 @@ const Create: React.FC = () => {
       customCSS: cssToUse,
       paymentId: currentPaymentId,
       buttonId: currentButtonId,
-      amount: paymentType === 'fixed' ? parseInt(fixedSatAmount || '5') : undefined,
+      amount:
+        paymentType === 'fixed' ? parseInt(fixedSatAmount || '5') : undefined,
       htmlCode
     }
     try {
-      logWithTimestamp(F, 'handleCopyCode: Registering button with payload:', { ...payload, multiUse })
+      logWithTimestamp(F, 'handleCopyCode: Registering button with payload:', {
+        ...payload,
+        multiUse
+      })
       const response = await fetchWithTimeout(
         `${location.protocol}//${location.host}/api/createButton`,
         {
@@ -1266,18 +1742,44 @@ const Create: React.FC = () => {
       const data: ButtonResponse = responseText ? JSON.parse(responseText) : {}
       logWithTimestamp(F, 'handleCopyCode: Parsed response data:', data)
       if (data.status !== 'success') {
-        throw new Error(data.message || '❌ Failed to create button due to invalid response')
+        throw new Error(
+          data.message || '❌ Failed to create button due to invalid response'
+        )
       }
       const serverButtonId = data.buttonId || currentButtonId
       const serverPaymentId = data.paymentId || currentPaymentId
       htmlCode =
         paymentType === 'fixed'
-          ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(updatedDescription)}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${multiUse}">${fixedText}</div>`
-          : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(updatedDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-      setPreviewCode_fixed(paymentType === 'fixed' ? htmlCode : previewCode_fixed)
-      setPreviewCode_variable(paymentType === 'variable' ? htmlCode : previewCode_variable)
-      const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(updatedDescription)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`
-      const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(updatedDescription)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+          ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
+              merchant || 'temp-merchant'
+            }"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
+              updatedDescription
+            )}"\n data-width="fit-content"\n data-server="${
+              location.protocol
+            }//${
+              location.host
+            }"\n data-multi-use="${multiUse}">${fixedText}</div>`
+          : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
+              merchant || 'temp-merchant'
+            }"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(
+              updatedDescription
+            )}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
+              location.protocol
+            }//${
+              location.host
+            }"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+      setPreviewCode_fixed(
+        paymentType === 'fixed' ? htmlCode : previewCode_fixed
+      )
+      setPreviewCode_variable(
+        paymentType === 'variable' ? htmlCode : previewCode_variable
+      )
+      const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+        updatedDescription
+      )}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`
+      const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+        updatedDescription
+      )}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
       setPreviewFixedHtml(fixedPreviewHtml)
       setPreviewVariableHtml(variablePreviewHtml)
       generatePreviewHtml(paymentType, updatedDescription)
@@ -1299,10 +1801,17 @@ const Create: React.FC = () => {
         localStorage.removeItem(`paymentID_${merchant}`)
         localStorage.removeItem(`idsInitializedbutton_${merchant}`)
         localStorage.removeItem(`idsInitializedpayment_${merchant}`)
-        logWithTimestamp(F, 'handleCopyCode: Cleared localStorage for new ID generation', { merchant })
+        logWithTimestamp(
+          F,
+          'handleCopyCode: Cleared localStorage for new ID generation',
+          { merchant }
+        )
         const newButtonId = generateBase58(12)
         const newPaymentId = generateBase58(12)
-        logWithTimestamp(F, 'handleCopyCode: Attempting to generate new IDs', { newButtonId, newPaymentId })
+        logWithTimestamp(F, 'handleCopyCode: Attempting to generate new IDs', {
+          newButtonId,
+          newPaymentId
+        })
         const buttonResponse = await initializeIds(
           'button',
           wallet,
@@ -1315,7 +1824,9 @@ const Create: React.FC = () => {
           true // Force new ID generation
         )
         if (buttonResponse.status !== 'success') {
-          throw new Error(buttonResponse.message || 'Failed to initialize new button ID')
+          throw new Error(
+            buttonResponse.message || 'Failed to initialize new button ID'
+          )
         }
         const validatedButtonId = buttonResponse.id || newButtonId
         const paymentResponse = await initializeIds(
@@ -1330,7 +1841,9 @@ const Create: React.FC = () => {
           true // Force new ID generation
         )
         if (paymentResponse.status !== 'success') {
-          throw new Error(paymentResponse.message || 'Failed to initialize new payment ID')
+          throw new Error(
+            paymentResponse.message || 'Failed to initialize new payment ID'
+          )
         }
         const validatedPaymentId = paymentResponse.id || newPaymentId
         setIds({ buttonId: validatedButtonId, paymentId: validatedPaymentId })
@@ -1338,21 +1851,41 @@ const Create: React.FC = () => {
         localStorage.setItem(`paymentID_${merchant}`, validatedPaymentId)
         localStorage.setItem(`idsInitializedbutton_${merchant}`, 'true')
         localStorage.setItem(`idsInitializedpayment_${merchant}`, 'true')
-        const newFixedDescription = sanitizeInput(`Payment using paymentId: ${validatedPaymentId}`).slice(0, 80)
-        const newVariableDescription = sanitizeInput(`Payment using paymentId: ${validatedPaymentId}`).slice(0, 80)
+        const newFixedDescription = sanitizeInput(
+          `Payment using paymentId: ${validatedPaymentId}`
+        ).slice(0, 80)
+        const newVariableDescription = sanitizeInput(
+          `Payment using paymentId: ${validatedPaymentId}`
+        ).slice(0, 80)
         setSpendingDescription_fixed(newFixedDescription)
         setSpendingDescription_variable(newVariableDescription)
-        localStorage.setItem(`spendingDescription_fixed_${merchant}`, newFixedDescription)
-        localStorage.setItem(`spendingDescription_variable_${merchant}`, newVariableDescription)
-        logWithTimestamp(F, 'handleCopyCode: Generated new IDs and descriptions for next button:', {
-          validatedButtonId,
-          validatedPaymentId,
-          newFixedDescription,
+        localStorage.setItem(
+          `spendingDescription_fixed_${merchant}`,
+          newFixedDescription
+        )
+        localStorage.setItem(
+          `spendingDescription_variable_${merchant}`,
           newVariableDescription
-        })
+        )
+        logWithTimestamp(
+          F,
+          'handleCopyCode: Generated new IDs and descriptions for next button:',
+          {
+            validatedButtonId,
+            validatedPaymentId,
+            newFixedDescription,
+            newVariableDescription
+          }
+        )
       } catch (err: any) {
-        logWithTimestamp(F, '❌ handleCopyCode: Failed to initialize new IDs for next button:', { error: err.message })
-        toast.error('❌ Failed to initialize new IDs for next button', { autoClose: 5000 })
+        logWithTimestamp(
+          F,
+          '❌ handleCopyCode: Failed to initialize new IDs for next button:',
+          { error: err.message }
+        )
+        toast.error('❌ Failed to initialize new IDs for next button', {
+          autoClose: 5000
+        })
       }
 
       const codeToCopy = `${htmlCode}\n<script src="${location.protocol}//${location.host}/pay.js"></script>`
@@ -1369,10 +1902,18 @@ const Create: React.FC = () => {
       setCopySuccess('success')
       setTimeout(() => setCopySuccess(''), 2000)
       toast.success(
-        `${paymentType === 'fixed' ? 'Fixed' : 'Variable'} button copied to clipboard (${multiUse ? 'Multi Use' : 'Single Use'})`,
+        `${
+          paymentType === 'fixed' ? 'Fixed' : 'Variable'
+        } button copied to clipboard (${
+          multiUse ? 'Multi Use' : 'Single Use'
+        })`,
         { autoClose: 5000 }
       )
-      logWithTimestamp(F, 'handleCopyCode: Copied to clipboard successfully, multiUse:', multiUse)
+      logWithTimestamp(
+        F,
+        'handleCopyCode: Copied to clipboard successfully, multiUse:',
+        multiUse
+      )
     } catch (err: any) {
       setCopySuccess('failed')
       try {
@@ -1386,19 +1927,35 @@ const Create: React.FC = () => {
           })
         })
         if (response.ok) {
-          logWithTimestamp(F, '✅ handleCopyCode: Cleaned up orphaned IDs:', { currentPaymentId, currentButtonId })
+          logWithTimestamp(F, '✅ handleCopyCode: Cleaned up orphaned IDs:', {
+            currentPaymentId,
+            currentButtonId
+          })
         } else {
-          logWithTimestamp(F, '❌ handleCopyCode: Failed to clean up orphaned IDs:', { status: response.status })
+          logWithTimestamp(
+            F,
+            '❌ handleCopyCode: Failed to clean up orphaned IDs:',
+            { status: response.status }
+          )
         }
       } catch (cleanupErr: any) {
-        logWithTimestamp(F, '❌ handleCopyCode: Failed to clean up orphaned IDs:', cleanupErr.message)
+        logWithTimestamp(
+          F,
+          '❌ handleCopyCode: Failed to clean up orphaned IDs:',
+          cleanupErr.message
+        )
       }
       toast.error('❌ Failed to copy code: ' + err.message, { autoClose: 5000 })
-      logWithTimestamp(F, '❌ handleCopyCode: Failed to copy code:', err.message, {
-        error: err.message,
-        stack: err.stack,
-        payload
-      })
+      logWithTimestamp(
+        F,
+        '❌ handleCopyCode: Failed to copy code:',
+        err.message,
+        {
+          error: err.message,
+          stack: err.stack,
+          payload
+        }
+      )
     }
   }
 
@@ -1409,7 +1966,8 @@ const Create: React.FC = () => {
           <CenteredHeader>
             <Typography variant="h2">Create Your Payment Button</Typography>
             <Typography variant="subtitle1">
-              Edit code live in the left panel to update the preview buttons for your site.
+              Edit code live in the left panel to update the preview buttons for
+              your site.
             </Typography>
           </CenteredHeader>
           <Grid container spacing={4}>
@@ -1422,7 +1980,11 @@ const Create: React.FC = () => {
                   <TextFieldStyled
                     label="Button Text"
                     name="buttonText"
-                    value={paymentType === 'fixed' ? buttonText_fixed : buttonText_variable}
+                    value={
+                      paymentType === 'fixed'
+                        ? buttonText_fixed
+                        : buttonText_variable
+                    }
                     onChange={handleButtonTextChange}
                     fullWidth
                   />
@@ -1431,8 +1993,16 @@ const Create: React.FC = () => {
                     onChange={handlePaymentTypeChange}
                     sx={{ display: 'flex', flexDirection: 'row' }}
                   >
-                    <FormControlLabel value="fixed" control={<Radio />} label="Fixed Amount" />
-                    <FormControlLabel value="variable" control={<Radio />} label="Variable Amount" />
+                    <FormControlLabel
+                      value="fixed"
+                      control={<Radio />}
+                      label="Fixed Amount"
+                    />
+                    <FormControlLabel
+                      value="variable"
+                      control={<Radio />}
+                      label="Variable Amount"
+                    />
                   </RadioGroup>
                   {paymentType === 'fixed' && (
                     <TextFieldStyled
@@ -1441,17 +2011,28 @@ const Create: React.FC = () => {
                       onChange={handleFixedSatChange}
                       type="number"
                       fullWidth
-                      InputProps={{ startAdornment: <InputAdornment position="start">sat</InputAdornment> }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">sat</InputAdornment>
+                        )
+                      }}
                     />
                   )}
                   <TextFieldStyled
                     label="Spending Description"
                     name="spendingDescription"
-                    value={paymentType === 'fixed' ? spendingDescription_fixed : spendingDescription_variable}
+                    value={
+                      paymentType === 'fixed'
+                        ? spendingDescription_fixed
+                        : spendingDescription_variable
+                    }
                     onChange={handleButtonTextChange}
                     fullWidth
                   />
-                  <Tooltip title="Set single-use button, leave unchecked for multi-use (default)" arrow>
+                  <Tooltip
+                    title="Set single-use button, leave unchecked for multi-use (default)"
+                    arrow
+                  >
                     <FormControlLabel
                       control={
                         <Checkbox
@@ -1460,7 +2041,10 @@ const Create: React.FC = () => {
                             const value = event.target.checked
                             setIsSingleUse(value)
                             if (merchant) {
-                              localStorage.setItem(`isSingleUse_${merchant}`, value.toString())
+                              localStorage.setItem(
+                                `isSingleUse_${merchant}`,
+                                value.toString()
+                              )
                               const disabledCSS = value
                                 ? `.gateway-paybutton-${paymentType}.disabled {
                   opacity: 0.4;
@@ -1526,7 +2110,13 @@ const Create: React.FC = () => {
                                     ? fixedCSS
                                     : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                                 )
-                                setLastValidCSS_fixed(extractCSS(value ? fixedCSS : `${fixedBaseCSS}\n</style>`))
+                                setLastValidCSS_fixed(
+                                  extractCSS(
+                                    value
+                                      ? fixedCSS
+                                      : `${fixedBaseCSS}\n</style>`
+                                  )
+                                )
                               }
                               if (!validateCSS(extractCSS(variableCSS))) {
                                 logWithTimestamp(
@@ -1544,7 +2134,11 @@ const Create: React.FC = () => {
                                     : `${variableBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                                 )
                                 setLastValidCSS_variable(
-                                  extractCSS(value ? variableCSS : `${variableBaseCSS}\n</style>`)
+                                  extractCSS(
+                                    value
+                                      ? variableCSS
+                                      : `${variableBaseCSS}\n</style>`
+                                  )
                                 )
                               }
                               localStorage.setItem(
@@ -1561,7 +2155,9 @@ const Create: React.FC = () => {
                               )
                               logWithTimestamp(
                                 F,
-                                `handleSingleUseChange: ${value ? 'Added' : 'Removed'} .disabled CSS rule`,
+                                `handleSingleUseChange: ${
+                                  value ? 'Added' : 'Removed'
+                                } .disabled CSS rule`,
                                 {
                                   fixedCSS:
                                     (value
@@ -1575,20 +2171,55 @@ const Create: React.FC = () => {
                                     ).substring(0, 50) + '...'
                                 }
                               )
-                              const fixedText = `${sanitizeInput(buttonText_fixed)} ${fixedSatAmount} Sats`
-                              const variableText = sanitizeInput(buttonText_variable)
+                              const fixedText = `${sanitizeInput(
+                                buttonText_fixed
+                              )} ${fixedSatAmount} Sats`
+                              const variableText =
+                                sanitizeInput(buttonText_variable)
                               const fixedDescription =
-                                spendingDescription_fixed || `Payment using paymentId: ${paymentID}`
+                                spendingDescription_fixed ||
+                                `Payment using paymentId: ${paymentID}`
                               const variableDescription =
-                                spendingDescription_variable || `Payment using paymentId: ${paymentID}`
+                                spendingDescription_variable ||
+                                `Payment using paymentId: ${paymentID}`
                               const fixedPreviewClass = `gateway-paybutton gateway-paybutton-fixed` // No disabled class for preview
                               const variablePreviewClass = `gateway-paybutton gateway-paybutton-variable` // No disabled class for preview
-                              const fixedCodeClass = `gateway-paybutton gateway-paybutton-fixed${value ? ' disabled' : ''}`
-                              const variableCodeClass = `gateway-paybutton gateway-paybutton-variable${value ? ' disabled' : ''}`
-                              const fixedPreviewHtml = `<div class="${fixedPreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(fixedDescription)}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="${!value}">${fixedText}</div>`
-                              const variablePreviewHtml = `<div class="${variablePreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-text="${variableText}" data-description="${sanitizeInput(variableDescription)}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-                              const fixedCode = `<style>\n${extractCSS(value ? fixedCSS : `${fixedBaseCSS}\n</style>`).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${fixedCodeClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(fixedDescription)}"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${!value}">${fixedText}</div>`
-                              const variableCode = `<style>\n${extractCSS(value ? variableCSS : `${variableBaseCSS}\n</style>`).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${variableCodeClass}"\n data-merchant="${merchant || 'temp-merchant'}"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${variableText}"\n data-description="${sanitizeInput(variableDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-server="${location.protocol}//${location.host}"\n data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+                              const fixedCodeClass = `gateway-paybutton gateway-paybutton-fixed${
+                                value ? ' disabled' : ''
+                              }`
+                              const variableCodeClass = `gateway-paybutton gateway-paybutton-variable${
+                                value ? ' disabled' : ''
+                              }`
+                              const fixedPreviewHtml = `<div class="${fixedPreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+                                fixedDescription
+                              )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="${!value}">${fixedText}</div>`
+                              const variablePreviewHtml = `<div class="${variablePreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-text="${variableText}" data-description="${sanitizeInput(
+                                variableDescription
+                              )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+                              const fixedCode = `<style>\n${extractCSS(
+                                value ? fixedCSS : `${fixedBaseCSS}\n</style>`
+                              ).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${fixedCodeClass}"\n data-merchant="${
+                                merchant || 'temp-merchant'
+                              }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
+                                fixedDescription
+                              )}"\n data-width="fit-content"\n data-server="${
+                                location.protocol
+                              }//${
+                                location.host
+                              }"\n data-multi-use="${!value}">${fixedText}</div>`
+                              const variableCode = `<style>\n${extractCSS(
+                                value
+                                  ? variableCSS
+                                  : `${variableBaseCSS}\n</style>`
+                              ).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${variableCodeClass}"\n data-merchant="${
+                                merchant || 'temp-merchant'
+                              }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${variableText}"\n data-description="${sanitizeInput(
+                                variableDescription
+                              )}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
+                                location.protocol
+                              }//${
+                                location.host
+                              }"\n data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
                               setPreviewFixedHtml(fixedPreviewHtml)
                               setPreviewVariableHtml(variablePreviewHtml)
                               setPreviewCode_fixed(fixedCode)
@@ -1596,16 +2227,31 @@ const Create: React.FC = () => {
                               setUpdateCounter(prev => prev + 1)
                               generatePreviewHtml(
                                 paymentType,
-                                paymentType === 'fixed' ? fixedDescription : variableDescription
+                                paymentType === 'fixed'
+                                  ? fixedDescription
+                                  : variableDescription
                               )
-                              logWithTimestamp(F, 'handleSingleUseChange: Updated preview HTML and code block', {
-                                fixedPreviewHtml: fixedPreviewHtml.substring(0, 50) + '...',
-                                variablePreviewHtml: variablePreviewHtml.substring(0, 50) + '...',
-                                fixedCode: fixedCode.substring(0, 50) + '...',
-                                variableCode: variableCode.substring(0, 50) + '...'
-                              })
+                              logWithTimestamp(
+                                F,
+                                'handleSingleUseChange: Updated preview HTML and code block',
+                                {
+                                  fixedPreviewHtml:
+                                    fixedPreviewHtml.substring(0, 50) + '...',
+                                  variablePreviewHtml:
+                                    variablePreviewHtml.substring(0, 50) +
+                                    '...',
+                                  fixedCode: fixedCode.substring(0, 50) + '...',
+                                  variableCode:
+                                    variableCode.substring(0, 50) + '...'
+                                }
+                              )
                             }
-                            toast.info(`Button set to ${value ? 'Single Use' : 'Multi Use'}`, { autoClose: 3000 })
+                            toast.info(
+                              `Button set to ${
+                                value ? 'Single Use' : 'Multi Use'
+                              }`,
+                              { autoClose: 3000 }
+                            )
                             logWithTimestamp(
                               F,
                               'handleSingleUseChange: Updated isSingleUse:',
@@ -1623,7 +2269,10 @@ const Create: React.FC = () => {
                   </Tooltip>
                   <Box sx={{ mt: 2 }}>
                     <Tooltip title="Reset all fields to default values" arrow>
-                      <IconButton onClick={resetAll} sx={{ color: 'primary.light' }}>
+                      <IconButton
+                        onClick={resetAll}
+                        sx={{ color: 'primary.light' }}
+                      >
                         <Typography>Reset</Typography>
                       </IconButton>
                     </Tooltip>
@@ -1635,7 +2284,11 @@ const Create: React.FC = () => {
                   </Typography>
                   <TextFieldStyled
                     label="Custom CSS"
-                    value={paymentType === 'fixed' ? customCSS_fixed : customCSS_variable}
+                    value={
+                      paymentType === 'fixed'
+                        ? customCSS_fixed
+                        : customCSS_variable
+                    }
                     onChange={handleCustomCSSChange}
                     onBlur={handleCustomCSSBlur}
                     fullWidth
@@ -1662,39 +2315,68 @@ const Create: React.FC = () => {
                     onMouseEnter={() => setIsCopyHovered(true)}
                     onMouseLeave={() => setIsCopyHovered(false)}
                   >
-                    <Tooltip title={buttonID && paymentID ? 'Copy Code' : 'Requires both IDs'} arrow>
+                    <Tooltip
+                      title={
+                        buttonID && paymentID
+                          ? 'Copy Code'
+                          : 'Requires both IDs'
+                      }
+                      arrow
+                    >
                       <span>
                         <IconButton
                           onClick={handleCopyCode}
                           disabled={!buttonID || !paymentID}
                           sx={{
-                            ...(isCopyHovered && { opacity: 0.7, transition: 'opacity 0.3s' })
+                            ...(isCopyHovered && {
+                              opacity: 0.7,
+                              transition: 'opacity 0.3s'
+                            })
                           }}
                         >
-                          {copySuccess === 'success' ? <CheckCircleIcon color="success" /> : <ContentCopyIcon />}
+                          {copySuccess === 'success' ? (
+                            <CheckCircleIcon color="success" />
+                          ) : (
+                            <ContentCopyIcon />
+                          )}
                         </IconButton>
                       </span>
                     </Tooltip>
                   </span>
                 </Typography>
-                {typeof copySuccess === 'string' && copySuccess !== '' && copySuccess === 'failed' && (
-                  <Typography color="error">❌ Failed to copy code!</Typography>
-                )}
+                {typeof copySuccess === 'string' &&
+                  copySuccess !== '' &&
+                  copySuccess === 'failed' && (
+                    <Typography color="error">
+                      ❌ Failed to copy code!
+                    </Typography>
+                  )}
                 <Box ref={previewContainerRef}>
                   <Box sx={{ mb: 2 }}>
                     <div
                       key={`preview-${updateCounter}`}
                       dangerouslySetInnerHTML={{
-                        __html: paymentType === 'fixed' ? previewFixedHtml : previewVariableHtml
+                        __html:
+                          paymentType === 'fixed'
+                            ? previewFixedHtml
+                            : previewVariableHtml
                       }}
                     />
                   </Box>
                 </Box>
                 <Box>
                   <CodeSnippet
-                    key={`code-${updateCounter}-${paymentType === 'fixed' ? previewCode_fixed : previewCode_variable}`}
+                    key={`code-${updateCounter}-${
+                      paymentType === 'fixed'
+                        ? previewCode_fixed
+                        : previewCode_variable
+                    }`}
                     language="html"
-                    code={paymentType === 'fixed' ? previewCode_fixed : previewCode_variable}
+                    code={
+                      paymentType === 'fixed'
+                        ? previewCode_fixed
+                        : previewCode_variable
+                    }
                   />
                 </Box>
                 <Typography variant="h3" sx={{ mt: 2, mb: 3 }}>
