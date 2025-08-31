@@ -46,7 +46,7 @@ import { Link } from 'react-router-dom'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { formatId, formatTimeLocal } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
-import { CONFIG } from '../../utils/constants'
+import { CONFIG, DUP_FIELD_PLACEHOLDER } from '../../utils/constants'
 
 const wallet = new WalletClient('json-api', CONFIG.WALLET_ORIGIN)
 const authFetch = new AuthFetch(wallet)
@@ -870,48 +870,49 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
                             timestamp: formatTimeLocal(payment.created_at)
                           })
                           return (
-                            <TableRow
-                              key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}
-                              sx={{ backgroundColor: expandedRowBg }}
-                            >
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {formatTimeLocal(payment.created_at)}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {''}
-                              </TableCell>
-                              <TableCell
-                                sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}
-                                onMouseEnter={() => handleMouseEnter(payment.payment_id, 'Payment Id', 0)}
-                                onMouseLeave={handleMouseLeave}
-                                onClick={() => handleClick(payment.payment_id, 'Payment Id')}
-                              >
-                                {formatId(payment.payment_id)}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {payment.amount ?? '—'}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {'—'}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {'—'}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {payment.completed ? 'Yes' : 'No'}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {'—'}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {payment.description || `Payment using paymentId: ${formatId(payment.payment_id)}`}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {'—'}
-                              </TableCell>
-                            </TableRow>
+<TableRow
+        key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}
+        sx={{ backgroundColor: expandedRowBg }}
+      >
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {formatTimeLocal(payment.created_at)}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {DUP_FIELD_PLACEHOLDER}
+        </TableCell>
+        <TableCell
+          sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}
+          onMouseEnter={() => payment.payment_id !== button.payment_id && handleMouseEnter(payment.payment_id, 'Payment Id', 0)}
+          onMouseLeave={handleMouseLeave}
+          onClick={() => payment.payment_id !== button.payment_id && handleClick(payment.payment_id, 'Payment Id')}
+        >
+          {payment.payment_id === button.payment_id ? DUP_FIELD_PLACEHOLDER : formatId(payment.payment_id)}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {payment.amount ?? DUP_FIELD_PLACEHOLDER}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {DUP_FIELD_PLACEHOLDER}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {DUP_FIELD_PLACEHOLDER}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {payment.completed ? 'Yes' : 'No'}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {DUP_FIELD_PLACEHOLDER}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {payment.payment_id === button.payment_id ? DUP_FIELD_PLACEHOLDER : (payment.description || (payment.payment_id ? `Payment using paymentId: ${formatId(payment.payment_id)}` : DUP_FIELD_PLACEHOLDER))}
+        </TableCell>
+        <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+          {DUP_FIELD_PLACEHOLDER}
+        </TableCell>
+      </TableRow>
                           )
-                        })}
+                        }
+                    )}
                     </React.Fragment>
                   )
                 })}
