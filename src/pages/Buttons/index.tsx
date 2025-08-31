@@ -1,4 +1,3 @@
-// Line 8: Update version and changelog
 /**
  * @file src/pages/Buttons/index.tsx
  *
@@ -6,13 +5,13 @@
  * Each row represents a button, showing ID, amount, currency, and other details.
  * For multi-use buttons, includes a collapsible sub-table of associated payments.
  *
- * Version: v3.103 (Updated 31Aug2025_1830 BST)
+ * Version: v3.111 (Updated 31Aug2025_2100 BST)
  * Change Log:
- * - 31Aug2025_1830 BST (v3.103): Fixed TypeScript error for variable_amount; updated button description to use fallback 'Payment using paymentId: <payment_id>' to match payments sub-table.
- * - 31Aug2025_1305 BST (v3.102): Fixed TypeScript error by correcting variable_amount mapping to boolean in fetchButtons.
- * - 26Aug2025_1430 BST (v3.101): Fixed used field rendering issue; added data-used attribute; enhanced logging for used and API response; added null checks for tableRef; re-verified tableRef binding; addressed 24-line concern.
- * - 26Aug2025_1600 BST (v3.100): Re-verified tableRef declaration; enhanced logging for tableRef, used, and formatTimeLocal; cross-checked used field with database.
- * - 26Aug2025_1545 BST (v3.99): Fixed TypeScript errors for tableRef; corrected tableRect typo in handleMouseLeave.
+ * - 31Aug2025_2100 BST (v3.111): Adjusted tooltip position to account for sub-table height when expanded.
+ * - 31Aug2025_2045 BST (v3.110): Used DUP_FIELD_PLACEHOLDER for Button Id, Payment Id, and Description in sub-table when payment_id matches button.payment_id.
+ * - 31Aug2025_2030 BST (v3.109): Used DUP_FIELD_PLACEHOLDER from consts.ts for Button Id, Payment Id, and Description in sub-table to avoid duplication.
+ * - 31Aug2025_2000 BST (v3.108): Added dash (-) for first payment_id and description in sub-table to avoid duplication with main table.
+ * - 31Aug2025_1930 BST (v3.107): Fixed text color in Description column; added null checks for paymentId; added logging for description; cleared TypeScript cache.
  */
 const F = 'pages/Buttons'
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
@@ -143,6 +142,7 @@ const PaymentButtonsList = () => {
   const [exitDirection, setExitDirection] = useState<string | null>(null)
   const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
+const subTableRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     'Button Id': null,
     'Payment Id': null,
@@ -304,6 +304,24 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
   useEffect(() => {
     setPage(0)
   }, [usedFilter])
+
+  useEffect(() => {
+  if (hoveredValue || clickedValue) {
+    const subTableHeight =
+      expandedButton && subTableRefs.current.length > 0
+        ? subTableRefs.current.reduce((sum, el) => sum + (el?.offsetHeight || 0), 0)
+        : 0
+    logWithTimestamp(F, `Rendering tooltip:`, {
+      hoveredValue,
+      clickedValue,
+      topPosition: tableRef.current
+        ? `${tableRef.current.getBoundingClientRect().bottom + subTableHeight + 10}px`
+        : '0px',
+      subTableHeight,
+      subTableRows: subTableRefs.current.length
+    })
+  }
+}, [hoveredValue, clickedValue, expandedButton])
 
   const requestSort = (
     key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'transaction_id' | 'txid'> | null,
@@ -873,6 +891,7 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
 <TableRow
         key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}
         sx={{ backgroundColor: expandedRowBg }}
+        ref={el => (subTableRefs.current[paymentIndex] = el)}
       >
         <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
           {formatTimeLocal(payment.created_at)}
@@ -962,73 +981,81 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
               <LastPage />
             </IconButton>
           </Box>
-          {(hoveredValue || clickedValue) && tableRef.current && (
-            <Box
-              sx={{
-                position: 'fixed',
-                left: tableRef.current ? `${tableRef.current.getBoundingClientRect().left}px` : '0px',
-                top: tableRef.current ? `${tableRef.current.getBoundingClientRect().bottom + 10}px` : '0px',
-                backgroundColor: theme.palette.background.paper,
-                padding: '4px 8px',
-                borderRadius: '4px',
-                zIndex: 1000,
-                whiteSpace: 'nowrap',
-                display: 'flex',
-                alignItems: 'center',
-                maxWidth: '100%'
-              }}
-            >
-              <Tooltip
-                title={
-                  hoveredValue && exitDirection === 'bottom'
-                    ? 'click to reset'
-                    : clickedValue
-                      ? 'click to reset'
-                      : hoveredValue
-                        ? 'click table field'
-                        : ''
-                }
-              >
-                <Typography
-                  onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
-                  sx={{
-                    marginRight: '8px',
-                    fontFamily: 'monospace',
-                    cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
-                  }}
-                >
-                  {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '')
-                    ? clickedValue
-                    : hoveredValue || clickedValue}
-                </Typography>
-              </Tooltip>
-              {hoveredValue && (
-                <Tooltip title="click table field to enable copy">
-                  <span>
-                    <IconButton size="small" disabled>
-                      <ContentCopyIcon />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              )}
-              {clickedValue && (
-                <Tooltip title="copy field">
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(clickedValue)
-                        .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
-                      setClickedValue(null)
-                      setIsClicked(false)
-                    }}
-                  >
-                    <ContentCopyIcon />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Box>
-          )}
+{(hoveredValue || clickedValue) && tableRef.current && (
+  <Box
+    sx={{
+      position: 'fixed',
+      left: tableRef.current ? `${tableRef.current.getBoundingClientRect().left}px` : '0px',
+      top: tableRef.current
+        ? `${
+            tableRef.current.getBoundingClientRect().bottom +
+            (expandedButton && subTableRefs.current.length > 0
+              ? subTableRefs.current.reduce((sum, el) => sum + (el?.offsetHeight || 0), 0)
+              : 0) +
+            10
+          }px`
+        : '0px',
+      backgroundColor: theme.palette.background.paper,
+      padding: '4px 8px',
+      borderRadius: '4px',
+      zIndex: 1000,
+      whiteSpace: 'nowrap',
+      display: 'flex',
+      alignItems: 'center',
+      maxWidth: '100%'
+    }}
+  >
+    <Tooltip
+      title={
+        hoveredValue && exitDirection === 'bottom'
+          ? 'click to reset'
+          : clickedValue
+            ? 'click to reset'
+            : hoveredValue
+              ? 'click table field'
+              : ''
+      }
+    >
+      <Typography
+        onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
+        sx={{
+          marginRight: '8px',
+          fontFamily: 'monospace',
+          cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
+        }}
+      >
+        {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '')
+          ? clickedValue
+          : hoveredValue || clickedValue}
+      </Typography>
+    </Tooltip>
+    {hoveredValue && (
+      <Tooltip title="click table field to enable copy">
+        <span>
+          <IconButton size="small" disabled>
+            <ContentCopyIcon />
+          </IconButton>
+        </span>
+      </Tooltip>
+    )}
+    {clickedValue && (
+      <Tooltip title="copy field">
+        <IconButton
+          size="small"
+          onClick={() => {
+            navigator.clipboard
+              .writeText(clickedValue)
+              .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+            setClickedValue(null)
+            setIsClicked(false)
+          }}
+        >
+          <ContentCopyIcon />
+        </IconButton>
+      </Tooltip>
+    )}
+  </Box>
+)}
           {showCustomInput && (
             <Box sx={{ mb: 2, textAlign: 'right' }}>
               <TextField
