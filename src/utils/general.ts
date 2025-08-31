@@ -4,14 +4,15 @@
  * This module provides reusable functions for ID generation, formatting, timestamp conversion,
  * HTTP request handling with timeout support, and ID/merchant validation.
  * @author [Your Name]
- * @date 2025-08-17
- * @version 1.10
+ * @date 2025-09-01
+ * @version 1.11
  * Change Log:
+ * - 01Sep2025_0130 BST (v1.11): Updated formatId to handle derivation_prefix and derivation_suffix; added generateRandomHex for derivation_suffix.
  * - 17Aug2025_1625 BST (v1.8): Renamed isIdMatch to getBase58Regex for clarity.
  * - 17Aug2025_1630 BST (v1.9): Added isBase58 function for boolean validation of 12-character Base58 IDs.
  * - 17Aug2025_1640 BST (v1.10): Added isMerchantId for 64-character hex merchant ID validation.
  */
-import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk' // Import WalletClient for typing
+import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
 
 /**
  * Generates a random Base58-encoded string of specified length.
@@ -24,6 +25,21 @@ export function generateBase58(n: number = 12): string {
   for (let i = 0; i < n; i++) {
     const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % 58
     result += base58Alphabet[randomIndex]
+  }
+  return result
+}
+
+/**
+ * Generates a random hex string of specified length.
+ * @param length The number of characters in the output string (default: 12).
+ * @returns A random hex string (e.g., 'a1b2c3d4e5f6').
+ */
+export function generateRandomHex(length: number = 12): string {
+  const hexChars = '0123456789abcdef'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % 16
+    result += hexChars[randomIndex]
   }
   return result
 }
@@ -45,21 +61,22 @@ export function isBase58(id: string): boolean {
   return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}$/.test(id)
 }
 
+/**
+ * Validates a merchant ID as a 64 or 66-character hex string or compressed public key.
+ * @param value The string to validate.
+ * @returns True if valid, false otherwise.
+ */
 export const isMerchantId = (value: string): boolean => {
-  // Check for 64 or 66 characters
   if (![64, 66].includes(value.length)) {
     return false
   }
-  // Check for valid hex string
   const hexRegex = /^[0-9a-fA-F]+$/
   if (!hexRegex.test(value)) {
     return false
   }
-  // If 66 characters, ensure it starts with '02' or '03' (compressed public key)
   if (value.length === 66 && !value.startsWith('02') && !value.startsWith('03')) {
     return false
   }
-  // Validate as secp256k1 public key
   try {
     PublicKey.fromString(value)
     return true
@@ -69,12 +86,12 @@ export const isMerchantId = (value: string): boolean => {
 }
 
 /**
- * Formats an ID (e.g., transaction_id or button_id) as 'first5...last5' with ellipses.
+ * Formats an ID (e.g., derivation_prefix, derivation_suffix, button_id) as 'first4...last4' with ellipses.
  * @param id The full ID string to format.
- * @returns Formatted string (e.g., "abcde...fghij") or the original string if too short.
+ * @returns Formatted string (e.g., "abcd...wxyz") or the original string if too short.
  */
 export function formatId(id: string): string {
-  if (id.length < 10) return id // Fallback for short IDs
+  if (id.length < 8) return id // Fallback for short IDs (e.g., derivation_suffix '1')
   return `${id.slice(0, 4)}...${id.slice(-4)}`
 }
 
@@ -166,6 +183,11 @@ export const fetchWithTimeout = async (
   }
 }
 
+/**
+ * Validates CSS input by checking syntax, balanced parentheses, and color formats.
+ * @param css The CSS string to validate.
+ * @returns True if valid, false otherwise.
+ */
 export const validateCSS = (css: string): boolean => {
   try {
     const rules = css
@@ -182,18 +204,15 @@ export const validateCSS = (css: string): boolean => {
       for (const prop of properties) {
         const [key, value] = prop.split(':').map(part => part.trim())
         if (!key || !value) return false
-        // Allow hex colors of 3+ characters
         if (value.includes('#')) {
           const hexMatch = value.match(/#[0-9a-fA-F]{3,}/g)
           if (!hexMatch) return false
         }
-        // Check for balanced parentheses and valid linear-gradient syntax
         if (value.includes('(')) {
           const openCount = (value.match(/\(/g) || []).length
           const closeCount = (value.match(/\)/g) || []).length
           if (openCount !== closeCount) return false
           if (value.includes('linear-gradient')) {
-            // Ensure linear-gradient ends with ')' and has at least two colors
             if (!value.match(/linear-gradient\s*\([^)]*\)\s*$/)) return false
             const colorMatches = value.match(/#[0-9a-fA-F]{3,}/g)
             if (!colorMatches || colorMatches.length < 2) return false
@@ -207,11 +226,21 @@ export const validateCSS = (css: string): boolean => {
   }
 }
 
+/**
+ * Extracts CSS content from a <style> tag.
+ * @param input The input string containing the CSS.
+ * @returns The extracted CSS or the input trimmed if no style tag is found.
+ */
 export const extractCSS = (input: string): string => {
   const match = input.match(/<style>([\s\S]*?)<\/style>/)
   return match ? match[1].trim() : input.trim()
 }
 
+/**
+ * Sanitizes input by removing angle brackets to prevent injection.
+ * @param input The input string to sanitize.
+ * @returns Sanitized string with angle brackets removed.
+ */
 export const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, '')
 }
