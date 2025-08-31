@@ -34,7 +34,9 @@ interface Payment {
   merchant_id: string
   amount: number
   completed: boolean
-  transaction_id: string // Added to reflect schema
+  derivation_prefix: string
+  derivation_suffix: string
+  //*transaction_id: string
   txid: string | null
 }
 interface RequestBody {
@@ -130,12 +132,13 @@ export default {
         throw new Error('❌ Missing lockingScript in request')
       }
       logWithTimestamp(F, '🔍 [pay] Using client-provided lockingScript:', lockingScript)
-      // Derive expected script and amount using P2PKH with payer_id
+      // BRC29
       const senderPrivateKey: PrivateKey = paymentRec.payer_id
         ? new PrivateKey(paymentRec.payer_id, 'hex')
         : new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex') // Fallback if payer_id is null
       const recipientPublicKey: PublicKey = PublicKey.fromString(paymentRec.merchant_id)
-      const invoiceNumber: string = `2-3241645161d8-${paymentRec.transaction_id} 1` // Use transaction_id from payment
+      const invoiceNumber: string = `2-3241645161d8-${paymentRec.derivation_prefix} ${paymentRec.derivation_suffix}`
+      //*const invoiceNumber: string = `2-3241645161d8-${paymentRec.transaction_id} 1`
       const senderPrivateKeyString: string = senderPrivateKey.toString()
       const recipientPublicKeyString: string = recipientPublicKey.toString()
       const combined: number[] = Utils.toArray(
@@ -241,16 +244,19 @@ export default {
       res.status(200).json(responseData)
       return
     } catch (error: unknown) {
-      const transactionIdForLog = payment && 'transaction_id' in payment ? payment.transaction_id : 'N/A'
+      const transactionIdForLog = payment && 'derivation_prefix' in payment && 'derivation_suffix' in payment ? `${payment.derivation_prefix} ${payment.derivation_suffix}` : 'N/A'
+      //*const transactionIdForLog = payment && 'transaction_id' in payment ? payment.transaction_id : 'N/A'
       logWithTimestamp(F, '❌ [pay] Error processing payment:', {
         message: error instanceof Error ? error.message : '❌ Unknown error',
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
-        transaction_id: transactionIdForLog
+        derivation_prefix: payment?.derivation_prefix,
+        derivation_suffix: payment?.derivation_suffix,
+        //*transaction_id: transactionIdForLog
       })
       res.status(500).json({
         status: 'error',
-        message: `❌ Internal server error: ${error instanceof Error ? error.message : 'Unknown error'} (transaction_id: ${transactionIdForLog})`
+        message: `❌ Internal server error: ${error instanceof Error ? error.message : 'Unknown error'} (derivations: ${transactionIdForLog})`
       })
       return
     }
