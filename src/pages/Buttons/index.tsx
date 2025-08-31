@@ -1,3 +1,4 @@
+// Line 8: Update version and changelog
 /**
  * @file src/pages/Buttons/index.tsx
  *
@@ -5,15 +6,14 @@
  * Each row represents a button, showing ID, amount, currency, and other details.
  * For multi-use buttons, includes a collapsible sub-table of associated payments.
  *
- * Version: v3.102 (Updated 31Aug2025_1305 BST)
+ * Version: v3.103 (Updated 31Aug2025_1830 BST)
  * Change Log:
+ * - 31Aug2025_1830 BST (v3.103): Fixed TypeScript error for variable_amount; updated button description to use fallback 'Payment using paymentId: <payment_id>' to match payments sub-table.
  * - 31Aug2025_1305 BST (v3.102): Fixed TypeScript error by correcting variable_amount mapping to boolean in fetchButtons.
  * - 26Aug2025_1430 BST (v3.101): Fixed used field rendering issue; added data-used attribute; enhanced logging for used and API response; added null checks for tableRef; re-verified tableRef binding; addressed 24-line concern.
  * - 26Aug2025_1600 BST (v3.100): Re-verified tableRef declaration; enhanced logging for tableRef, used, and formatTimeLocal; cross-checked used field with database.
  * - 26Aug2025_1545 BST (v3.99): Fixed TypeScript errors for tableRef; corrected tableRect typo in handleMouseLeave.
- * - 26Aug2025_1530 BST (v3.98): Fixed TypeScript error by removing render_id from Payment interface and sub-table key.
- * ... [Previous changelog entries]
-*/
+ */
 const F = 'pages/Buttons'
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import {
@@ -229,49 +229,57 @@ const PaymentButtonsList = () => {
       const data: ButtonResponse = await response.json()
       logWithTimestamp(F, 'API response:', JSON.stringify(data))
       if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch buttons'}`)
-      const mappedButtons: Button[] = data.data.map((button, index) => {
-        const payments = button.payments
-          ? button.payments.map(payment => ({
-              payment_id: payment.paymentId,
-              transaction_id: payment.transactionId,
-              amount: payment.amount,
-              txid: payment.txid ?? null,
-              completed: !!payment.completed,
-              created_at: payment.createdAt,
-              description: payment.description || `Payment using paymentId: ${formatId(payment.paymentId)}`
-            }))
-          : []
-        logWithTimestamp(F, `Payments for button ${button.buttonId}:`, JSON.stringify(payments))
-        const calculated_total =
-          button.calculated_total !== null && button.calculated_total !== undefined ? button.calculated_total : null
-        logWithTimestamp(F, `Calculated total for button ${button.buttonId}:`, calculated_total)
-        //*const totalPaid = button.totalPaid !== null && button.totalPaid !== undefined ? button.totalPaid : null;
-        logWithTimestamp(F, `Total paid for button ${button.buttonId}:`, calculated_total)
-        logWithTimestamp(
-          F,
-          `Raw used for button ${button.buttonId}:`,
-          button.used,
-          'Mapped used:',
-          !!button.used,
-          'Type:',
-          typeof button.used
-        )
-return {
-  button_id: button.buttonId,
-  amount: button.variableAmount ? 0 : (button.amount ?? 0),
-  description: button.description ?? 'No description',
-  html_code: button.htmlCode ?? '<div>Pay Now</div>',
-  variable_amount: !!button.variableAmount, // Convert numeric to boolean
-  multi_use: !!button.multiUse,
-  used: !!button.used,
-  calculated_total,
-  created_at: button.createdAt,
-  updated_at: button.updatedAt,
-  payment_id: button.paymentId ?? null,
-  payments,
-  render_id: `${button.buttonId}-${Date.now()}-${index}`
-}
-      })
+const mappedButtons: Button[] = data.data.map((button, index) => {
+  const payments = button.payments
+    ? button.payments.map(payment => ({
+        payment_id: payment.paymentId,
+        transaction_id: payment.transactionId,
+        amount: payment.amount,
+        txid: payment.txid ?? null,
+        completed: !!payment.completed,
+        created_at: payment.createdAt,
+        description: payment.description || `Payment using paymentId: ${payment.paymentId ? formatId(payment.paymentId) : ''}`
+      }))
+    : []
+  logWithTimestamp(F, `Payments for button ${button.buttonId}:`, JSON.stringify(payments))
+  const calculated_total =
+    button.calculated_total !== null && button.calculated_total !== undefined ? button.calculated_total : null
+  logWithTimestamp(F, `Calculated total for button ${button.buttonId}:`, calculated_total)
+  logWithTimestamp(F, `Total paid for button ${button.buttonId}:`, calculated_total)
+  logWithTimestamp(
+    F,
+    `Raw used for button ${button.buttonId}:`,
+    button.used,
+    'Mapped used:',
+    !!button.used,
+    'Type:',
+    typeof button.used
+  )
+  logWithTimestamp(
+    F,
+    `Description for button ${button.buttonId}:`,
+    button.description,
+    'PaymentId:',
+    button.paymentId,
+    'Formatted PaymentId:',
+    button.paymentId ? formatId(button.paymentId) : ''
+  )
+  return {
+    button_id: button.buttonId,
+    amount: button.variableAmount ? 0 : (button.amount ?? 0),
+    description: button.description || (button.paymentId ? `Payment using paymentId: ${formatId(button.paymentId)}` : ''),
+    html_code: button.htmlCode ?? '<div>Pay Now</div>',
+    variable_amount: !!button.variableAmount,
+    multi_use: !!button.multiUse,
+    used: !!button.used,
+    calculated_total,
+    created_at: button.createdAt,
+    updated_at: button.updatedAt,
+    payment_id: button.paymentId ?? null,
+    payments,
+    render_id: `${button.buttonId}-${Date.now()}-${index}`
+  }
+});
       logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons))
       setTotalRecords(data.total || mappedButtons.length)
       setButtons(mappedButtons)
@@ -826,14 +834,16 @@ return {
                         >
                           {button.calculated_total !== null ? button.calculated_total : 'N/A'}
                         </TableCell>
-                        <TableCell
-                          sx={{
-                            ...cellStyle,
-                            borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}`
-                          }}
-                        >
-                          {button.description}
-                        </TableCell>
+<TableCell
+  sx={{
+    fontSize: '0.875rem',
+    color: theme.palette.text.primary,
+    padding: '6px 16px',
+    borderBottom: expandedButton === button.button_id ? 0 : `1px solid ${theme.palette.divider}`
+  }}
+>
+  {button.description || (button.payment_id ? `Payment using paymentId: ${formatId(button.payment_id)}` : '')}
+</TableCell>
                         <TableCell
                           onMouseEnter={() => handleMouseEnter(fullHtmlCode, 'HTML Code', index * 2 + 1)}
                           onMouseLeave={handleMouseLeave}
