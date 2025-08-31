@@ -78,7 +78,9 @@ export default {
       .withMessage('description exceeds maximum length of 80 characters')
   ],
   func: async (req: Request, res: Response): Promise<void> => {
-    let transactionIdNew: string = randomBytes(12).toString('hex').slice(0, 12)
+    let derivationPrefix: string = randomBytes(12).toString('hex').slice(0, 12)
+    let derivationSuffix: string = randomBytes(12).toString('hex').slice(0, 12)
+    //*let transactionIdNew: string = randomBytes(12).toString('hex').slice(0, 12)
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
       logWithTimestamp(F, '❌ [invoice] Validation errors:', errors.array())
@@ -163,13 +165,17 @@ export default {
       if (!button.multi_use) {
         logWithTimestamp(F, '🔍 [invoice] Single-use button, using existing payment:', { paymentId, buttonId })
         await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
-          transaction_id: transactionIdNew,
+          derivation_prefix: derivationPrefix,
+          derivation_suffix: derivationSuffix,
+          //*transaction_id: transactionIdNew,
           payer_id: senderIdentityKey,
           updated_at: db.fn.now()
         })
-        logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', {
+        logWithTimestamp(F, '✅ [invoice] [Step 4] Updated derivation and payer_id for existing payment:', {
           paymentId,
-          transactionId: transactionIdNew,
+          derivation_prefix: derivationPrefix,
+          derivation_suffix: derivationSuffix,
+          //*transactionId: transactionIdNew,
           payer_id: senderIdentityKey
         })
       } else {
@@ -179,13 +185,17 @@ export default {
             buttonId
           })
           await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
-            transaction_id: transactionIdNew,
+            derivation_prefix: derivationPrefix,
+            derivation_suffix: derivationSuffix,
+            //*transaction_id: transactionIdNew,
             payer_id: senderIdentityKey,
             updated_at: db.fn.now()
           })
-          logWithTimestamp(F, '✅ [invoice] [Step 4] Updated transaction_id and payer_id for existing payment:', {
+          logWithTimestamp(F, '✅ [invoice] [Step 4] Updated derivation and payer_id for existing payment:', {
             paymentId,
-            transactionId: transactionIdNew,
+            derivation_prefix: derivationPrefix,
+            derivation_suffix: derivationSuffix,
+            //*transactionId: transactionIdNew,
             payer_id: senderIdentityKey
           })
         } else {
@@ -205,7 +215,9 @@ export default {
             description: paymentDescription
           })
           await db('payments').insert({
-            transaction_id: transactionIdNew,
+            derivation_prefix: derivationPrefix,
+            derivation_suffix: derivationSuffix,
+            //*transaction_id: transactionIdNew,
             payment_id: paymentId,
             button_id: buttonId,
             payer_id: senderIdentityKey,
@@ -237,7 +249,7 @@ export default {
         })
         return
       }
-      logWithTimestamp(F, '🔍 [invoice] [Step 6] Generating transaction ID:', transactionIdNew)
+      logWithTimestamp(F, '🔍 [invoice] [Step 6] Generating derivation:', derivationPrefix, derivationSuffix)
       const paymentsSchema = await db('information_schema.columns')
         .where({ table_name: 'payments' })
         .select('column_name')
@@ -245,11 +257,12 @@ export default {
         F,
         '🔍 [invoice] [Step 6] Payments table schema:',
         paymentsSchema.map(col => col.column_name)
-      )
+    )
       // Log existing payments for buttonId
       const existingPayments = await db('payments')
         .where({ button_id: buttonId })
-        .select('transaction_id', 'payment_id')
+        .select('derivation_prefix', 'derivation_suffix', 'payment_id')
+        //*.select('transaction_id', 'payment_id')
       logWithTimestamp(F, '🔍 [invoice] [Step 6] Existing payments for buttonId:', {
         buttonId,
         existingPayments
@@ -269,7 +282,9 @@ export default {
         logWithTimestamp(F, '✅ [invoice] [Step 7] Invoice prepared:', {
           paymentId,
           buttonId,
-          transactionId: transactionIdNew
+          derivationPrefix,
+          derivationSuffix,
+          //*transactionId: transactionIdNew
         })
       } catch (insertError) {
         const errorMessage = insertError instanceof Error ? insertError.message : 'Unknown error'
@@ -277,7 +292,9 @@ export default {
           error: errorMessage,
           stack: insertError instanceof Error ? insertError.stack : 'No stack trace',
           paymentId,
-          transactionId: transactionIdNew
+          derivationPrefix,
+          derivationSuffix,
+          //*transactionId: transactionIdNew
         })
         if (errorMessage.includes('Duplicate entry') && !button.multi_use) {
           await db('payment_buttons')
@@ -308,7 +325,8 @@ export default {
         logWithTimestamp(F, '🔍 [invoice] Using hardcoded key as fallback')
       }
       const recipientPublicKey = PublicKey.fromString(button.merchant_id)
-      const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`
+      const invoiceNumber: string = `2-3241645161d8-${derivationPrefix} ${derivationSuffix}`
+      //*const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`
       const combined = Utils.toArray(
         `${senderPrivateKey.toString()}${recipientPublicKey.toString()}${invoiceNumber}`,
         'utf8'
@@ -326,7 +344,7 @@ export default {
       const outputs = [
         {
           lockingScript: derivedScript,
-          customInstructions: JSON.stringify({ transactionid: transactionIdNew, payee: senderIdentityKey }),
+          customInstructions: JSON.stringify({ derivationPrefix, derivationSuffix, payee: senderIdentityKey }),
           satoshis,
           outputDescription,
           merchantId
@@ -346,7 +364,9 @@ export default {
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
         errorDetails: error,
-        transaction_id: transactionIdNew ? transactionIdNew : 'N/A'
+        derivation_prefix: derivationPrefix,
+        derivation_suffix: derivationSuffix,
+        //*transaction_id: transactionIdNew ? transactionIdNew : 'N/A'
       })
       if (message.includes('Duplicate entry') && !req.body.multi_use) {
         await db('payment_buttons')
@@ -363,7 +383,8 @@ export default {
       }
       res.status(500).json({
         status: 'error',
-        message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`
+        message: `❌ Internal server error: ${message} (derivation_prefix,derivation_suffix: ${derivationPrefix && derivationSuffix} ?? 'N/A'})`
+        //*message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`
       })
     }
   }

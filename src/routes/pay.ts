@@ -244,19 +244,19 @@ export default {
       res.status(200).json(responseData)
       return
     } catch (error: unknown) {
-      const transactionIdForLog = payment && 'derivation_prefix' in payment && 'derivation_suffix' in payment ? `${payment.derivation_prefix} ${payment.derivation_suffix}` : 'N/A'
-      //*const transactionIdForLog = payment && 'transaction_id' in payment ? payment.transaction_id : 'N/A'
+      const derivationForLog = payment && 'derivation_prefix' in payment && 'derivation_suffix' in payment ? `${payment.derivation_prefix} ${payment.derivation_suffix}` : 'N/A'
+      //*const derivationForLog = payment && 'transaction_id' in payment ? payment.transaction_id : 'N/A'
       logWithTimestamp(F, '❌ [pay] Error processing payment:', {
         message: error instanceof Error ? error.message : '❌ Unknown error',
         stack: error instanceof Error ? error.stack : '❌ No stack trace',
         requestBody: req.body,
         derivation_prefix: payment?.derivation_prefix,
         derivation_suffix: payment?.derivation_suffix,
-        //*transaction_id: transactionIdForLog
+        //*transaction_id: derivationForLog
       })
       res.status(500).json({
         status: 'error',
-        message: `❌ Internal server error: ${error instanceof Error ? error.message : 'Unknown error'} (derivations: ${transactionIdForLog})`
+        message: `❌ Internal server error: ${error instanceof Error ? error.message : 'Unknown error'} (derivations: ${derivationForLog})`
       })
       return
     }

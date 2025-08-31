@@ -181,7 +181,9 @@ logWithTimestamp(F, '📊 [listButtons] Query executed', {
         const paymentsQuery = db('payments')
           .select(
             'payment_id as paymentId',
-            'transaction_id as transactionId',
+            'derivation_prefix as derivationPrefix',
+            'derivation_suffix as derivationSuffix',
+            //*'transaction_id as transactionId',
             'amount',
             'txid',
             'completed as completed',
@@ -242,7 +244,9 @@ logWithTimestamp(F, '📊 [listButtons] Query executed', {
         payments: b.payments
           ? b.payments.map((p: any) => ({
               paymentId: p.paymentId,
-              transactionId: p.transactionId,
+              derivationPrefix: p.derivationPrefix,
+              derivationSuffix: p.derivationSuffix,
+              //*transactionId: p.transactionId,
               amount: p.amount,
               txid: p.txid ?? null,
               completed: !!p.completed,
