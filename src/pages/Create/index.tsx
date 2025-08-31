@@ -798,6 +798,9 @@ const Create: React.FC = () => {
           // CPR enable-copy: ensure state even on fallback init
           setButtonID(validButtonID)
           setPaymentID(validPaymentID)
+          // CPR enable-copy: final guarantee UI reflects chosen IDs
+          setButtonID(validButtonID)
+          setPaymentID(validPaymentID)
           setIds({ buttonId: validButtonID, paymentId: validPaymentID })
           logWithTimestamp(
             F,

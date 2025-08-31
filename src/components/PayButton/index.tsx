@@ -635,7 +635,7 @@ const PayButton = ({
           console.log(`[${new Date().toISOString()}] [${F}] 🔍 Updated paymentId to:`, invoice.paymentId)
         }
         let outputsWithSats =
-          invoice.outputs?.map(output => ({ ...output, satoshis: Math.round(output.satoshis) })) || []
+          invoice.outputs?.map(output => ({ ...output, satoshis: output.satoshis })) || []
         if (variable && outputsWithSats.length && outputsWithSats[0].satoshis === 0) {
           outputsWithSats[0].satoshis = effectiveAmount
         }
