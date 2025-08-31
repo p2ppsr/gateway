@@ -5,13 +5,13 @@
  * Each row represents a button, showing ID, amount, currency, and other details.
  * For multi-use buttons, includes a collapsible sub-table of associated payments.
  *
- * Version: v3.111 (Updated 31Aug2025_2100 BST)
+ * Version: v3.113 (Updated 31Aug2025_2130 BST)
  * Change Log:
- * - 31Aug2025_2100 BST (v3.111): Adjusted tooltip position to account for sub-table height when expanded.
+ * - 31Aug2025_2130 BST (v3.113): Fixed tooltip vertical position by clearing subTableRefs and using useLayoutEffect for accurate sub-table height.
+ * - 31Aug2025_2115 BST (v3.112): Fixed TypeScript error by moving tooltip logging to useEffect; improved sub-table height calculation for tooltip positioning.
  * - 31Aug2025_2045 BST (v3.110): Used DUP_FIELD_PLACEHOLDER for Button Id, Payment Id, and Description in sub-table when payment_id matches button.payment_id.
  * - 31Aug2025_2030 BST (v3.109): Used DUP_FIELD_PLACEHOLDER from consts.ts for Button Id, Payment Id, and Description in sub-table to avoid duplication.
  * - 31Aug2025_2000 BST (v3.108): Added dash (-) for first payment_id and description in sub-table to avoid duplication with main table.
- * - 31Aug2025_1930 BST (v3.107): Fixed text color in Description column; added null checks for paymentId; added logging for description; cleared TypeScript cache.
  */
 const F = 'pages/Buttons'
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
@@ -305,7 +305,7 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
     setPage(0)
   }, [usedFilter])
 
-  useEffect(() => {
+useEffect(() => {
   if (hoveredValue || clickedValue) {
     const subTableHeight =
       expandedButton && subTableRefs.current.length > 0
@@ -318,7 +318,8 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
         ? `${tableRef.current.getBoundingClientRect().bottom + subTableHeight + 10}px`
         : '0px',
       subTableHeight,
-      subTableRows: subTableRefs.current.length
+      subTableRows: subTableRefs.current.length,
+      subTableRowHeights: subTableRefs.current.map((el, i) => ({ index: i, height: el?.offsetHeight || 0 }))
     })
   }
 }, [hoveredValue, clickedValue, expandedButton])
@@ -454,6 +455,28 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
     : filteredButtons
 
   const paginatedButtons = sortedButtons.slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+
+  useLayoutEffect(() => {
+  // Clear subTableRefs to prevent duplicates
+  subTableRefs.current = []
+  if (expandedButton && paginatedButtons.length > 0) {
+    paginatedButtons.forEach((button, index) => {
+      if (button.button_id === expandedButton && button.multi_use && button.payments.length > 0) {
+        button.payments.forEach((_, paymentIndex) => {
+          const rowEl = document.querySelector(
+            `tr[data-payment-row="${button.button_id}-${paymentIndex}"]`
+          ) as HTMLTableRowElement | null
+          subTableRefs.current[paymentIndex] = rowEl
+        })
+      }
+    })
+    logWithTimestamp(F, `Updated subTableRefs:`, {
+      expandedButton,
+      subTableRows: subTableRefs.current.length,
+      subTableRowHeights: subTableRefs.current.map((el, i) => ({ index: i, height: el?.offsetHeight || 0 }))
+    })
+  }
+}, [expandedButton, paginatedButtons])
 
   const sortPayments = (payments: Payment[], config: SubTableSortConfig) => {
     if (!config.key) return payments
