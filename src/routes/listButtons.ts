@@ -1,3 +1,4 @@
+// Line 8: Update version and changelog
 /**
  * @file src/routes/listButtons.ts
  *
@@ -5,8 +6,9 @@
  * Retrieves paginated payment buttons from the payment_buttons table, joined with payments,
  * filtered by merchant_id and optional usage/excludeSingleUse parameters.
  *
- * Version: v2.64 (Updated 28Aug2025_0300 BST)
+ * Version: v2.65 (Updated 31Aug2025_1830 BST)
  * Change Log:
+ * - 31Aug2025_1830 BST (v2.65): Confirmed description fallback using 'Payment using paymentId: <payment_id>'.
  * - 28Aug2025_0300 BST (v2.64): Fixed Used computation to rely on completed payments; removed paymentDesc query; kept button_id join.
  * - 28Aug2025_0200 BST (v2.63): Fixed logWithTimestamp syntax error; simplified used computation; removed paymentDesc query; ensured correct button_id join.
  * - 28Aug2025_0130 BST (v2.62): Simplified used computation; removed paymentDesc query; ensured correct button_id join; addressed duplicate entry issue.
@@ -111,6 +113,7 @@ export default {
           'pb.variable_amount as variableAmount',
           'pb.multi_use as multiUse',
           'pb.used as dbUsed',
+          db.raw(`COALESCE(pb.description, CONCAT('Payment using paymentId: ', pb.payment_id)) as "description"`),
           'pb.html_code as htmlCode',
           db.raw(`COALESCE(pa.paidSum, 0) as "calculated_total"`),
           db.raw(`COALESCE(pb.created_at, CURRENT_TIMESTAMP) as "createdAt"`),
@@ -145,13 +148,14 @@ export default {
         .limit(Number(limit))
         .offset(Number(offset))
       logSql('listButtons(final)', preview)
-      const rows = await buttonQuery
-        .orderBy('pb.created_at', sort as 'asc' | 'desc')
-        .limit(Number(limit))
-        .offset(Number(offset))
-      logWithTimestamp(F, '📊 [listButtons] Query executed', {
-        rowCount: rows.length
-      })
+const rows = await buttonQuery
+  .orderBy('pb.created_at', sort as 'asc' | 'desc')
+  .limit(Number(limit))
+  .offset(Number(offset))
+logWithTimestamp(F, '📊 [listButtons] Query executed', {
+  rowCount: rows.length,
+  descriptions: rows.map(row => ({ buttonId: row.buttonId, description: row.description, paymentId: row.paymentId }))
+});
       if (!rows.length) {
         logWithTimestamp(
           F,

@@ -1,55 +1,10 @@
-# Patch file: 0007-fix-button-description-fallback.patch
+diff --git a/src/pages/Buttons/index.tsx b/src/pages/Buttons/index.tsx
 --- a/src/pages/Buttons/index.tsx
 +++ b/src/pages/Buttons/index.tsx
-@@ -4,10 +4,11 @@
-  * Displays a paginated table of payment buttons created by the user.
-  * Each row represents a button, showing ID, amount, currency, and other details.
-  * For multi-use buttons, includes a collapsible sub-table of associated payments.
-  *
-- * Version: v3.102 (Updated 31Aug2025_1305 BST)
-+ * Version: v3.103 (Updated 31Aug2025_1500 BST)
-  * Change Log:
-+ * - 31Aug2025_1500 BST (v3.103): Updated button description to use fallback 'Payment using paymentId: <payment_id>' in main table to match sub-table.
-  * - 31Aug2025_1305 BST (v3.102): Fixed TypeScript error by correcting variable_amount mapping to boolean in fetchButtons.
-  * - 26Aug2025_1430 BST (v3.101): Fixed used field rendering issue; added data-used attribute; enhanced logging for used and API response; added null checks for tableRef; re-verified tableRef binding; addressed 24-line concern.
-  * - 26Aug2025_1600 BST (v3.100): Re-verified tableRef declaration; enhanced logging for tableRef, used, and formatTimeLocal; cross-checked used field with database.
-  * - 26Aug2025_1545 BST (v3.99): Fixed TypeScript errors for tableRef; corrected tableRect typo in handleMouseLeave.
-@@ -246,7 +246,7 @@
-     return {
-       button_id: button.buttonId,
-       amount: button.variableAmount ? 0 : (button.amount ?? 0),
--      description: button.description ?? 'No description',
-+      description: button.description || `Payment using paymentId: ${formatId(button.paymentId)}`,
-       html_code: button.htmlCode ?? '<div>Pay Now</div>',
-       variable_amount: !!button.variableAmount, // Convert numeric to boolean
-       multi_use: !!button.multiUse,
-@@ -804,7 +804,7 @@
-     }}
-   >
--    {button.description}
-+    {button.description || `Payment using paymentId: ${formatId(button.payment_id)}`}
-   </TableCell>
-   <TableCell
+@@ -262,1 +262,1 @@
+-    description: button.description ?? 'No description',
++    description: button.description || `Payment using paymentId: ${formatId(button.paymentId || '')}`,
+@@ -244,2 +244,2 @@
+-                            {button.description}
++                            {button.description || `Payment using paymentId: ${formatId(button.payment_id || '')}`}
 
---- a/src/routes/listButtons.ts
-+++ b/src/routes/listButtons.ts
-@@ -4,10 +4,11 @@
-  * GET route to list payment buttons for a merchant.
-  * Retrieves paginated payment buttons from the payment_buttons table, joined with payments,
-  * filtered by merchant_id and optional usage/excludeSingleUse parameters.
-  *
-- * Version: v2.64 (Updated 28Aug2025_0300 BST)
-+ * Version: v2.65 (Updated 31Aug2025_1500 BST)
-  * Change Log:
-+ * - 31Aug2025_1500 BST (v2.65): Added fallback for button description using 'Payment using paymentId: <payment_id>'.
-  * - 28Aug2025_0300 BST (v2.64): Fixed Used computation to rely on completed payments; removed paymentDesc query; kept button_id join.
-  * - 28Aug2025_0200 BST (v2.63): Fixed logWithTimestamp syntax error; simplified used computation; removed paymentDesc query; ensured correct button_id join.
-  * - 28Aug2025_0130 BST (v2.62): Simplified used computation; removed paymentDesc query; ensured correct button_id join; addressed duplicate entry issue.
-@@ -108,6 +108,7 @@
-     'pb.button_id as buttonId',
-     'pb.payment_id as paymentId',
-     'pb.amount',
-+    db.raw(`COALESCE(pb.description, CONCAT('Payment using paymentId: ', pb.payment_id)) as "description"`),
-     'pb.variable_amount as variableAmount',
-     'pb.multi_use as multiUse',
-     'pb.used as dbUsed',
