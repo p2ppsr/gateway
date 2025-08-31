@@ -47,7 +47,7 @@ fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
   read -r -p "⚠️  Working tree has uncommitted changes. Continue applying ${PATCH_FILE}? [y/N] " ans
-  [[ "${ans,,}" == "y" ]] || die "aborted"
+  [[ "$(echo "$ans" | tr '[:upper:]' '[:lower:]')" == "y" ]] || die "aborted"
 fi
 
 # Try normal apply

@@ -55,6 +55,15 @@ import { fetchWithTimeout } from './utils/general'
 import { WalletClient } from '@bsv/sdk'
 import { CONFIG } from './utils/constants'
 
+// Extra props we accept via data-* that are not part of PayButtonProps,
+// but are used when creating the button on the server.
+type ExtraInjectProps = {
+  description?: string
+  customCSS?: string
+  [key: string]: any
+}
+
+
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN) // Global wallet instance
 // Error normalization helper (safe, typed, no dodgy casts)
 const toError = (e: unknown): Error =>
@@ -115,7 +124,7 @@ const validateIds = async (paymentId: string, buttonId: string, wallet: WalletCl
     return { status: 'error', valid: false }
   }
 }
-const createButton = async (props: Partial<PayButtonProps>, wallet: WalletClient): Promise<void> => {
+const createButton = async (props: Partial<PayButtonProps & ExtraInjectProps>, wallet: WalletClient): Promise<void> => {
   try {
     const response = await fetchWithTimeout(
       `${props.server}/api/createButton`,
@@ -127,8 +136,8 @@ const createButton = async (props: Partial<PayButtonProps>, wallet: WalletClient
           amount: props.variable ? undefined : props.amount,
           variableAmount: props.variable || false,
           multiUse: true,
-          description: props.description || `Payment using paymentId: ${props.paymentId}`,
-          htmlCode: `<style>${props.customCSS || '.gateway-paybutton { background: #8484FA; color: white; }'}</style><div>${props.text || 'Pay'}</div>`,
+          description: (props.description as string) || `Payment using paymentId: ${props.paymentId}`,
+          htmlCode: `<style>${(props.customCSS as string) || '.gateway-paybutton { background: #8484FA; color: white; }'}</style><div>${props.text || 'Pay'}</div>`,
           paymentId: props.paymentId || '',
           buttonId: props.buttonId || '' // Retained for API compatibility, not passed to PayButton
         })
@@ -169,7 +178,7 @@ const bootstrapPayButtons = async (): Promise<void> => {
     const domElementId = `pay-${Math.floor(Math.random() * 100000)}` // Renamed from buttonID for clarity
     button.id = domElementId
     button.setAttribute('id', domElementId)
-    const props: Partial<PayButtonProps> = { amount: 0, merchant: '', server: '', variable: false, paymentId: '' }
+    const props: Partial<PayButtonProps & ExtraInjectProps> = { amount: 0, merchant: '', server: '', variable: false, paymentId: '' }
     logWithTimestamp(F, '🔍 [inject] Initial props:', { ...props }) // Debug initial state
     if (button.hasAttributes()) {
       const attrs = button.attributes
@@ -180,15 +189,15 @@ const bootstrapPayButtons = async (): Promise<void> => {
         logWithTimestamp(F, '🔍 [inject] Processing attribute (raw):', { propName: attrs[j].name, value }) // Log raw attribute name
         if (propName.toLowerCase() === 'paymentid' || propName.toLowerCase() === 'paymentId') {
           propName = 'paymentId' // Force camelCase
-          props[propName] = value // Assign directly, handle invalidity later
+          props.paymentId = value // Assign directly, handle invalidity later
           logWithTimestamp(F, '🔍 [inject] Assigned paymentId:', props[propName]) // Debug final value
         } else if (propName.toLowerCase() === 'buttonid' || propName.toLowerCase() === 'buttonId') {
           propName = 'buttonId' // Force camelCase, handled internally for API
           const isValidBase58 = /^[A-HJ-NP-Za-km-z1-9]{12}$/.test(value) // 12-char Base58 check
-          props[propName] = isValidBase58 ? value : '' // Use only if valid, otherwise empty
+          props.buttonId = isValidBase58 ? value : '' // Use only if valid, otherwise empty
           logWithTimestamp(F, '🔍 [inject] Assigned buttonId:', props[propName]) // Debug final value
         } else if (propName === 'amount') {
-          props[propName] = Number(value)
+          props.amount = Number(value)
         } else {
           propName = propName.replace(/-(.)/g, (_, char) => char.toUpperCase())
           props[propName] = value
