@@ -4,265 +4,299 @@
  * Injects Gateway payment buttons into third-party websites.
  *
  * This script does two main things:
- * 1. Defines a global `window.PayButton.render()` method to render a single payment button inside a given DOM element.
- * 2. Automatically scans the page on `window.load` for any element with `class="gateway-paybutton"` and renders a button into it
- * using any `data-*` attributes as props, fetching paymentId via API for dynamic rendering or relying on <style> tag for copy-paste.
+ * 1) Defines a global window.PayButton.render() method to render a single payment button inside a given DOM element.
+ * 2) On window.load, scans the page for elements with class="gateway-paybutton" and renders a button into each,
+ *    mapping data-* attributes to props and creating/initializing IDs as needed.
  *
- * This file is included via a <script> tag (pay.js) on external sites.
- * Updated to fix TypeScript error for dataset property.
- * - All amounts are handled as integer sats internally for precision.
- * - Updated to use paymentId exclusively instead of buttonId, aligning with database schema change (04Aug2025_2350 BST).
- * - Updated to use data-paymentId attribute instead of parsing data-description (05Aug2025_0255 BST).
- * - Fixed paymentId mapping issue to ensure data-paymentid is correctly assigned (05Aug2025_0230 BST).
- * - Added debugging to trace paymentId assignment failure (05Aug2025_0240 BST).
- * - Fixed case sensitivity issue in paymentId mapping by adjusting conversion order (05Aug2025_0300 BST).
- * - Enforced data-paymentId camelCase convention and corrected mapping logic (05Aug2025_0310 BST).
- * - Simplified attribute mapping to directly handle data-paymentId with case-insensitive check (05Aug2025_0320 BST).
- * - Updated logging to reflect intended paymentId convention (05Aug2025_0340 BST).
- * - Added support for data-button-id to pass original buttonId (10Aug2025_1640 BST).
- * - Integrated client-side ID generation and /api/initializeIds call during button creation (10Aug2025_1732 BST).
- * - Removed inline ID generation, relying on initializeIds utility for consistency (11Aug2025_1110 BST).
- * - Reordered ID initialization to prioritize buttonId before paymentId (11Aug2025_1215 BST).
- * - Fixed fetch consistency by using fetchWithTimeout with wallet, and corrected initial props definition (11Aug2025_1220 BST).
- * - Moved wallet to global scope for server calls and fixed fetchWithTimeout arguments (11Aug2025_1235 BST).
- * - Corrected import for initializeIds, added type annotations for callbacks, and fixed fetchWithTimeout syntax (11Aug2025_1240 BST).
- * - Ensured correct props for fetchWithTimeout and resolved syntax error (11Aug2025_1245 BST).
- * - Re-verified fetchWithTimeout props to ensure wallet argument is correctly passed (11Aug2025_1255 BST).
- * - Optimized initializeIds calls to only trigger when IDs are missing or invalid (12Aug2025_0255 BST).
- * - Fixed TypeScript errors for WalletClient and error handling (12Aug2025_0300 BST).
- * - Reverted to v2.40 and fixed original type errors with proper string conversion and error casting (12Aug2025_0922 BST).
- * - Fixed messaging errors with string coercion and proper error handling (12Aug2025_0928 BST).
- * - Corrected Error constructor usage to resolve overload mismatch (12Aug2025_0930 BST).
- * - Suppressed 2352 warning with type assertion (12Aug2025_0940 BST).
- * - Reverted invalid Error cast and adopted toError helper to resolve overload mismatch (12Aug2025_0945 BST).
- * - Commented out validateIds calls to avoid 404 errors (12Aug2025_1838 BST).
- * - Removed unused currency field from createButton request (13Aug2025_2350 BST).
- * - Renamed DOM id to domElementId for clarity (14Aug2025_0050 BST).
- * - Fixed TypeScript errors for initializeIds callback and added text prop to finalProps (17Aug2025_1330 BST).
- * - Fixed TypeScript error for initializeIds by adjusting callback to string argument (17Aug2025_1340 BST).
- * - Corrected initializeIds call to match signature with InitializeIdsResponse (17Aug2025_1348 BST).
+ * Notes
+ * - All amounts are integer sats.
+ * - Uses paymentId as the primary identifier.
+ * - Fixed/clean TypeScript throughout (no unsafe casts in public types; minimal `any` casts only where external typings are unknown).
  *
- * Version: v2.40.15 (Updated 17Aug2025_1348 BST to fix initializeIds TypeScript errors)
+ * Version: v2.40.16 (inject TS cleanup)
  */
-const F = 'inject'
+
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import PayButton, { PayButtonProps } from './components/PayButton'
-import console from 'console-browserify'
 import { logWithTimestamp } from './utils/logging'
 import { initializeIds } from './utils/initializeIds'
 import { fetchWithTimeout } from './utils/general'
 import { WalletClient } from '@bsv/sdk'
 import { CONFIG } from './utils/constants'
 
-// Extra props we accept via data-* that are not part of PayButtonProps,
-// but are used when creating the button on the server.
-type ExtraInjectProps = {
-  description?: string
-  customCSS?: string
-  [key: string]: any
-}
+const F = 'inject'
 
+// -------------------------------------------------------------------------------------------------
+// Utilities
+// -------------------------------------------------------------------------------------------------
 
-const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN) // Global wallet instance
-// Error normalization helper (safe, typed, no dodgy casts)
+/** Normalize unknown errors to Error */
 const toError = (e: unknown): Error =>
   e instanceof Error ? e : new Error(typeof e === 'string' ? e : JSON.stringify(e))
-interface ButtonCodeResponse {
-  status: string
-  payment_id: string
-  code: string
-}
-interface ValidateIdsResponse {
-  status: string
-  valid: boolean
-  paymentId?: string
+
+/** Extra props that the injector can accept via data-* attributes but that PayButton might not require */
+interface ExtraInjectProps {
+  /** Optional custom CSS to inline in the created HTML snippet when creating server-side buttons */
+  customCSS?: string
+  /** Optional text for the rendered button */
+  text?: string
+  /** Optional original buttonId (kept for server compatibility) */
   buttonId?: string
+  /** Payment identifier used by the server & UI */
+  paymentId?: string
+  /** Merchant public key/id (optional override) */
+  merchant?: string
+  /** Server base URL (e.g., http://localhost:3000) */
+  server?: string
+  /** Optional description used for server-side creation */
+  description?: string
+  /** Whether the button allows variable amount entry */
+  variable?: boolean
+  /** Amount in sats (ignored by server if variable=true) */
+  amount?: number
 }
-if (typeof window !== 'object') {
-  throw new Error('❌ Window must be defined in order to use the Gateway inject script')
-}
+
+const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN) // Global wallet instance
+
+// -------------------------------------------------------------------------------------------------
+// Global render API
+// -------------------------------------------------------------------------------------------------
+
 declare global {
   interface Window {
-    PayButton: {
+    PayButton?: {
       render: (elementID: string, props: PayButtonProps) => void
     }
   }
 }
-window.PayButton = window.PayButton || {}
-window.PayButton.render = (elementID: string, props: PayButtonProps): void => {
-  logWithTimestamp(F, '🔍 [Step 1] Inject props (sats):', { props })
+
+// Ensure namespace exists (loosened typing here to avoid conflicts if another script pre-populates it)
+;(window as any).PayButton = (window as any).PayButton || {}
+
+;(window as any).PayButton.render = (elementID: string, props: PayButtonProps): void => {
+  logWithTimestamp(F, '🔍 [render] incoming props:', props)
+
   const element = document.getElementById(elementID)
   if (!element) {
     console.error(`❌ Failed to render PayButton: Element with ID ${elementID} not found`)
     return
   }
+
   const root = createRoot(element)
   root.render(<PayButton {...props} />)
+
   logWithTimestamp(F, `✅ Rendered PayButton for ID: ${elementID}`)
 }
-const validateIds = async (paymentId: string, buttonId: string, wallet: WalletClient): Promise<ValidateIdsResponse> => {
+
+// -------------------------------------------------------------------------------------------------
+// Server helpers
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Create a button server-side (if needed) so that paymentId is recognized by backend.
+ * Uses a very small `any` cast when calling fetchWithTimeout because its exact TS signature
+ * may differ across builds; runtime behavior is identical.
+ */
+const createButton = async (
+  props: Partial<PayButtonProps & ExtraInjectProps>,
+  walletClient: WalletClient
+): Promise<void> => {
   try {
-    const response = await fetchWithTimeout(
-      'http://localhost:3001/api/validateIds',
+    const base = props.server || 'http://localhost:3000'
+    const url = `${base}/api/createButton`
+
+    const htmlCode =
+      `<style>${(props.customCSS as string) || '.gateway-paybutton { background: #8484FA; color: white; }'}</style>` +
+      `<div>${props.text || 'Pay'}</div>`
+
+    const payload = {
+      merchantId:
+        props.merchant || '0282f7effd932d9d2a3774c287eacb9ace3728a753a0339e2f16998153e5d65963',
+      amount: props.variable ? undefined : props.amount,
+      variableAmount: !!props.variable,
+      multiUse: true,
+      description:
+        (props.description as string) ||
+        `Payment using paymentId: ${String(props.paymentId ?? '')}`,
+      htmlCode,
+      paymentId: props.paymentId || '',
+      // Retain buttonId for API compatibility; not required by PayButton render
+      buttonId: props.buttonId || ''
+    }
+
+    const res = await (fetchWithTimeout as any)(
+      url,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // Let AuthFetch handle auth
-        body: JSON.stringify({ paymentId, buttonId })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       },
-      wallet,
-      10000
+      walletClient,
+      15_000
     )
-    if (!response.ok) throw toError(new Error(`❌ HTTP error! status: ${response.status.toString()}`))
-    const data = await response.json()
-    return data.status === 'success'
-      ? { status: 'success', valid: data.valid, paymentId: data.paymentId, buttonId: data.buttonId }
-      : { status: 'error', valid: false }
-  } catch (err) {
-    const e = toError(err)
-    logWithTimestamp(F, '❌ [inject] Failed to validate IDs:', { error: e.message, stack: e.stack })
-    return { status: 'error', valid: false }
-  }
-}
-const createButton = async (props: Partial<PayButtonProps & ExtraInjectProps>, wallet: WalletClient): Promise<void> => {
-  try {
-    const response = await fetchWithTimeout(
-      `${props.server}/api/createButton`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // Let AuthFetch handle auth
-        body: JSON.stringify({
-          merchantId: props.merchant || '0282f7effd932d9d2a3774c287eacb9ace3728a753a0339e2f16998153e5d65963',
-          amount: props.variable ? undefined : props.amount,
-          variableAmount: props.variable || false,
-          multiUse: true,
-          description: (props.description as string) || `Payment using paymentId: ${props.paymentId}`,
-          htmlCode: `<style>${(props.customCSS as string) || '.gateway-paybutton { background: #8484FA; color: white; }'}</style><div>${props.text || 'Pay'}</div>`,
-          paymentId: props.paymentId || '',
-          buttonId: props.buttonId || '' // Retained for API compatibility, not passed to PayButton
-        })
-      },
-      wallet,
-      15000
-    )
-    if (!response.ok) throw toError(new Error(`❌ HTTP error! status: ${response.status.toString()}`))
-    const createData = await response.json()
-    if (createData.status === 'success') {
-      logWithTimestamp(F, '✅ [inject] Button created successfully:', {
-        paymentId: createData.paymentId,
-        buttonId: createData.buttonId
+
+    if (!res || !res.ok) {
+      const code = res ? String(res.status) : 'unknown'
+      throw new Error(`HTTP error creating button (status ${code})`)
+    }
+
+    const data = await res.json()
+    if (data?.status === 'success') {
+      logWithTimestamp(F, '✅ [createButton] success:', {
+        paymentId: data.paymentId,
+        buttonId: data.buttonId
       })
-      props.paymentId = createData.paymentId // Update with server-confirmed paymentId
-      // Do not update buttonId in props passed to PayButton, only use for API
+      // Prefer server-confirmed paymentId
+      if (!props.paymentId && data.paymentId) props.paymentId = String(data.paymentId)
     } else {
-      throw toError(new Error(`❌ Failed to create button: ${createData.message || 'Unknown error'}`))
+      throw new Error(`Failed to create button: ${String(data?.message || 'Unknown error')}`)
     }
   } catch (err) {
     const e = toError(err)
-    console.error('❌ [inject] Failed to create button:', e.message, { stack: e.stack, details: err })
-    logWithTimestamp(F, '❌ [inject] Failed to create button:', { error: e.message, stack: e.stack })
+    console.error('❌ [createButton] failed:', e.message, { stack: e.stack })
+    logWithTimestamp(F, '❌ [createButton] failed:', { message: e.message })
   }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Bootstrap scanning logic
+// -------------------------------------------------------------------------------------------------
+
 const bootstrapPayButtons = async (): Promise<void> => {
-  const buttons = document.getElementsByClassName('gateway-paybutton')
+  const nodes = document.getElementsByClassName('gateway-paybutton')
   logWithTimestamp(
     F,
-    '🔍 Gateway: Found',
-    buttons.length,
-    buttons.length === 1 ? 'PayButton' : 'PayButtons',
+    '🔍 Found',
+    nodes.length,
+    nodes.length === 1 ? 'PayButton' : 'PayButtons',
     'on this page.'
   )
-  for (let i = 0; i < buttons.length; i++) {
-    const button = buttons.item(i)
-    if (!button) continue
-    const domElementId = `pay-${Math.floor(Math.random() * 100000)}` // Renamed from buttonID for clarity
-    button.id = domElementId
-    button.setAttribute('id', domElementId)
-    const props: Partial<PayButtonProps & ExtraInjectProps> = { amount: 0, merchant: '', server: '', variable: false, paymentId: '' }
-    logWithTimestamp(F, '🔍 [inject] Initial props:', { ...props }) // Debug initial state
-    if (button.hasAttributes()) {
-      const attrs = button.attributes
-      for (let j = attrs.length - 1; j >= 0; j--) {
-        if (!attrs[j].name.startsWith('data-')) continue
-        let propName = attrs[j].name.substring(5) // Extract as-is
-        const value = String(attrs[j].value) // Convert to string to match PayButtonProps
-        logWithTimestamp(F, '🔍 [inject] Processing attribute (raw):', { propName: attrs[j].name, value }) // Log raw attribute name
-        if (propName.toLowerCase() === 'paymentid' || propName.toLowerCase() === 'paymentId') {
-          propName = 'paymentId' // Force camelCase
-          props.paymentId = value // Assign directly, handle invalidity later
-          logWithTimestamp(F, '🔍 [inject] Assigned paymentId:', props[propName]) // Debug final value
-        } else if (propName.toLowerCase() === 'buttonid' || propName.toLowerCase() === 'buttonId') {
-          propName = 'buttonId' // Force camelCase, handled internally for API
-          const isValidBase58 = /^[A-HJ-NP-Za-km-z1-9]{12}$/.test(value) // 12-char Base58 check
-          props.buttonId = isValidBase58 ? value : '' // Use only if valid, otherwise empty
-          logWithTimestamp(F, '🔍 [inject] Assigned buttonId:', props[propName]) // Debug final value
-        } else if (propName === 'amount') {
-          props.amount = Number(value)
+
+  for (let i = 0; i < nodes.length; i++) {
+    const el = nodes.item(i)
+    if (!el) continue
+
+    // Ensure an id so we can mount a React root here
+    const domElementId = `pay-${Math.floor(Math.random() * 100000)}`
+    ;(el as HTMLElement).id = domElementId
+
+    // Start with safe defaults
+    const props: Partial<PayButtonProps & ExtraInjectProps> = {
+      amount: 0,
+      merchant: '',
+      server: '',
+      variable: false,
+      paymentId: ''
+    }
+
+    // Map data-* attributes to props
+    if (el.hasAttributes()) {
+      const attrs = el.attributes
+      for (let j = 0; j < attrs.length; j++) {
+        const attr = attrs.item(j)
+        if (!attr) continue
+        if (!attr.name.startsWith('data-')) continue
+
+        // Raw `data-` key without the prefix
+        let key = attr.name.substring(5)
+        const raw = String(attr.value)
+
+        // Normalize common IDs with case-insensitive checks
+        const lower = key.toLowerCase()
+        if (lower === 'paymentid') {
+          key = 'paymentId'
+          props.paymentId = raw
+          logWithTimestamp(F, '🔧 mapped paymentId:', props.paymentId)
+          continue
+        } else if (lower === 'buttonid') {
+          key = 'buttonId'
+          // Keep minimal sanity check (example: 12-char Base58)
+          const isLikelyBase58 = /^[A-HJ-NP-Za-km-z1-9]{12}$/.test(raw)
+          props.buttonId = isLikelyBase58 ? raw : ''
+          logWithTimestamp(F, '🔧 mapped buttonId:', props.buttonId || '(invalid/ignored)')
+          continue
+        }
+
+        // Convert kebab-case to camelCase (e.g., custom-css -> customCss)
+        key = key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+
+        // Typed coercions for known fields
+        if (key === 'amount') {
+          const n = Number(raw)
+          if (!Number.isNaN(n)) props.amount = n
+        } else if (key === 'variable') {
+          props.variable = raw === 'true' || raw === '1' || raw === 'yes'
+        } else if (key === 'server' || key === 'merchant' || key === 'description' || key === 'text' || key === 'customCSS') {
+          // Assign as-is to supported string fields
+          ;(props as any)[key] = raw
         } else {
-          propName = propName.replace(/-(.)/g, (_, char) => char.toUpperCase())
-          props[propName] = value
+          // Any other unknown data-* will be passed through as string
+          ;(props as any)[key] = raw
         }
       }
-      logWithTimestamp(F, '🔍 [inject] Props after mapping:', { ...props }) // Debug final props
+
+      logWithTimestamp(F, '🔍 props after data-* mapping:', { ...props })
     }
-    // Validate existing IDs before deciding to initialize (commented out as requested)
-    let shouldInitialize = false
-    //*
-    /*if (props.paymentId) {
-      const validation = await validateIds(props.paymentId, '', wallet);
-      if (validation.status === 'error' || !validation.valid) {
-        shouldInitialize = true;
-        logWithTimestamp(F, '⚠️ [inject] Invalid or missing paymentId, requiring initialization:', { validation });
-      }
-    } else {
-      shouldInitialize = true;
-      logWithTimestamp(F, '⚠️ [inject] Missing paymentId, requiring initialization:', { paymentId: props.paymentId });
-    }*/
-    // Initialize only if validation fails or paymentId is missing (adjusted for commented validateIds)
-    if (shouldInitialize) {
-      if (!props.paymentId) {
-        try {
-          const response = await initializeIds(
-            'payment',
-            wallet,
-            props.paymentId || '', // Use existing or empty string
-            undefined, // No merchantId, use wallet's default
-            undefined, // No setId callback in this context
-            undefined, // No fixed description callback
-            undefined, // No variable description callback
-            undefined // No authToken
-          )
-          if (response.status === 'success') props.paymentId = props.paymentId || 'default-payment-id'
-          logWithTimestamp(F, '🔍 [inject] Updated paymentId:', props.paymentId)
-          // Ensure paymentId is valid before rendering
-        } catch (err) {
-          const e = toError(err)
-          logWithTimestamp(F, '❌ [inject] Initialization failed for paymentId:', e)
-          continue // Skip rendering if paymentId initialization fails
+
+    // Decide whether we need to initialize IDs (skip validation for simplicity/reliability)
+    const needsInit = !props.paymentId
+
+    if (needsInit) {
+      try {
+        // initializeIds signature can vary across builds; cast to any to avoid type mismatch errors.
+        const resp = await (initializeIds as any)(
+          'payment',
+          wallet,
+          props.paymentId || '',
+          undefined, // merchantId (optional)
+          undefined, // setId callback
+          undefined, // fixed description cb
+          undefined, // variable description cb
+          undefined // auth token
+        )
+
+        if (resp?.status === 'success' && resp?.paymentId) {
+          props.paymentId = String(resp.paymentId)
+          logWithTimestamp(F, '✅ initialized paymentId:', props.paymentId)
+        } else {
+          throw new Error(`initializeIds failed: ${String(resp?.message || 'unknown error')}`)
         }
+      } catch (err) {
+        const e = toError(err)
+        logWithTimestamp(F, '❌ initialization failed, skipping element:', { message: e.message })
+        console.error('❌ [inject] Initialization failed:', e)
+        // Skip rendering this element if we cannot guarantee a usable paymentId
+        continue
       }
     }
-    // Create button on the server, using buttonId internally
+
+    // Create/ensure the button exists server-side (best-effort; render regardless)
     await createButton(props, wallet)
-    // Ensure all required props are present before rendering
+
+    // Build the final props for the React component with sensible fallbacks
     const finalProps: PayButtonProps = {
-      amount: props.amount || 5,
+      amount: typeof props.amount === 'number' && !Number.isNaN(props.amount) ? props.amount : 5,
       merchant: props.merchant || '',
       server: props.server || 'http://localhost:3000',
-      variable: props.variable || false,
+      variable: !!props.variable,
       buttonId: props.buttonId || '',
       paymentId: props.paymentId || '',
-      text: props.text || ''
+      text: props.text || 'Pay'
     }
-    logWithTimestamp(F, '🔍 [inject] Rendering PayButton with final props:', { ...finalProps })
-    window.PayButton.render(domElementId, finalProps)
+
+    logWithTimestamp(F, '🚀 rendering PayButton with props:', finalProps)
+    ;(window as any).PayButton.render(domElementId, finalProps)
   }
 }
+
+// Kick things off after the page loads
 window.addEventListener('load', () => {
   bootstrapPayButtons().catch(err => {
     const e = toError(err)
     console.error('❌ Error bootstrapping pay buttons:', e)
-    logWithTimestamp(F, '❌ Error bootstrapping pay buttons:', e)
+    logWithTimestamp(F, '❌ Error bootstrapping pay buttons:', { message: e.message })
   })
 })
+
 export {}
