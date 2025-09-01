@@ -114,7 +114,7 @@ export default {
           'pb.variable_amount as variableAmount',
           'pb.multi_use as multiUse',
           'pb.used as dbUsed',
-          db.raw(`COALESCE(pb.description, CONCAT('Payment using paymentId: ', pb.payment_id)) as "description"`),
+          //*db.raw(`COALESCE(pb.description, CONCAT('Payment using paymentId: ', pb.payment_id)) as "description"`),
           'pb.html_code as htmlCode',
           db.raw(`COALESCE(pa.paidSum, 0) as "calculated_total"`),
           db.raw(`COALESCE(pb.created_at, CURRENT_TIMESTAMP) as "createdAt"`),
