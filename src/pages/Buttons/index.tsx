@@ -143,6 +143,9 @@ const PaymentButtonsList = () => {
   const [exitDirection, setExitDirection] = useState<string | null>(null)
   const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(null)
   const tableRef = useRef<HTMLDivElement>(null)
+const hoverTextRef = useRef<HTMLDivElement>(null)
+const [isHoverMultiline, setIsHoverMultiline] = useState(false)
+
 const subTableRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
     'Button Id': null,
@@ -482,6 +485,13 @@ useEffect(() => {
     })
   }
 }, [expandedButton, paginatedButtons])
+
+useLayoutEffect(() => {
+  const el = hoverTextRef.current
+  if (!el) return
+  const lh = parseFloat(getComputedStyle(el).lineHeight || '20')
+  setIsHoverMultiline(el.scrollHeight > lh + 2)
+}, [hoveredValue, clickedValue])
 
   const sortPayments = (payments: Payment[], config: SubTableSortConfig) => {
     if (!config.key) return payments
@@ -967,117 +977,125 @@ useEffect(() => {
             </Table>
           </TableContainer>
 {/* Footer container: preview panel + pagination (no overlap, same width as table) */}
-<Box sx={{ mt: 1, width: '100%' }}>
-  {(hoveredValue || clickedValue) && (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 1,
-        mb: 1,
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 1,
-        whiteSpace: 'pre-wrap',
-        overflowWrap: 'anywhere',
-        wordBreak: 'break-word'
-      }}
-    >
-      <Tooltip
-        title={
-          hoveredValue && exitDirection === 'bottom'
-            ? 'click to reset'
-            : clickedValue
-            ? 'click to reset'
-            : hoveredValue
-            ? 'click table field'
-            : ''
-        }
+<Box sx={{ mt: 1 }}>
+  <Box
+    sx={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 1,
+      flexWrap: 'wrap',                // allows wrap when message becomes multi-line
+      width: '100%'
+    }}
+  >
+    {/* pagination group (stays on the first row) */}
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, ml: 'auto', order: 1 }}>
+      <IconButton onClick={() => setPage(0)} disabled={page === 0} color="inherit" size="small" sx={{ mr: 0.5 }}>
+        <FirstPage />
+      </IconButton>
+      <IconButton onClick={() => setPage(page - 1)} disabled={page === 0} color="inherit" size="small" />
+      <TablePagination
+        component="div"
+        count={filteredButtons.length}
+        page={page}
+        onPageChange={(e, newPage) => {
+          setPage(newPage)
+          logWithTimestamp(F, 'Page changed to:', newPage, 'Rows:', paginatedButtons.length)
+          setHoveredValue(null); setClickedValue(null); setIsClicked(false); setExitDirection(null); setLastClickedColumn(null)
+        }}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={handleRowsPerPageChange}
+        rowsPerPageOptions={rowsPerPageOptions}
+        sx={{ mx: 0, flexShrink: 1 }}
+      />
+      <IconButton
+        onClick={() => setPage(page + 1)}
+        disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
+        color="inherit"
+        size="small"
+      />
+      <IconButton
+        onClick={() => setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)}
+        disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
+        color="inherit"
+        size="small"
+        sx={{ ml: 0.5 }}
       >
-        <Typography
-          onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
-          sx={{
-            fontFamily: 'monospace',
-            flex: 1,
-            cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
-          }}
-        >
-          {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '')
-            ? clickedValue
-            : hoveredValue || clickedValue}
-        </Typography>
-      </Tooltip>
+        <LastPage />
+      </IconButton>
+    </Box>
 
-      {clickedValue ? (
-        <Tooltip title="copy field">
-          <IconButton
-            size="small"
-            onClick={() => {
-              navigator.clipboard
-                .writeText(clickedValue as string)
-                .catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
-              setClickedValue(null)
-              setIsClicked(false)
+    {/* bottom message (shares the row if single-line; full-width below if multi-line) */}
+    {(hoveredValue || clickedValue) && (
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          px: 1,
+          py: 0.5,
+          borderRadius: '4px',
+          bgcolor: theme.palette.background.paper,
+          minWidth: 0,
+          flex: isHoverMultiline ? '1 1 100%' : '1 1 auto', // single-line: share row; multi-line: take full width below
+          order: isHoverMultiline ? 2 : 0                    // multi-line puts it on the next line after pagination
+        }}
+      >
+        <Tooltip
+          title={
+            hoveredValue && exitDirection === 'bottom'
+              ? 'click to reset'
+              : clickedValue
+                ? 'click to reset'
+                : hoveredValue
+                  ? 'click table field'
+                  : ''
+          }
+        >
+          <Typography
+            ref={hoverTextRef}
+            onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
+            sx={{
+              mr: 1,
+              fontFamily: 'monospace',
+              whiteSpace: 'pre-wrap',          // allow multi-line
+              wordBreak: 'break-all',          // prevent overflow
+              cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
             }}
           >
-            <ContentCopyIcon />
-          </IconButton>
+            {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '')
+              ? clickedValue
+              : hoveredValue || clickedValue}
+          </Typography>
         </Tooltip>
-      ) : (
-        <Tooltip title="click table field to enable copy">
-          <span>
-            <IconButton size="small" disabled>
+
+        {hoveredValue && (
+          <Tooltip title="click table field to enable copy">
+            <span>
+              <IconButton size="small" disabled>
+                <ContentCopyIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+
+        {clickedValue && (
+          <Tooltip title="copy field">
+            <IconButton
+              size="small"
+              onClick={() => {
+                navigator.clipboard.writeText(clickedValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+                setClickedValue(null); setIsClicked(false)
+              }}
+            >
               <ContentCopyIcon />
             </IconButton>
-          </span>
-        </Tooltip>
-      )}
-    </Paper>
-  )}
-
-  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, justifyContent: 'flex-end', padding: '4px 0' }}>
-    <IconButton onClick={() => setPage(0)} disabled={page === 0} color="inherit" size="small" sx={{ mr: 0.5 }}>
-      <FirstPage />
-    </IconButton>
-    <IconButton onClick={() => setPage(page - 1)} disabled={page === 0} color="inherit" size="small">
-      {/* Previous */}
-    </IconButton>
-    <TablePagination
-      component="div"
-      count={filteredButtons.length}
-      page={page}
-      onPageChange={(e, newPage) => {
-        setPage(newPage)
-        logWithTimestamp(F, 'Page changed to:', newPage, 'Rows:', paginatedButtons.length)
-        setHoveredValue(null)
-        setClickedValue(null)
-        setIsClicked(false)
-        setExitDirection(null)
-        setLastClickedColumn(null)
-      }}
-      rowsPerPage={rowsPerPage}
-      onRowsPerPageChange={handleRowsPerPageChange}
-      rowsPerPageOptions={rowsPerPageOptions}
-      sx={{ mx: 0, flexShrink: 1 }}
-    />
-    <IconButton
-      onClick={() => setPage(page + 1)}
-      disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
-      color="inherit"
-      size="small"
-    >
-      {/* Next */}
-    </IconButton>
-    <IconButton
-      onClick={() => setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)}
-      disabled={page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1}
-      color="inherit"
-      size="small"
-      sx={{ ml: 0.5 }}
-    >
-      <LastPage />
-    </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+    )}
   </Box>
 </Box>
+
 
           {showCustomInput && (
             <Box sx={{ mb: 2, textAlign: 'right' }}>
