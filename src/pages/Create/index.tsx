@@ -124,20 +124,6 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   )
 }
 
-//* const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
-//   const theme = useTheme()
-//   return (
-//     <SyntaxHighlighter
-//       language={language}
-//       style={theme.palette.mode === 'dark' ? atomDark : oneLight}
-//       showLineNumbers
-//       wrapLines
-//     >
-//       {code.trim()}
-//     </SyntaxHighlighter>
-//   )
-// }
-
 const Create: React.FC = () => {
   const theme = useTheme()
   const copyIconRef = useRef<HTMLSpanElement | null>(null)
@@ -159,8 +145,8 @@ const Create: React.FC = () => {
   const [hasMetanet, setHasMetanet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
   const [customCSS_fixed, setCustomCSS_fixed] =
-    useState<string>(`
-<style>
+    useState<string>(
+`<style>
   .gateway-paybutton-fixed {
     border-radius: 2em;
     border: none;
@@ -189,8 +175,8 @@ const Create: React.FC = () => {
 </style>
 <div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`)
   const [customCSS_variable, setCustomCSS_variable] =
-    useState<string>(`
-<style>
+    useState<string>(
+`<style>
   .gateway-paybutton-variable {
     border-radius: 2em;
     border: none;
@@ -1306,7 +1292,7 @@ ${normalizeCSS(cssToUse)}
       )
       if (type === 'fixed') {
         setCustomCSS_fixed(
-          `<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+          `<style>\n  ${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
         )
         logWithTimestamp(
           F,
@@ -1315,7 +1301,7 @@ ${normalizeCSS(cssToUse)}
         )
       } else {
         setCustomCSS_variable(
-          `<style>${lastValidCSS_variable}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+          `<style>\n  ${lastValidCSS_variable}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
         )
         logWithTimestamp(
           F,
@@ -1490,8 +1476,8 @@ ${normalizeCSS(cssToUse)}
         setPaymentType('fixed')
         setFixedSatAmount('5')
         setIsSingleUse(false)
-        const fixedCSS = `
-<style>
+        const fixedCSS = 
+`<style>
   .gateway-paybutton-fixed {
     border-radius: 2em;
     border: none;
@@ -1512,8 +1498,8 @@ ${normalizeCSS(cssToUse)}
     color: #ffffff;
   }
 </style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
-  const variableCSS = `
-<style>
+  const variableCSS =
+`<style>
   .gateway-paybutton-variable {
     border-radius: 2em;
     border: none;
@@ -2055,8 +2041,8 @@ ${normalizeCSS(cssToUse)}
                   pointer-events: none;
                 }`
                                 : ''
-                              const fixedBaseCSS = `
-<style>
+                              const fixedBaseCSS =
+`<style>
   .gateway-paybutton-fixed {
     border-radius: 2em;
     border: none;
@@ -2076,8 +2062,8 @@ ${normalizeCSS(cssToUse)}
     background: linear-gradient(145deg, #7986cb, #2A2A2E);
     color: #ffffff;
   }`
-                              const variableBaseCSS = `
-<style>
+                              const variableBaseCSS =
+`<style>
   .gateway-paybutton-variable {
     border-radius: 2em;
     border: none;
@@ -2106,7 +2092,7 @@ ${normalizeCSS(cssToUse)}
                                   lastValidCSS_fixed
                                 )
                                 setCustomCSS_fixed(
-                                  `<style>${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+                                  `<style>\n  ${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                                 )
                               } else {
                                 setCustomCSS_fixed(
@@ -2129,7 +2115,7 @@ ${normalizeCSS(cssToUse)}
                                   lastValidCSS_variable
                                 )
                                 setCustomCSS_variable(
-                                  `<style>${lastValidCSS_variable}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+                                  `<style>\n  ${lastValidCSS_variable}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                                 )
                               } else {
                                 setCustomCSS_variable(
