@@ -652,7 +652,7 @@ const PaymentsList = () => {
                       }}
                       onClick={() => requestSort('amount')}
                     >
-                      Amount
+                      Sats
                       {sortConfig.key === 'amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </Typography>
                   </TableCell>
