@@ -1292,7 +1292,7 @@ ${normalizeCSS(cssToUse)}
       )
       if (type === 'fixed') {
         setCustomCSS_fixed(
-          `<style>\n  ${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+          `<style>\n  ${lastValidCSS_fixed}</style>\n<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
         )
         logWithTimestamp(
           F,
@@ -1301,7 +1301,7 @@ ${normalizeCSS(cssToUse)}
         )
       } else {
         setCustomCSS_variable(
-          `<style>\n  ${lastValidCSS_variable}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+          `<style>\n  ${lastValidCSS_variable}</style>\n<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
         )
         logWithTimestamp(
           F,
@@ -1497,7 +1497,8 @@ ${normalizeCSS(cssToUse)}
     background: linear-gradient(145deg, #7986cb, #2A2A2E);
     color: #ffffff;
   }
-</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+</style>
+<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
   const variableCSS =
 `<style>
   .gateway-paybutton-variable {
@@ -2083,8 +2084,8 @@ ${normalizeCSS(cssToUse)}
     background: linear-gradient(145deg, #7986cb, #1C1C1F);
     color: #ffffff;
   }`
-                              const fixedCSS = `${fixedBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
-                              const variableCSS = `${variableBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+                              const fixedCSS = `${fixedBaseCSS}\n${disabledCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+                              const variableCSS = `${variableBaseCSS}\n${disabledCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                               if (!validateCSS(extractCSS(fixedCSS))) {
                                 logWithTimestamp(
                                   F,
@@ -2092,13 +2093,13 @@ ${normalizeCSS(cssToUse)}
                                   lastValidCSS_fixed
                                 )
                                 setCustomCSS_fixed(
-                                  `<style>\n  ${lastValidCSS_fixed}</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+                                  `<style>\n  ${lastValidCSS_fixed}</style>\n<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                                 )
                               } else {
                                 setCustomCSS_fixed(
                                   value
                                     ? fixedCSS
-                                    : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+                                    : `${fixedBaseCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                                 )
                                 setLastValidCSS_fixed(
                                   extractCSS(
@@ -2115,13 +2116,13 @@ ${normalizeCSS(cssToUse)}
                                   lastValidCSS_variable
                                 )
                                 setCustomCSS_variable(
-                                  `<style>\n  ${lastValidCSS_variable}</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+                                  `<style>\n  ${lastValidCSS_variable}</style>\n<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                                 )
                               } else {
                                 setCustomCSS_variable(
                                   value
                                     ? variableCSS
-                                    : `${variableBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+                                    : `${variableBaseCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                                 )
                                 setLastValidCSS_variable(
                                   extractCSS(
@@ -2135,13 +2136,13 @@ ${normalizeCSS(cssToUse)}
                                 `customCSS_fixed_${merchant}`,
                                 value
                                   ? fixedCSS
-                                  : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+                                  : `${fixedBaseCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                               )
                               localStorage.setItem(
                                 `customCSS_variable_${merchant}`,
                                 value
                                   ? variableCSS
-                                  : `${variableBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+                                  : `${variableBaseCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                               )
                               logWithTimestamp(
                                 F,
@@ -2152,12 +2153,12 @@ ${normalizeCSS(cssToUse)}
                                   fixedCSS:
                                     (value
                                       ? fixedCSS
-                                      : `${fixedBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+                                      : `${fixedBaseCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                                     ).substring(0, 50) + '...',
                                   variableCSS:
                                     (value
                                       ? variableCSS
-                                      : `${variableBaseCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+                                      : `${variableBaseCSS}\n</style>\n<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                                     ).substring(0, 50) + '...'
                                 }
                               )
