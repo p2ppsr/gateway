@@ -976,7 +976,7 @@ useLayoutEffect(() => {
               </TableBody>
             </Table>
           </TableContainer>
-{/* Footer container: preview panel + pagination (no overlap, same width as table) */}
+{/* Footer container: preview panel + pagination (no overlap, same width as table, payment link) */}
 <Box sx={{ mt: 1 }}>
   <Box
     sx={{
@@ -984,7 +984,7 @@ useLayoutEffect(() => {
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 1,
-      flexWrap: 'wrap',                // allows wrap when message becomes multi-line
+      flexWrap: 'wrap',
       width: '100%'
     }}
   >
@@ -1028,6 +1028,7 @@ useLayoutEffect(() => {
     {/* bottom message (shares the row if single-line; full-width below if multi-line) */}
     {(hoveredValue || clickedValue) && (
       <Box
+        onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined} // NEW: click anywhere to reset
         sx={{
           display: 'flex',
           alignItems: 'center',
@@ -1036,8 +1037,9 @@ useLayoutEffect(() => {
           borderRadius: '4px',
           bgcolor: theme.palette.background.paper,
           minWidth: 0,
-          flex: isHoverMultiline ? '1 1 100%' : '1 1 auto', // single-line: share row; multi-line: take full width below
-          order: isHoverMultiline ? 2 : 0                    // multi-line puts it on the next line after pagination
+          flex: isHoverMultiline ? '1 1 100%' : '1 1 auto',
+          order: isHoverMultiline ? 2 : 0,
+          cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default' // NEW: pointer when resettable
         }}
       >
         <Tooltip
@@ -1053,18 +1055,26 @@ useLayoutEffect(() => {
         >
           <Typography
             ref={hoverTextRef}
-            onClick={(hoveredValue && exitDirection === 'bottom') || clickedValue ? handleReset : undefined}
             sx={{
               mr: 1,
               fontFamily: 'monospace',
-              whiteSpace: 'pre-wrap',          // allow multi-line
-              wordBreak: 'break-all',          // prevent overflow
-              cursor: (hoveredValue && exitDirection === 'bottom') || clickedValue ? 'pointer' : 'default'
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all'
             }}
           >
-            {clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || '')
-              ? clickedValue
-              : hoveredValue || clickedValue}
+            {(clickedValue && lastClickedColumn === 'Payment Id') ? ( // NEW: make Payment Id a link after click
+              <Link
+                to={`/payments?paymentId=${encodeURIComponent(String(clickedValue))}`}
+                onClick={(e) => e.stopPropagation()} // don't reset when following the link
+                style={{ textDecoration: 'underline' }}
+              >
+                {clickedValue}
+              </Link>
+            ) : (
+              (clickedValue && ['Button Id', 'Payment Id', 'HTML Code'].includes(lastClickedColumn || ''))
+                ? clickedValue
+                : (hoveredValue || clickedValue)
+            )}
           </Typography>
         </Tooltip>
 
@@ -1082,8 +1092,11 @@ useLayoutEffect(() => {
           <Tooltip title="copy field">
             <IconButton
               size="small"
-              onClick={() => {
-                navigator.clipboard.writeText(clickedValue).catch(err => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+              onClick={(e) => {
+                e.stopPropagation() // NEW: don't reset before copying
+                navigator.clipboard.writeText(String(clickedValue)).catch(err =>
+                  logWithTimestamp(F, 'Failed to copy to clipboard:', err)
+                )
                 setClickedValue(null); setIsClicked(false)
               }}
             >
@@ -1095,7 +1108,6 @@ useLayoutEffect(() => {
     )}
   </Box>
 </Box>
-
 
           {showCustomInput && (
             <Box sx={{ mb: 2, textAlign: 'right' }}>

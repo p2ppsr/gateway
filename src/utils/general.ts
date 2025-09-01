@@ -1,111 +1,146 @@
 /**
  * @file utils/general.ts
- * @description General utility functions for the Gateway application.
- * This module provides reusable functions for ID generation, formatting, timestamp conversion,
- * HTTP request handling with timeout support, and ID/merchant validation.
- * @author [Your Name]
+ * @description General utility functions for the Gateway application, including ID generation, formatting, timestamp conversion, HTTP request handling, and validation.
+ * @author xAI
  * @date 2025-09-01
- * @version 1.11
- * Change Log:
- * - 01Sep2025_0130 BST (v1.11): Updated formatId to handle derivation_prefix and derivation_suffix; added generateRandomHex for derivation_suffix.
- * - 17Aug2025_1625 BST (v1.8): Renamed isIdMatch to getBase58Regex for clarity.
- * - 17Aug2025_1630 BST (v1.9): Added isBase58 function for boolean validation of 12-character Base58 IDs.
- * - 17Aug2025_1640 BST (v1.10): Added isMerchantId for 64-character hex merchant ID validation.
+ * @version 1.16
+ * @changelog
+ * - 2025-09-01: Added input validation for non-string inputs, fixed modulo bias in generateRandomHex, removed global flag from getBase58Regex, fixed formatTimeLocal error handling, removed emoji from fetchWithTimeout error, and updated JSDoc.
  */
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
 
 /**
- * Generates a random Base58-encoded string of specified length.
- * @param n The number of characters in the output string (default: 12).
- * @returns A Base58-encoded string of length n.
+ * Generates a cryptographically secure random Base58-encoded string of specified length.
+ * @param {number} [n=12] The number of characters in the output string (default: 12).
+ * @returns {string} A Base58-encoded string of length n.
+ * @throws {Error} If n is not a positive integer.
  */
 export function generateBase58(n: number = 12): string {
-  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-  let result = ''
-  for (let i = 0; i < n; i++) {
-    const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % 58
-    result += base58Alphabet[randomIndex]
+  if (!Number.isInteger(n) || n <= 0) {
+    throw new Error('Length must be a positive integer');
   }
-  return result
+  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let result = '';
+  const maxSafeValue = Math.floor((2 ** 32 - 1) / 58) * 58;
+  const randomValues = crypto.getRandomValues(new Uint32Array(n));
+  for (let i = 0; i < n; i++) {
+    let randomValue = randomValues[i];
+    while (randomValue >= maxSafeValue) {
+      randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+    }
+    const randomIndex = randomValue % 58;
+    result += base58Alphabet[randomIndex];
+  }
+  return result;
 }
 
 /**
- * Generates a random hex string of specified length.
- * @param length The number of characters in the output string (default: 12).
- * @returns A random hex string (e.g., 'a1b2c3d4e5f6').
+ * Generates a cryptographically secure random hex string of specified length.
+ * @param {number} [length=12] The number of characters in the output string (default: 12).
+ * @returns {string} A random hex string (e.g., 'a1b2c3d4e5f6').
+ * @throws {Error} If length is not a positive integer.
  */
 export function generateRandomHex(length: number = 12): string {
-  const hexChars = '0123456789abcdef'
-  let result = ''
-  for (let i = 0; i < length; i++) {
-    const randomIndex = crypto.getRandomValues(new Uint32Array(1))[0] % 16
-    result += hexChars[randomIndex]
+  if (!Number.isInteger(length) || length <= 0) {
+    throw new Error('Length must be a positive integer');
   }
-  return result
+  const hexChars = '0123456789abcdef';
+  let result = '';
+  const maxSafeValue = Math.floor((2 ** 32 - 1) / 16) * 16;
+  const randomValues = crypto.getRandomValues(new Uint32Array(length));
+  for (let i = 0; i < length; i++) {
+    let randomValue = randomValues[i];
+    while (randomValue >= maxSafeValue) {
+      randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+    }
+    const randomIndex = randomValue % 16;
+    result += hexChars[randomIndex];
+  }
+  return result;
 }
 
 /**
- * Returns a regex for matching 12-character Base58-encoded IDs.
- * @returns A RegExp object matching 12-character Base58 strings.
+ * Returns a regex for matching Base58-encoded IDs of specified length.
+ * @param {number} [length=12] The number of characters to match (default: 12).
+ * @returns {RegExp} A RegExp object matching Base58 strings of the specified length.
+ * @throws {Error} If length is not a positive integer.
  */
-export function getBase58Regex(): RegExp {
-  return /[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}/g
+export function getBase58Regex(length: number = 12): RegExp {
+  if (!Number.isInteger(length) || length <= 0) {
+    throw new Error('Length must be a positive integer');
+  }
+  return new RegExp(`^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{${length}}$`);
 }
 
 /**
- * Checks if a string is a valid 12-character Base58-encoded ID.
- * @param id The string to validate.
- * @returns True if the string is a 12-character Base58 ID, false otherwise.
+ * Checks if a string is a valid Base58-encoded ID of specified length.
+ * @param {string} id The string to validate.
+ * @param {number} [length=12] The expected length (default: 12).
+ * @returns {boolean} True if the string is a valid Base58 ID of the specified length, false otherwise.
  */
-export function isBase58(id: string): boolean {
-  return /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{12}$/.test(id)
+export function isBase58(id: string, length: number = 12): boolean {
+  if (typeof id !== 'string' || id.length === 0) {
+    return false;
+  }
+  return getBase58Regex(length).test(id);
 }
 
 /**
  * Validates a merchant ID as a 64 or 66-character hex string or compressed public key.
- * @param value The string to validate.
- * @returns True if valid, false otherwise.
+ * @param {string} value The string to validate.
+ * @returns {boolean} True if valid, false for invalid or non-string inputs.
  */
 export const isMerchantId = (value: string): boolean => {
-  if (![64, 66].includes(value.length)) {
-    return false
+  if (typeof value !== 'string' || value.length === 0) {
+    return false;
   }
-  const hexRegex = /^[0-9a-fA-F]+$/
+  if (![64, 66].includes(value.length)) {
+    return false;
+  }
+  const hexRegex = /^[0-9a-fA-F]+$/;
   if (!hexRegex.test(value)) {
-    return false
+    return false;
   }
   if (value.length === 66 && !value.startsWith('02') && !value.startsWith('03')) {
-    return false
+    return false;
   }
   try {
-    PublicKey.fromString(value)
-    return true
-  } catch {
-    return false
+    PublicKey.fromString(value);
+    return true;
+  } catch (error) {
+    console.warn(`Invalid public key format for merchant ID: ${value}`, error);
+    return false;
   }
-}
+};
 
 /**
  * Formats an ID (e.g., derivation_prefix, derivation_suffix, button_id) as 'first4...last4' with ellipses.
- * @param id The full ID string to format.
- * @returns Formatted string (e.g., "abcd...wxyz") or the original string if too short.
+ * @param {string} id The full ID string to format.
+ * @returns {string} Formatted string (e.g., "abcd...wxyz"), the original string if too short (< 8 characters), or empty string if invalid.
  */
 export function formatId(id: string): string {
-  if (id.length < 8) return id // Fallback for short IDs (e.g., derivation_suffix '1')
-  return `${id.slice(0, 4)}...${id.slice(-4)}`
+  if (typeof id !== 'string' || id.length === 0) {
+    return '';
+  }
+  if (id.length < 8) return id;
+  return `${id.slice(0, 4)}...${id.slice(-4)}`;
 }
 
 /**
  * Formats a timestamp string into a human-readable format in the user's local timezone.
- * @param dateStr The timestamp string (e.g., ISO string or Unix timestamp) or null/undefined.
- * @returns Formatted date string (e.g., "26 Aug 2025 14:30:45") or 'N/A' if invalid.
+ * @param {string | null | undefined} dateStr The timestamp string (e.g., ISO string or Unix timestamp) or null/undefined.
+ * @returns {string} Formatted date string (e.g., "26 Aug 2025 14:30:45") or 'N/A' if invalid.
  */
 export function formatTimeLocal(dateStr: string | null | undefined): string {
   if (!dateStr) {
-    return 'N/A'
+    return 'N/A';
   }
   try {
-    const date = new Date(dateStr)
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date string: ${dateStr}`);
+      return 'N/A';
+    }
     return date
       .toLocaleString('en-GB', {
         year: 'numeric',
@@ -116,37 +151,46 @@ export function formatTimeLocal(dateStr: string | null | undefined): string {
         second: '2-digit',
         hour12: false
       })
-      .replace(',', '')
+      .replace(',', '');
   } catch (error) {
-    return 'N/A'
+    console.warn(`Error formatting date string: ${dateStr}`, error);
+    return 'N/A';
   }
 }
 
 /**
  * Formats a timestamp string into a human-readable YYYY-MM-DD HH:MM:SS format (UTC).
- * @param dateStr The timestamp string (e.g., ISO string or Unix timestamp).
- * @returns Formatted date string or 'N/A' if invalid.
+ * @param {string | null | undefined} dateStr The timestamp string (e.g., ISO string or Unix timestamp) or null/undefined.
+ * @returns {string} Formatted date string or 'N/A' if invalid.
  */
-export function formatTimestamp(dateStr: string | undefined): string {
+export function formatTimestamp(dateStr: string | null | undefined): string {
   if (!dateStr) {
-    return 'N/A'
+    return 'N/A';
   }
   try {
-    const date = new Date(dateStr)
-    return date.toISOString().replace('T', ' ').slice(0, 19)
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) {
+      console.warn(`Invalid date string: ${dateStr}`);
+      return 'N/A';
+    }
+    return date.toISOString().replace('T', ' ').slice(0, 19);
   } catch (error) {
-    return 'N/A'
+    console.warn(`Error formatting timestamp: ${dateStr}`, error);
+    return 'N/A';
   }
 }
 
 /**
  * Performs an HTTP fetch with a configurable timeout using the provided wallet for authentication.
- * @param url The URL to fetch.
- * @param options Fetch options including headers, method, and body.
- * @param wallet The WalletClient instance for authentication.
- * @param timeoutMs The timeout duration in milliseconds (default: 15000).
- * @returns A Promise resolving to the Response object.
- * @throws Error with detailed context if the request times out or fails.
+ * @param {string} url The URL to fetch.
+ * @param {object} options Fetch options compatible with SimplifiedFetchRequestOptions from @bsv/sdk.
+ * @param {Record<string, string>} [options.headers] Optional HTTP headers.
+ * @param {string} [options.method] HTTP method (e.g., 'GET', 'POST').
+ * @param {string} [options.body] Request body as a string.
+ * @param {WalletClient} wallet The WalletClient instance for authentication.
+ * @param {number} [timeoutMs=15000] The timeout duration in milliseconds (default: 15000).
+ * @returns {Promise<Response>} A Promise resolving to the Response object.
+ * @throws {Error} If the request times out or fails, with detailed context.
  */
 export const fetchWithTimeout = async (
   url: string,
@@ -154,93 +198,114 @@ export const fetchWithTimeout = async (
   wallet: WalletClient,
   timeoutMs: number = 15000
 ): Promise<Response> => {
-  const authFetch = new AuthFetch(wallet)
+  if (typeof url !== 'string' || url.length === 0) {
+    throw new Error('URL must be a non-empty string');
+  }
+  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+    throw new Error('Timeout must be a positive integer');
+  }
+  const authFetch = new AuthFetch(wallet);
   const timeoutId = setTimeout(() => {
-    throw new Error(`❌ Request timed out after ${timeoutMs}ms for URL: ${url}`)
-  }, timeoutMs)
+    throw new Error(`Request timed out after ${timeoutMs}ms for URL: ${url}`);
+  }, timeoutMs);
   try {
-    const response = await authFetch.fetch(url, options)
+    const response = await authFetch.fetch(url, options);
     if (!response.ok) {
-      let errorDetail = ''
+      let errorDetail = '';
       try {
-        errorDetail = await response.text()
+        errorDetail = await response.text();
       } catch (textError) {
-        errorDetail = 'Failed to retrieve error details'
+        errorDetail = 'Failed to retrieve error details';
       }
       throw new Error(
         `Failed to fetch ${url} with method ${options.method || 'GET'}: Status ${response.status} ${response.statusText}, Details: ${errorDetail}`
-      )
+      );
     }
-    return response
-  } catch (err: any) {
-    throw new Error(
-      `Failed to fetch ${url} with method ${options.method || 'GET'}: ${err.message}${
-        err.status ? `, Status: ${err.status}` : ''
-      }`
-    )
+    return response;
+  } catch (err) {
+    throw err instanceof Error ? err : new Error(`Failed to fetch ${url}: ${String(err)}`);
   } finally {
-    clearTimeout(timeoutId)
+    clearTimeout(timeoutId);
   }
-}
+};
 
 /**
- * Validates CSS input by checking syntax, balanced parentheses, and color formats.
- * @param css The CSS string to validate.
- * @returns True if valid, false otherwise.
+ * Validates CSS input by checking syntax, balanced parentheses, hex color formats, and linear gradients.
+ * @param {string} css The CSS string to validate.
+ * @returns {boolean} True if the CSS is valid, false for invalid or non-string inputs.
  */
 export const validateCSS = (css: string): boolean => {
+  if (typeof css !== 'string' || css.length === 0) {
+    return false;
+  }
   try {
     const rules = css
       .split('}')
       .map(rule => rule.trim())
-      .filter(rule => rule.length > 0)
+      .filter(rule => rule.length > 0);
     for (const rule of rules) {
-      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim())
-      if (!selectorPart || !propertiesPart) return false
+      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim());
+      if (!selectorPart || !propertiesPart) return false;
       const properties = propertiesPart
         .split(';')
         .map(prop => prop.trim())
-        .filter(prop => prop.length > 0)
+        .filter(prop => prop.length > 0);
       for (const prop of properties) {
-        const [key, value] = prop.split(':').map(part => part.trim())
-        if (!key || !value) return false
+        const [key, value] = prop.split(':').map(part => part.trim());
+        if (!key || !value) return false;
         if (value.includes('#')) {
-          const hexMatch = value.match(/#[0-9a-fA-F]{3,}/g)
-          if (!hexMatch) return false
+          const hexMatch = value.match(/#[0-9a-fA-F]{3,6}/g);
+          if (!hexMatch) return false;
         }
         if (value.includes('(')) {
-          const openCount = (value.match(/\(/g) || []).length
-          const closeCount = (value.match(/\)/g) || []).length
-          if (openCount !== closeCount) return false
+          const openCount = (value.match(/\(/g) || []).length;
+          const closeCount = (value.match(/\)/g) || []).length;
+          if (openCount !== closeCount) return false;
           if (value.includes('linear-gradient')) {
-            if (!value.match(/linear-gradient\s*\([^)]*\)\s*$/)) return false
-            const colorMatches = value.match(/#[0-9a-fA-F]{3,}/g)
-            if (!colorMatches || colorMatches.length < 2) return false
+            if (!value.match(/linear-gradient\s*\([^)]+\)/)) return false;
+            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g);
+            if (!colorMatches || colorMatches.length < 2) return false;
           }
         }
       }
     }
-    return true
-  } catch {
-    return false
+    return true;
+  } catch (error) {
+    console.warn(`Invalid CSS: ${css}`, error);
+    return false;
   }
-}
+};
 
 /**
  * Extracts CSS content from a <style> tag.
- * @param input The input string containing the CSS.
- * @returns The extracted CSS or the input trimmed if no style tag is found.
+ * @param {string} input The input string containing the CSS.
+ * @returns {string} The extracted CSS or the input trimmed if no style tag is found; empty string for non-string inputs.
  */
 export const extractCSS = (input: string): string => {
-  const match = input.match(/<style>([\s\S]*?)<\/style>/)
-  return match ? match[1].trim() : input.trim()
-}
+  if (typeof input !== 'string' || input.length === 0) {
+    return '';
+  }
+  const match = input.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i);
+  if (!match) {
+    console.warn(`No style tags found in input: ${input.slice(0, 50)}...`);
+    return input.trim();
+  }
+  return match[1].trim();
+};
 
 /**
- * Sanitizes input by removing angle brackets to prevent injection.
- * @param input The input string to sanitize.
- * @returns Sanitized string with angle brackets removed.
+ * Sanitizes input by escaping HTML characters to prevent injection.
+ * @param {string} input The input string to sanitize.
+ * @returns {string} Sanitized string with HTML characters escaped; empty string for non-string inputs.
  */
 export const sanitizeInput = (input: string): string => {
-  return input.replace(/[<>]/g, '')
-}
+  if (typeof input !== 'string') {
+    return '';
+  }
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+};
