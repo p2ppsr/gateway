@@ -85,8 +85,33 @@ interface ButtonResponse {
   buttonId: string
 }
 
+// Normalize CSS to use 4-space indentation for properties
+const normalizeCSS = (css: string): string => {
+  const lines = css.trim().split('\n')
+  let output = ''
+  let indentLevel = 0
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    if (!trimmedLine) continue
+    if (trimmedLine.startsWith('}') || trimmedLine.startsWith('}')) {
+      indentLevel = Math.max(0, indentLevel - 1)
+    }
+    output += `${'    '.repeat(indentLevel)}${trimmedLine}\n`
+    if (trimmedLine.endsWith('{')) {
+      indentLevel++
+    }
+  }
+  return output.trim()
+}
+
 const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   const theme = useTheme()
+  // Normalize indentation to 2 spaces for HTML structure, CSS handled by normalizeCSS
+  const normalizedCode = code
+    .split('\n')
+    .map(line => line.replace(/^\s{2,}/, '  ')) // Replace 2+ spaces with 2 spaces for HTML
+    .join('\n')
+    .trim()
   return (
     <SyntaxHighlighter
       language={language}
@@ -94,10 +119,24 @@ const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
       showLineNumbers
       wrapLines
     >
-      {code.trim()}
+      {normalizedCode}
     </SyntaxHighlighter>
   )
 }
+
+//* const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
+//   const theme = useTheme()
+//   return (
+//     <SyntaxHighlighter
+//       language={language}
+//       style={theme.palette.mode === 'dark' ? atomDark : oneLight}
+//       showLineNumbers
+//       wrapLines
+//     >
+//       {code.trim()}
+//     </SyntaxHighlighter>
+//   )
+// }
 
 const Create: React.FC = () => {
   const theme = useTheme()
@@ -120,7 +159,9 @@ const Create: React.FC = () => {
   const [hasMetanet, setHasMetanet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
   const [customCSS_fixed, setCustomCSS_fixed] =
-    useState<string>(`<style>.gateway-paybutton-fixed {
+    useState<string>(`
+<style>
+  .gateway-paybutton-fixed {
     border-radius: 2em;
     border: none;
     padding: 0.7em 1em 0.7em 1em;
@@ -145,9 +186,12 @@ const Create: React.FC = () => {
     cursor: not-allowed;
     pointer-events: none;
   }
-  </style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`)
+</style>
+<div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`)
   const [customCSS_variable, setCustomCSS_variable] =
-    useState<string>(`<style>.gateway-paybutton-variable {
+    useState<string>(`
+<style>
+  .gateway-paybutton-variable {
     border-radius: 2em;
     border: none;
     padding: 0.7em 1em 0.7em 1em;
@@ -172,7 +216,8 @@ const Create: React.FC = () => {
     cursor: not-allowed;
     pointer-events: none;
   }
-  </style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`)
+</style>
+<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`)
   const [lastValidCSS_fixed, setLastValidCSS_fixed] = useState(
     extractCSS(customCSS_fixed)
   )
@@ -198,120 +243,69 @@ const Create: React.FC = () => {
 
   const generatePreviewHtml = useCallback(
     (type: 'fixed' | 'variable', description: string) => {
-      logWithTimestamp(
-        F,
-        'generatePreviewHtml: Starting for type:',
-        type,
-        'current paymentType:',
-        paymentType,
-        'isSingleUse:',
-        isSingleUse,
-        'description:',
-        description
-      )
-      const text =
-        type === 'fixed'
-          ? `${sanitizeInput(buttonText_fixed)} ${fixedSatAmount} Sats`
-          : sanitizeInput(buttonText_variable)
-      const previewClassName =
-        type === 'fixed'
-          ? `gateway-paybutton gateway-paybutton-fixed`
-          : `gateway-paybutton gateway-paybutton-variable`
-      const codeClassName =
-        type === 'fixed'
-          ? `gateway-paybutton gateway-paybutton-fixed${
-              isSingleUse ? ' disabled' : ''
-            }`
-          : `gateway-paybutton gateway-paybutton-variable${
-              isSingleUse ? ' disabled' : ''
-            }`
-      const safeDescription = sanitizeInput(
-        description || `Payment using paymentId: ${ids.paymentId || ''}`
-      )
-      const cssToUse =
-        type === 'fixed'
-          ? validateCSS(extractCSS(customCSS_fixed))
-            ? extractCSS(customCSS_fixed)
-            : lastValidCSS_fixed
-          : validateCSS(extractCSS(customCSS_variable))
-          ? extractCSS(customCSS_variable)
-          : lastValidCSS_variable
+      logWithTimestamp(F, 'generatePreviewHtml: Starting for type:', type, 'current paymentType:', paymentType, 'isSingleUse:', isSingleUse, 'description:', description)
+      const text = type === 'fixed' ? `${sanitizeInput(buttonText_fixed)} ${fixedSatAmount} Sats` : sanitizeInput(buttonText_variable)
+      const previewClassName = type === 'fixed' ? `gateway-paybutton gateway-paybutton-fixed` : `gateway-paybutton gateway-paybutton-variable`
+      const codeClassName = type === 'fixed' ? `gateway-paybutton gateway-paybutton-fixed${isSingleUse ? ' disabled' : ''}` : `gateway-paybutton gateway-paybutton-variable${isSingleUse ? ' disabled' : ''}`
+      const safeDescription = sanitizeInput(description || `Payment using paymentId: ${ids.paymentId || ''}`)
+      const cssToUse = type === 'fixed' ? (validateCSS(extractCSS(customCSS_fixed)) ? extractCSS(customCSS_fixed) : lastValidCSS_fixed) : (validateCSS(extractCSS(customCSS_variable)) ? extractCSS(customCSS_variable) : lastValidCSS_variable)
       let previewHtml = ''
       let codeHtml = ''
       if (type === 'fixed') {
-        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${text}" data-description="${safeDescription}" data-buttonId="${
-          ids.buttonId
-        }" data-paymentId="${
-          ids.paymentId
-        }" data-multi-use="${!isSingleUse}">${text}</div>`
-        codeHtml = `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${
-          ids.buttonId
-        }"\n class="${codeClassName}"\n data-merchant="${
-          merchant || 'temp-merchant'
-        }"\n data-buttonId="${ids.buttonId}"\n data-paymentId="${
-          ids.paymentId
-        }"\n data-amount="${fixedSatAmount}"\n data-text="${text}"\n data-description="${safeDescription}"\n data-width="fit-content"\n data-server="${
-          location.protocol
-        }//${location.host}"\n data-multi-use="${!isSingleUse}">${text}</div>`
+        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-multi-use="${!isSingleUse}">${text}</div>`
+        codeHtml = `<style>
+${normalizeCSS(cssToUse)}
+</style>
+<div
+  id="${ids.buttonId}"
+  class="${codeClassName}"
+  data-merchant="${merchant || 'temp-merchant'}"
+  data-buttonId="${ids.buttonId}"
+  data-paymentId="${ids.paymentId}"
+  data-amount="${fixedSatAmount}"
+  data-text="${text}"
+  data-description="${safeDescription}"
+  data-width="fit-content"
+  data-server="${location.protocol}//${location.host}"
+  data-multi-use="${!isSingleUse}">${text}</div>`
         setPreviewFixedHtml(previewHtml)
         setPreviewCode_fixed(codeHtml)
-        logWithTimestamp(
-          F,
-          'generatePreviewHtml: Fixed preview HTML set:',
-          previewHtml,
-          'code HTML:',
-          codeHtml
-        )
+        logWithTimestamp(F, 'generatePreviewHtml: Fixed preview HTML set:', previewHtml, 'code HTML:', codeHtml)
       } else {
-        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-text="${text}" data-description="${safeDescription}" data-buttonId="${
-          ids.buttonId
-        }" data-paymentId="${
-          ids.paymentId
-        }" data-variable="true" data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-        codeHtml = `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${
-          ids.buttonId
-        }"\n class="${codeClassName}"\n data-merchant="${
-          merchant || 'temp-merchant'
-        }"\n data-buttonId="${ids.buttonId}"\n data-paymentId="${
-          ids.paymentId
-        }"\n data-text="${text}"\n data-description="${safeDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
-          location.protocol
-        }//${
-          location.host
-        }"\n data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-variable="true" data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        codeHtml = `<style>
+${normalizeCSS(cssToUse)}
+</style>
+<div
+  id="${ids.buttonId}"
+  class="${codeClassName}"
+  data-merchant="${merchant || 'temp-merchant'}"
+  data-buttonId="${ids.buttonId}"
+  data-paymentId="${ids.paymentId}"
+  data-text="${text}"
+  data-description="${safeDescription}"
+  data-variable="true"
+  data-width="fit-content"
+  data-server="${location.protocol}//${location.host}"
+  data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
         setPreviewVariableHtml(previewHtml)
         setPreviewCode_variable(codeHtml)
-        logWithTimestamp(
-          F,
-          'generatePreviewHtml: Variable preview HTML set:',
-          previewHtml,
-          'code HTML:',
-          codeHtml
-        )
+        logWithTimestamp(F, 'generatePreviewHtml: Variable preview HTML set:', previewHtml, 'code HTML:', codeHtml)
       }
-      logWithTimestamp(
-        F,
-        'generatePreviewHtml: Completed generation for type:',
-        type
-      )
+      logWithTimestamp(F, 'generatePreviewHtml: Completed generation for type:', type)
     },
     [
       paymentType,
       buttonText_fixed,
       buttonText_variable,
       fixedSatAmount,
-      ids.buttonId,
-      ids.paymentId,
+      ids,
       customCSS_fixed,
       customCSS_variable,
       lastValidCSS_fixed,
       lastValidCSS_variable,
       isSingleUse,
-      merchant,
-      setPreviewFixedHtml,
-      setPreviewCode_fixed,
-      setPreviewVariableHtml,
-      setPreviewCode_variable
+      merchant
     ]
   )
 
@@ -1496,46 +1490,51 @@ const Create: React.FC = () => {
         setPaymentType('fixed')
         setFixedSatAmount('5')
         setIsSingleUse(false)
-        const fixedCSS = `<style>.gateway-paybutton-fixed {
-          border-radius: 2em;
-          border: none;
-          padding: 0.7em 1em 0.7em 1em;
-          min-width: 10em;
-          background: linear-gradient(145deg, #3F51B5, #1C1C1F);
-          color: #ffffff;
-          box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
-          user-select: none;
-          transition: all 0.3s;
-          font-weight: bold;
-          text-align: center;
-        }
-        .gateway-paybutton-fixed:hover {
-          cursor: pointer;
-          box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-          background: linear-gradient(145deg, #7986cb, #2A2A2E);
-          color: #ffffff;
-        }
-        </style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
-        const variableCSS = `<style>.gateway-paybutton-variable {
-          border-radius: 2em;
-          border: none;
-          padding: 0.7em 1em 0.7em 1em;
-          min-width: 10em;
-          background: linear-gradient(145deg, #3F51B5, #1C1C1F);
-          color: #ffffff;
-          box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
-          user-select: none;
-          transition: all 0.3s;
-          font-weight: bold;
-          text-align: center;
-        }
-        .gateway-paybutton-variable:hover {
-          cursor: pointer;
-          box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-          background: linear-gradient(145deg, #7986cb, #1C1C1F);
-          color: #ffffff;
-        }
-        </style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
+        const fixedCSS = `
+<style>
+  .gateway-paybutton-fixed {
+    border-radius: 2em;
+    border: none;
+    padding: 0.7em 1em 0.7em 1em;
+    min-width: 10em;
+    background: linear-gradient(145deg, #3F51B5, #1C1C1F);
+    color: #ffffff;
+    box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.3s;
+    font-weight: bold;
+    text-align: center;
+  }
+  .gateway-paybutton-fixed:hover {
+    cursor: pointer;
+    box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #7986cb, #2A2A2E);
+    color: #ffffff;
+  }
+</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
+  const variableCSS = `
+<style>
+  .gateway-paybutton-variable {
+    border-radius: 2em;
+    border: none;
+    padding: 0.7em 1em 0.7em 1em;
+    min-width: 10em;
+    background: linear-gradient(145deg, #3F51B5, #1C1C1F);
+    color: #ffffff;
+    box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.3s;
+    font-weight: bold;
+    text-align: center;
+  }
+  .gateway-paybutton-variable:hover {
+    cursor: pointer;
+    box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #7986cb, #1C1C1F);
+    color: #ffffff;
+  }
+</style>
+<div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
         setCustomCSS_fixed(fixedCSS)
         setCustomCSS_variable(variableCSS)
         setLastValidCSS_fixed(extractCSS(fixedCSS))
@@ -2057,45 +2056,47 @@ const Create: React.FC = () => {
                 }`
                                 : ''
                               const fixedBaseCSS = `
-              <style>.gateway-paybutton-fixed {
-                border-radius: 2em;
-                border: none;
-                padding: 0.7em 1em 0.7em 1em;
-                min-width: 10em;
-                background: linear-gradient(145deg, #3F51B5, #1C1C1F);
-                color: #ffffff;
-                box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
-                user-select: none;
-                transition: all 0.3s;
-                font-weight: bold;
-                text-align: center;
-              }
-              .gateway-paybutton-fixed:hover {
-                cursor: pointer;
-                box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-                background: linear-gradient(145deg, #7986cb, #2A2A2E);
-                color: #ffffff;
-              }`
+<style>
+  .gateway-paybutton-fixed {
+    border-radius: 2em;
+    border: none;
+    padding: 0.7em 1em 0.7em 1em;
+    min-width: 10em;
+    background: linear-gradient(145deg, #3F51B5, #1C1C1F);
+    color: #ffffff;
+    box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.3s;
+    font-weight: bold;
+    text-align: center;
+  }
+  .gateway-paybutton-fixed:hover {
+    cursor: pointer;
+    box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #7986cb, #2A2A2E);
+    color: #ffffff;
+  }`
                               const variableBaseCSS = `
-              <style>.gateway-paybutton-variable {
-                border-radius: 2em;
-                border: none;
-                padding: 0.7em 1em 0.7em 1em;
-                min-width: 10em;
-                background: linear-gradient(145deg, #3F51B5, #1C1C1F);
-                color: #ffffff;
-                box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
-                user-select: none;
-                transition: all 0.3s;
-                font-weight: bold;
-                text-align: center;
-              }
-              .gateway-paybutton-variable:hover {
-                cursor: pointer;
-                box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
-                background: linear-gradient(145deg, #7986cb, #1C1C1F);
-                color: #ffffff;
-              }`
+<style>
+  .gateway-paybutton-variable {
+    border-radius: 2em;
+    border: none;
+    padding: 0.7em 1em 0.7em 1em;
+    min-width: 10em;
+    background: linear-gradient(145deg, #3F51B5, #1C1C1F);
+    color: #ffffff;
+    box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+    user-select: none;
+    transition: all 0.3s;
+    font-weight: bold;
+    text-align: center;
+  }
+  .gateway-paybutton-variable:hover {
+    cursor: pointer;
+    box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+    background: linear-gradient(145deg, #7986cb, #1C1C1F);
+    color: #ffffff;
+  }`
                               const fixedCSS = `${fixedBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-fixed">Pay</div>`
                               const variableCSS = `${variableBaseCSS}\n${disabledCSS}\n</style><div class="gateway-paybutton gateway-paybutton-variable" data-variable="true">Pay</div>`
                               if (!validateCSS(extractCSS(fixedCSS))) {
