@@ -5,13 +5,14 @@
  * Each row represents a button, showing ID, amount, currency, and other details.
  * For multi-use buttons, includes a collapsible sub-table of associated payments.
  *
- * Version: v3.113 (Updated 31Aug2025_2130 BST)
+ * Version: v3.123 (Updated 01Sep2025_0215 BST)
  * Change Log:
+ * - 01Sep2025_0215 BST (v3.123): Updated requestSort to use derivation_prefix and derivation_suffix instead of transaction_id for sub-table sorting.
+ * - 01Sep2025_0130 BST (v3.122): Replaced transaction_id with derivation_prefix and derivation_suffix in Payment interface and mapping.
  * - 31Aug2025_2130 BST (v3.113): Fixed tooltip vertical position by clearing subTableRefs and using useLayoutEffect for accurate sub-table height.
  * - 31Aug2025_2115 BST (v3.112): Fixed TypeScript error by moving tooltip logging to useEffect; improved sub-table height calculation for tooltip positioning.
  * - 31Aug2025_2045 BST (v3.110): Used DUP_FIELD_PLACEHOLDER for Button Id, Payment Id, and Description in sub-table when payment_id matches button.payment_id.
  * - 31Aug2025_2030 BST (v3.109): Used DUP_FIELD_PLACEHOLDER from consts.ts for Button Id, Payment Id, and Description in sub-table to avoid duplication.
- * - 31Aug2025_2000 BST (v3.108): Added dash (-) for first payment_id and description in sub-table to avoid duplication with main table.
  */
 const F = 'pages/Buttons'
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
@@ -52,7 +53,7 @@ const authFetch = new AuthFetch(wallet)
 
 interface Payment {
   payment_id: string
-  transaction_id: string
+  //*transaction_id: string
   amount: number
   txid: string | null
   completed: boolean
@@ -95,7 +96,7 @@ interface ButtonResponse {
     updatedAt: string
     payments?: {
       paymentId: string
-      transactionId: string
+      //*transactionId: string
       amount: number
       txid: string | null
       completed: boolean
@@ -233,7 +234,7 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
   const payments = button.payments
     ? button.payments.map(payment => ({
         payment_id: payment.paymentId,
-        transaction_id: payment.transactionId,
+        //*transaction_id: payment.transactionId,
         amount: payment.amount,
         txid: payment.txid ?? null,
         completed: !!payment.completed,
@@ -325,7 +326,8 @@ useEffect(() => {
 }, [hoveredValue, clickedValue, expandedButton])
 
   const requestSort = (
-    key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'transaction_id' | 'txid'> | null,
+    key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'derivation_prefix' | 'derivation_suffix' | 'txid'> | null,
+    //*key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'transaction_id' | 'txid'> | null,
     isSubTable?: boolean
   ) => {
     const config = isSubTable ? subTableSortConfig : sortConfig
@@ -339,7 +341,8 @@ useEffect(() => {
         console.warn(`Invalid sub-table sort key: ${key}, defaulting to 'created_at'`)
         setSubTableSortConfig({ key: 'created_at', direction })
       } else {
-        setSubTableSortConfig({ key: key as Exclude<keyof Payment, 'transaction_id' | 'txid'> | null, direction })
+        setSubTableSortConfig({ key: key as Exclude<keyof Payment,  'derivation_prefix' | 'derivation_suffix' | 'txid'> | null, direction })
+        //*setSubTableSortConfig({ key: key as Exclude<keyof Payment, 'transaction_id' | 'txid'> | null, direction })
       }
     } else {
       setSortConfig({ key: key as Exclude<keyof Button, 'payments'> | null, direction })

@@ -8,6 +8,7 @@
  *
  * Version: v2.65 (Updated 31Aug2025_1830 BST)
  * Change Log:
+ * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
  * - 31Aug2025_1830 BST (v2.65): Confirmed description fallback using 'Payment using paymentId: <payment_id>'.
  * - 28Aug2025_0300 BST (v2.64): Fixed Used computation to rely on completed payments; removed paymentDesc query; kept button_id join.
  * - 28Aug2025_0200 BST (v2.63): Fixed logWithTimestamp syntax error; simplified used computation; removed paymentDesc query; ensured correct button_id join.
