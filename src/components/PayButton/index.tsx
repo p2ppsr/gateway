@@ -3,6 +3,7 @@
  * @description Renders a PayButton component for initiating blockchain payments using the Metanet client. Executes a multi-step flow: server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and single-use/multi-use buttons.
  * @version 2.58.10
  * @changelog
+ * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
  * - 28Aug2025_1500 BST (v2.58.10): Added invoice failure logging in handleClick; added paid state logging to debug multi-use button disabling.
  * - 28Aug2025_1435 BST (v2.58.9): Added logging in fetchButtonStatus to diagnose incorrect disabling of multi-use buttons.
  * - 28Aug2025_1410 BST (v2.58.8): Fixed incomplete JSDoc description for clarity.
@@ -80,14 +81,18 @@ export interface PayButtonProps {
  * @interface InvoiceResponse
  * @property {string} status - Response status.
  * @property {string} [message] - Optional error message.
- * @property {string} transaction_id - Transaction identifier.
+ * @property {string} derivation_suffix - BRC29 derivation suffix.
+ * @property {string} derivation_prefix - BRC29 derivation prefix.
+ //* @property {string} transaction_id - Transaction identifier.
  * @property {string} paymentId - Payment identifier.
  * @property {CreateActionOutput[] | undefined} outputs - Optional transaction outputs.
  */
 interface InvoiceResponse {
   status: string
   message?: string
-  transaction_id: string
+  derivation_suffix: string
+  derivation_prefix: string
+  //*transaction_id: string
   paymentId: string
   outputs: CreateActionOutput[] | undefined
 }

@@ -13,6 +13,7 @@
  *
  * Version: v2.41 (Updated 24Aug2025_1246 BST (v2.41): Added check to ensure payments.amount matches request amount for fixed buttons.)
  * Change Log:
+ * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
  * - 24Aug2025_1246 BST (v2.41): Added check to ensure payments.amount matches request amount for fixed buttons.
  * - 24Aug2025_1156 BST (v2.40): Removed description from payment_buttons insert, as it’s stored in payments table; updated paymentId/buttonId validation to exactly 12 characters.
  * - 24Aug2025_1024 BST (v2.39): Fixed payments insert to include all non-nullable fields (button_id, transaction_id, completed, is_new).
@@ -230,7 +231,9 @@ export default {
             button_id: buttonId,
             payment_id: paymentId,
             merchant_id: merchantId,
-            transaction_id: '',
+            derivation_prefix: '',
+            derivation_suffix: '',
+            //*transaction_id: '',
             amount: amountInSats,
             description: finalDescription.slice(0, 80),
             completed: 0,

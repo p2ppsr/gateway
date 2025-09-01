@@ -15,6 +15,7 @@
  *
  * @version v4.26 (Updated 28Aug2025_1401 BST)
  * Change Log:
+ * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
  * - 28Aug2025_1401 BST (v4.26): Removed redundant log and corrected changelog for v4.25.
  * - 27Aug2025_0155 BST (v4.25): Used req.body.amount for variable buttons to match client-provided amount, ensuring identical first payment behavior. * - Previous changes omitted for brevity...
  * - Previous changes omitted for brevity...
