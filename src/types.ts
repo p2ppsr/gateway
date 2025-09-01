@@ -19,7 +19,9 @@ export interface UTXOReference {
  * @property {number} amount - Amount paid in the transaction.
  * @property {string} currency - Currency type (e.g. "BSV").
  * @property {string} buttonId - ID of the payment button used.
- * @property {string} transactionId - Application-level transaction reference.
+ * @property {string} derivationPrefix - BRC29 derivation prefix.
+ * @property {string} derivationSuffix - BRC29 derivation suffix.
+ //** @property {string} transactionId - Application-level transaction reference.
  * @property {string} status - Current status of the payment.
  * @property {Date} createdAt - Timestamp when the record was created.
  * @property {string} searchableAttributes - Serialized string for overlay indexing.
@@ -32,7 +34,9 @@ export interface GatewayRecord {
   amount: number
   currency: string
   buttonId: string
-  transactionId: string
+  derivationPrefix: string
+  derivationSuffix: string
+  //*transactionId: string
   status: string
   createdAt: Date
   searchableAttributes: string
@@ -46,7 +50,9 @@ export interface GatewayRecord {
  * @property {number} [amount] - Filter by amount paid.
  * @property {string} [currency] - Filter by currency type.
  * @property {string} [buttonId] - Filter by button ID.
- * @property {string} [transactionId] - Filter by transaction ID.
+ * @property {string} [derivationPrefix] - BRC29 derivation prefix.
+ * @property {string} [derivationSuffix] - BRC29 derivation suffix.
+ //** @property {string} [transactionId] - Filter by transaction ID.
  * @property {string} [status] - Filter by payment status.
  */
 export interface GatewayAttributes {
@@ -55,7 +61,9 @@ export interface GatewayAttributes {
   amount?: number
   currency?: string
   buttonId?: string
-  transactionId?: string
+  derivationPrefix?: string
+  derivationSuffix?: string
+  //*transactionId?: string
   status?: string
 }
 
@@ -104,15 +112,37 @@ export interface FindByButtonIdQuery {
 }
 
 /**
- * Lookup query to find payments by transaction ID.
+ * Lookup query to find payments by derivation prefix.
  *
- * @property {'findByTransactionId'} type - Query type.
- * @property {{ transactionId: string }} value - Transaction ID to match.
+ * @property {'findByDerivationPrefix'} type - Query type.
+ * @property {{ derivationPrefix: string }} value - derivation prefix to match.
  */
-export interface FindByTransactionIdQuery {
-  type: 'findByTransactionId'
-  value: { transactionId: string }
+export interface FindByDerivationPrefixQuery {
+  type: 'findByDerivationPrefix'
+  value: { derivationPrefix: string }
 }
+
+/**
+ * Lookup query to find payments by derivation suffix.
+ *
+ * @property {'findByDerivationSuffix'} type - Query type.
+ * @property {{ derivationSuffix: string }} value - derivation suffix to match.
+ */
+export interface FindByDerivationSuffixQuery {
+  type: 'findByDerivationSuffix'
+  value: { derivationSuffix: string }
+}
+
+// /**
+//  * Lookup query to find payments by transaction ID.
+//  *
+//  * @property {'findByTransactionId'} type - Query type.
+//  * @property {{ transactionId: string }} value - Transaction ID to match.
+//  */
+// export interface FindByTransactionIdQuery {
+//   type: 'findByTransactionId'
+//   value: { transactionId: string }
+// }
 
 /**
  * Lookup query to find payments by amount.
@@ -130,13 +160,17 @@ export interface FindByAmountQuery {
  *
  * @property {'findAll'} type - Query type.
  * @property {Object} [value] - Optional filters for narrowing the result set.
- * @property {string} [value.transactionId] - Filter by transaction ID.
+ * @property {string} [value.derivastionPrefix] - Filter by derivastion prefix.
+ * @property {string} [value.derivastionSuffix] - Filter by derivastion suffix.
+//** @property {string} [value.transactionId] - Filter by transaction ID.
  * @property {string} [value.merchantId] - Filter by merchant ID.
  */
 export interface FindAllQuery {
   type: 'findAll'
   value?: {
-    transactionId?: string
+    derivationPrefix?: string
+    derivationSuffix?: string
+    //*transactionId?: string
     merchantId?: string
   }
 }
@@ -148,6 +182,7 @@ export type GatewayLookupQuery =
   | FindByMerchantIdQuery
   | FindByPaymentIdQuery
   | FindByButtonIdQuery
-  | FindByTransactionIdQuery
+  | FindByDerivationPrefixQuery
+  | FindByDerivationSuffixQuery
   | FindByAmountQuery
   | FindAllQuery
