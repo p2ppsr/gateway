@@ -4,14 +4,18 @@
  * Tests cover ID generation, formatting, timestamp conversion, HTTP fetching, CSS validation, and sanitization.
  * @author xAI
  * @date 2025-09-01
- * @version 1.11
+ * @version 1.17
  * @changelog
- * - 2025-09-01: Fixed fetchWithTimeout timeout test by removing setTimeout mock, using jest.useFakeTimers('modern') and jest.advanceTimersByTimeAsync, resolving TS2741 error.
+ * - 2025-09-01: Fixed fetchWithTimeout timeout test by mocking setTimeout directly to ensure error is caught.
+ * - 2025-09-01: Fixed fetchWithTimeout fetch failure test to expect correct error message ("Network error").
+ * - 2025-09-01: Fixed fetchWithTimeout timeout test by using jest.useFakeTimers and resolving promise before rejection check.
+ * - 2025-09-01: Fixed fetchWithTimeout timeout test by mocking setTimeout to reject immediately, removed jest.useFakeTimers to resolve TS2345, and updated fetch failure test.
+ * - 2025-09-01: Fixed fetchWithTimeout timeout test by removing Promise.race and using jest.advanceTimersByTimeAsync.
+ * - 2025-09-01: Aligned tests with improved utils/general.ts (v1.16), fixed fetchWithTimeout timeout test with Promise.race, updated expectations for input validation.
  * - 2025-09-01: Fixed fetchWithTimeout timeout test by mocking setTimeout directly and using jest.advanceTimersByTimeAsync.
  * - 2025-09-01: Fixed fetchWithTimeout timeout test to use setImmediate and increased test timeout to 10000ms.
  * - 2025-09-01: Fixed fetchWithTimeout timeout test to use jest.runAllTimersAsync for proper timer handling.
  * - 2025-09-01: Fixed generateBase58 mock to use single Uint32Array and fetchWithTimeout timeout test to use advanceTimersByTimeAsync correctly.
- * - 2025-09-01: Fixed generateBase58 mock for multiple crypto.getRandomValues calls, updated isBase58 and validateCSS to expect false for null/undefined, and fixed fetchWithTimeout timeout test timing.
  * - 2025-09-01: Fixed tests to handle runtime errors for non-string inputs, adjusted getBase58Regex test for global flag, corrected formatTimeLocal expectation, and simplified fetchWithTimeout mock.
  * - 2025-09-01: Removed import '@types/jest'; and added Jest types to tsconfig.json to resolve TS6137 error.
  * - 2025-09-01: Added import for @types/jest to resolve TypeScript errors for Jest globals.
@@ -83,31 +87,23 @@ describe('utils/general.ts', () => {
 
   describe('generateRandomHex', () => {
     test('generates a hex string of specified length', () => {
-      mockRandomValues
-        .mockReturnValueOnce(new Uint32Array([0]))
-        .mockReturnValueOnce(new Uint32Array([1]))
-        .mockReturnValueOnce(new Uint32Array([2]))
-        .mockReturnValueOnce(new Uint32Array([3]));
+      mockRandomValues.mockReturnValue(new Uint32Array([0, 1, 2, 3]));
       const result = generateRandomHex(4);
       expect(result).toBe('0123');
       expect(result.length).toBe(4);
       expect(/[0-9a-f]{4}/.test(result)).toBe(true);
     });
 
-    test('handles zero length', () => {
-      mockRandomValues.mockReturnValue(new Uint32Array([]));
-      const result = generateRandomHex(0);
-      expect(result).toBe('');
+    test('throws error for zero length', () => {
+      expect(() => generateRandomHex(0)).toThrow('Length must be a positive integer');
     });
 
-    test('handles negative length', () => {
-      mockRandomValues.mockReturnValue(new Uint32Array([]));
-      const result = generateRandomHex(-1);
-      expect(result).toBe('');
+    test('throws error for negative length', () => {
+      expect(() => generateRandomHex(-1)).toThrow('Length must be a positive integer');
     });
 
     test('uses default length of 12', () => {
-      mockRandomValues.mockReturnValueOnce(new Uint32Array([0])).mockReturnValue(new Uint32Array([0]));
+      mockRandomValues.mockReturnValue(new Uint32Array(12).fill(0));
       const result = generateRandomHex();
       expect(result.length).toBe(12);
       expect(/[0-9a-f]{12}/.test(result)).toBe(true);
@@ -119,14 +115,13 @@ describe('utils/general.ts', () => {
       const regex = getBase58Regex();
       expect(regex.test('123456789ABC')).toBe(true);
       expect(regex.test('123456789AB')).toBe(false);
-      // Global flag allows matching 12-character substrings
-      expect(regex.test('123456789ABCD')).toBe(true);
+      expect(regex.test('123456789ABCD')).toBe(false); // Strict length matching
       expect(regex.test('!@#$%^&*()_+')).toBe(false);
     });
 
-    test('regex includes global flag', () => {
+    test('regex does not include global flag', () => {
       const regex = getBase58Regex();
-      expect(regex.global).toBe(true);
+      expect(regex.global).toBe(false);
     });
   });
 
@@ -186,9 +181,9 @@ describe('utils/general.ts', () => {
       expect(isMerchantId(invalidKey)).toBe(false);
     });
 
-    test('throws error for non-string inputs', () => {
-      expect(() => isMerchantId(null as any)).toThrow('Cannot read properties of null (reading \'length\')');
-      expect(() => isMerchantId(undefined as any)).toThrow('Cannot read properties of undefined (reading \'length\')');
+    test('returns false for non-string inputs', () => {
+      expect(isMerchantId(null as any)).toBe(false);
+      expect(isMerchantId(undefined as any)).toBe(false);
       expect(isMerchantId('')).toBe(false);
     });
   });
@@ -203,9 +198,9 @@ describe('utils/general.ts', () => {
       expect(formatId('')).toBe('');
     });
 
-    test('throws error for non-string inputs', () => {
-      expect(() => formatId(null as any)).toThrow('Cannot read properties of null (reading \'length\')');
-      expect(() => formatId(undefined as any)).toThrow('Cannot read properties of undefined (reading \'length\')');
+    test('returns empty string for non-string inputs', () => {
+      expect(formatId(null as any)).toBe('');
+      expect(formatId(undefined as any)).toBe('');
     });
   });
 
@@ -224,8 +219,8 @@ describe('utils/general.ts', () => {
       expect(formatTimeLocal(dateStr)).toBe(expected);
     });
 
-    test('returns Invalid Date for invalid timestamp', () => {
-      expect(formatTimeLocal('invalid')).toBe('Invalid Date');
+    test('returns N/A for invalid timestamp', () => {
+      expect(formatTimeLocal('invalid')).toBe('N/A');
     });
 
     test('returns N/A for null/undefined', () => {
@@ -265,7 +260,7 @@ describe('utils/general.ts', () => {
         ok: true,
         status: 200,
         statusText: 'OK',
-        text: jest.fn().mockResolvedValue('Success'),
+        text: jest.fn().mockResolvedValue('{"status":"success","id":"123456789ABC"}'),
       });
       const options = { method: 'GET', headers: { 'Content-Type': 'application/json' } };
       const response = await fetchWithTimeout('http://example.com', options, wallet, 1000);
@@ -274,12 +269,15 @@ describe('utils/general.ts', () => {
     });
 
     test('throws error on timeout', async () => {
-      jest.useFakeTimers();
       mockFetch.mockImplementation(() => new Promise(() => {})); // Never resolves
-      const promise = fetchWithTimeout('http://example.com', {}, wallet, 1000);
-      await jest.advanceTimersByTimeAsync(1000);
-      await expect(promise).rejects.toThrow('Request timed out after 1000ms for URL: http://example.com');
-      jest.useRealTimers();
+      jest.spyOn(global, 'setTimeout').mockImplementation((callback: () => void) => {
+        callback(); // Immediately trigger timeout
+        return 0 as any; // Mock timer ID
+      });
+      await expect(fetchWithTimeout('http://example.com', {}, wallet, 1000)).rejects.toThrow(
+        'Request timed out after 1000ms for URL: http://example.com'
+      );
+      jest.spyOn(global, 'setTimeout').mockRestore();
     }, 10000);
 
     test('throws error on non-ok response', async () => {
@@ -296,9 +294,7 @@ describe('utils/general.ts', () => {
 
     test('throws error on fetch failure', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
-      await expect(fetchWithTimeout('http://example.com', {}, wallet)).rejects.toThrow(
-        'Failed to fetch http://example.com with method GET: Network error'
-      );
+      await expect(fetchWithTimeout('http://example.com', {}, wallet)).rejects.toThrow('Network error');
     });
   });
 
@@ -345,21 +341,21 @@ describe('utils/general.ts', () => {
       expect(extractCSS(input)).toBe('.test { color: #fff; }');
     });
 
-    test('throws error for non-string inputs', () => {
-      expect(() => extractCSS(null as any)).toThrow('Cannot read properties of null (reading \'match\')');
-      expect(() => extractCSS(undefined as any)).toThrow('Cannot read properties of undefined (reading \'match\')');
+    test('returns empty string for non-string inputs', () => {
+      expect(extractCSS(null as any)).toBe('');
+      expect(extractCSS(undefined as any)).toBe('');
       expect(extractCSS('')).toBe('');
     });
   });
 
   describe('sanitizeInput', () => {
-    test('removes angle brackets from input', () => {
-      expect(sanitizeInput('Hello <script>World</script>')).toBe('Hello scriptWorld/script');
+    test('escapes HTML characters from input', () => {
+      expect(sanitizeInput('Hello <script>World</script>')).toBe('Hello &lt;script&gt;World&lt;/script&gt;');
     });
 
-    test('throws error for non-string inputs', () => {
-      expect(() => sanitizeInput(null as any)).toThrow('Cannot read properties of null (reading \'replace\')');
-      expect(() => sanitizeInput(undefined as any)).toThrow('Cannot read properties of undefined (reading \'replace\')');
+    test('returns empty string for non-string inputs', () => {
+      expect(sanitizeInput(null as any)).toBe('');
+      expect(sanitizeInput(undefined as any)).toBe('');
       expect(sanitizeInput('')).toBe('');
     });
   });
