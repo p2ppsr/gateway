@@ -1,10 +1,13 @@
 /**
  * @file src/utils/checkForMetanetclient.ts
- *
- * Utility function to check if the Metanet Client is running and determine its network.
- * It attempts to connect via `WalletClient` and fetch the current network setting.
+ * @description Utility function to check if the Metanet Client is running and determine its network (mainnet or testnet) using WalletClient.
+ * @version 1.0.0 (Updated 02Sep2025_1919 BST to standardize header comment)
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - @bsv/sdk: For WalletClient
+ * @changelog
+ * - 02Sep2025_1919 BST (v1.0.0): Updated header comment to follow standardized template.
  */
-
 import { WalletClient } from '@bsv/sdk'
 
 /**
