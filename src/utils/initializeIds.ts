@@ -10,12 +10,6 @@
  * - ../utils/general: For fetchWithTimeout, isBase58, generateBase58
  * @changelog
  * - 01Sep2025_2350 BST (v1.67): Added cache clearing for corrupted states and improved logging for invalid id handling.
- * - 01Sep2025_2345 BST (v1.66): Restored cache-first behavior from v1.61, moved id validation after cache check, and added new ID generation for invalid input id.
- * - 01Sep2025_2220 BST (v1.64): Added handling for invalid cache state and early id validation.
- * - 01Sep2025_2100 BST (v1.63): Added local ID generation for invalid newId and validated buttonId.
- * - 01Sep2025_2030 BST (v1.62): Improved error handling, added type validation, and standardized logging.
- * - 24Aug2025_1800 BST (v1.60): Added force parameter and removed retries.
- * - 24Aug2025_2330 BST (v1.61): Added retry logic for 409 responses.
  */
 import { logWithTimestamp } from './logging';
 import { fetchWithTimeout, generateBase58, isBase58 } from './general';
