@@ -2,13 +2,13 @@
  * @file src/__tests/utils/merchant.test.ts
  * @description Jest tests for ensureMerchantExists function in utils/merchant.ts.
  * Tests cover merchant insertion, conflict handling, empty merchantId, and error cases.
- * @version 1.0.13 (Updated 02Sep2025_1819 BST to fix Jest crash in error handling test)
+ * @version 1.0.11 (Updated 02Sep2025_1529 BST to fix Jest crash in error handling test)
  * @author xAI (Grok 3)
  * @dependencies
  * - knex: For database operations
  * - ../utils/logging: For logWithTimestamp
  * @changelog
- * - 02Sep2025_1819 BST (v1.0.13): Fixed Jest crash by using Promise.resolve().then() with try/catch and mockRejectedValueOnce in error handling test.
+ * - 02Sep2025_1529 BST (v1.0.11): Fixed Jest crash by using try/catch in error handling test to catch rejection explicitly.
  */
 import { ensureMerchantExists } from '../../utils/merchant';
 import { logWithTimestamp } from '../../utils/logging';
@@ -52,7 +52,7 @@ describe('utils/merchant.ts', () => {
     };
     mockDb = jest.fn((table: string) => queryBuilder) as unknown as CustomKnex;
     mockDb.fn = {
-      now: jest.fn().mockReturnValue('2025-09-02 18:19:00'),
+      now: jest.fn().mockReturnValue('2025-09-02 15:29:00'),
       uuid: jest.fn(),
       uuidToBin: jest.fn(),
       binToUuid: jest.fn(),
@@ -69,8 +69,8 @@ describe('utils/merchant.ts', () => {
       custom_fee_rate: 0,
       custom_fee: 0,
       welcomed: 0,
-      created_at: '2025-09-02 18:19:00',
-      updated_at: '2025-09-02 18:19:00',
+      created_at: '2025-09-02 15:29:00',
+      updated_at: '2025-09-02 15:29:00',
     });
     expect(mockDb('merchants').onConflict).toHaveBeenCalledWith('merchant_id');
     expect(mockDb('merchants').ignore).toHaveBeenCalled();
@@ -123,16 +123,14 @@ describe('utils/merchant.ts', () => {
   test('rejects with database error', async () => {
     const merchantId = 'merchant123';
     const error = new Error('Database error');
-    mockDb('merchants').insert.mockRejectedValueOnce(error);
+    mockDb('merchants').insert.mockImplementation(() => Promise.reject(error));
 
     let caughtError: unknown;
-    await Promise.resolve().then(async () => {
-      try {
-        await ensureMerchantExists(mockDb as Knex, merchantId);
-      } catch (e) {
-        caughtError = e;
-      }
-    });
+    try {
+      await ensureMerchantExists(mockDb as Knex, merchantId);
+    } catch (e) {
+      caughtError = e;
+    }
     expect(caughtError).toEqual(error);
     expect(mockDb).toHaveBeenCalledWith('merchants');
     expect(mockDb('merchants').insert).toHaveBeenCalled();
