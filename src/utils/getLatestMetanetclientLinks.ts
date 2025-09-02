@@ -1,10 +1,13 @@
 /**
  * @file src/utils/getLatestMetanetclientLinks.ts
- *
- * Provides a function to fetch download links for the latest Metanet Desktop release
- * from the official GitHub repository, including placeholders for mobile app links.
+ * @description Provides a function to fetch download links for the latest Metanet Desktop release from the official GitHub repository, including placeholders for mobile app links.
+ * @version 1.0.0 (Updated 02Sep2025_1823 BST to standardize header comment)
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - ./logging: For logWithTimestamp
+ * @changelog
+ * - 02Sep2025_1823 BST (v1.0.0): Updated header comment to follow standardized template.
  */
-
 import { logWithTimestamp } from './logging'
 
 /**
