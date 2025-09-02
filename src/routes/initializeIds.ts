@@ -1,37 +1,18 @@
 /**
  * @file src/routes/initializeIds.ts
- *
- * POST route to validate client-generated payment or button IDs in the database.
- * Validates and stores the client-provided ID (paymentId or buttonId) in the ids table, ensuring uniqueness.
- * Updates the payment_buttons and payments table descriptions to reflect the new payment_id or button_id using getBase58Regex for replace all.
- * Leverages the 'description' column in the payments table for payment-specific data and payment_buttons for initial/default values.
- *
- * Used by the Gateway UI to pre-register a single unique ID for payment buttons or payments in the ids table,
- * satisfying the foreign key constraint for payment_buttons and payments.
- *
- * - IDs are client-generated 12-character Base58-encoded strings, validated for uniqueness by the database.
- * - Description is a required field, displayed in the Metanet client, and limited to 80 characters.
- *
- * @version v1.59 (Updated 24Aug2025_2330 BST to fix paymentId validation and add buttonId existence check)
+ * @description POST route to validate and store client-generated payment or button IDs in the database, ensuring uniqueness and updating descriptions in payment_buttons and payments tables.
+ * @version 1.0.0 (Updated 02Sep2025_1933 BST to standardize header comment)
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - knex: For database operations
+ * - express: For Request and Response types
+ * - express-validator: For request body validation
+ * - ../utils/logging: For logWithTimestamp
+ * - ../utils/general: For isBase58 and isMerchantId
+ * - ../utils/idGenerator: For generateAndValidateUniqueId
+ * - ../utils/merchant: For ensureMerchantExists
  * @changelog
- * - 14Aug2025_2000 BST (v1.40): Updated to validate only the requested ID, returning success/failure status without querying other IDs.
- * - 17Aug2025_1605 BST (v1.41): Added description update for payment_id in payment_buttons table using replace all.
- * - 17Aug2025_1615 BST (v1.42): Changed duplicate ID handling to return error (409) and used general replace all for 12-character Base58 payment_id.
- * - 17Aug2025_1625 BST (v1.44): Renamed isIdMatch to getBase58Regex for clarity.
- * - 17Aug2025_1630 BST (v1.45): Added isBase58 for validation in middlewares.
- * - 17Aug2025_1640 BST (v1.46): Used isMerchantId from general.ts for merchantId validation.
- * - 17Aug2025_1700 BST (v1.47): Corrected merchantId validation to 64 characters using isMerchantId.
- * - 17Aug2025_1705 BST (v1.48): Removed id from response, used paymentId/buttonId post-validation, fixed log typo.
- * - 19Aug2025_1240 BST (v1.49): Added payment_id update for multi-use buttons in payment_buttons, improved description handling with fallback, fixed maxAttempts scope, corrected versioning.
- * - 21Aug2025_1453 BST (v1.50): Integrated 'description' column from payments table, enhanced description update logic.
- * - 23Aug2025_1520 BST (v1.51): Used generateAndValidateUniqueId utility for ID generation.
- * - 23Aug2025_1530 BST (v1.52): Updated generateAndValidateUniqueId to use generateBase58.
- * - 23Aug2025_1535 BST (v1.53): Used 'id' instead of 'newId' for clarity.
- * - 23Aug2025_1545 BST (v1.54): Set description max length to 80 characters.
- * - 23Aug2025_1705 BST (v1.55): Updated generateAndValidateUniqueId to handle payments.description update.
- * - 23Aug2025_1710 BST (v1.56): Made description a required field and updated schema logic for Metanet client display.
- * - 24Aug2025_2115 BST (v1.57): Fixed duplicate ID insertion by updating id variable in loop, added table locking, and returned newId in 409 response.
- * - 24Aug2025_2330 BST (v1.59): Fixed paymentId validation by prioritizing paymentId, added separate buttonId existence check with read lock, ensured correct targetType.
+ * - 02Sep2025_1933 BST (v1.0.0): Updated header comment to follow standardized template.
  */
 const F = 'routes/initializeIds'
 import knex, { Knex } from 'knex'
@@ -173,6 +154,7 @@ export default {
       await db.transaction(async trx => {
         let attempts = 0
         let currentId = id // Track the ID being validated (buttonId or paymentId)
+
         // For paymentId requests with buttonId, verify buttonId exists
         if (paymentId && buttonId) {
           await trx.raw('LOCK TABLES ids READ') // Lock for reading buttonId
