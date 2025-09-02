@@ -39,7 +39,7 @@
   "dependencies": {
     "@bsv/auth-express-middleware": "^1.2.0",
     "@bsv/payment-express-middleware": "^1.2.1",
-    "@bsv/sdk": "^1.6.17",
+    "@bsv/sdk": "^1.6.24",
     "@bsv/wallet-toolbox": "^1.5.9",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
