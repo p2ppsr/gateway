@@ -39,7 +39,7 @@ import knexConfig from '../../knexfile'
 import type { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
-import { generateBase58, getBase58Regex, isBase58, isMerchantId } from '../utils/general'
+import { isBase58, isMerchantId } from '../utils/general'
 import { generateAndValidateUniqueId } from '../utils/idGenerator'
 import { ensureMerchantExists } from '../utils/merchant'
 const db: Knex = knex(knexConfig)

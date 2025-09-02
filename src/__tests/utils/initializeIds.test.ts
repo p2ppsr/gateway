@@ -113,26 +113,6 @@ describe('utils/initializeIds.ts', () => {
       expect(fetchWithTimeout).not.toHaveBeenCalled();
     });
 
-    test('generates new ID for invalid cache state', async () => {
-      mockLocalStorage.getItem
-        .mockReturnValueOnce('true') // isInitialized
-        .mockReturnValueOnce(null); // storedId
-      (generateBase58 as jest.Mock).mockReturnValueOnce('987654321XYZ');
-      const result = await initializeIds('payment', mockWallet, undefined, 'a'.repeat(64), mockSetId, mockSetSpendingDescriptionFixed, mockSetSpendingDescriptionVariable);
-      expect(result).toEqual({ status: 'success', id: '987654321XYZ' });
-      expect(mockSetId).toHaveBeenCalledWith('987654321XYZ');
-      expect(mockSetSpendingDescriptionFixed).toHaveBeenCalledWith('Payment using paymentId: 987654321XYZ');
-      expect(mockSetSpendingDescriptionVariable).toHaveBeenCalledWith('Payment using paymentId: 987654321XYZ');
-      expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('idsInitializedpayment_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith('idsInitializedpayment_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'true');
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith('paymentId_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', '987654321XYZ');
-      expect(logWithTimestamp).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('initializeIds: Invalid cache state for paymentId with merchantId aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, clearing cache and generating new ID')
-      );
-      expect(fetchWithTimeout).not.toHaveBeenCalled();
-    });
-
 test('generates new ID for invalid cache state', async () => {
   mockLocalStorage.getItem
     .mockReturnValueOnce('true') // isInitialized
