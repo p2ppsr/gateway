@@ -34,7 +34,15 @@ A secure, full-stack payment server and embeddable **Pay** button system for the
 ## Introduction
 The Gateway project is a secure, blockchain-based payment processing application designed to facilitate merchant payments using the Bitcoin SV (BSV) network. It provides a full-stack solution for creating and managing merchant buttons, handling payments, and ensuring secure transaction validation. The application integrates backend routes for ID initialization, payment acknowledgment, and transaction completion with frontend components for dynamic button display and editing. 
 
-Key features include: Displays fixed and variable merchant buttons with dynamic CSS updating using the edit box to drive changes: The frontend (e.g., Create.tsx) allows merchants to create and edit fixed-amount or variable-amount buttons, with an edit box that dynamically updates the button's CSS styles in real-time, providing a WYSIWYG experience for customization. Uses secure BRC 29 for payments: The payment processing uses BRC 29 (Bitcoin Request for Comment 29) for secure, trustless invoice generation and validation. This ensures that payments are cryptographically verified using derivation prefixes and suffixes, preventing tampering and guaranteeing authenticity.
+Key features include: Displays fixed and variable merchant buttons with dynamic CSS updating using the edit box to drive changes: The frontend (e.g., src/pages/Create/index.tsx) allows merchants to create and edit fixed-amount or variable-amount buttons, with an edit box that dynamically updates the button's CSS styles in real-time, providing a WYSIWYG experience for customization. Uses secure BRC 29 for payments: The payment processing uses BRC 29 (Bitcoin Request for Comment 29) for secure, trustless invoice generation and validation. This ensures that payments are cryptographically verified using derivation prefixes and suffixes, preventing tampering and guaranteeing authenticity.
+
+
+<img width="963" height="834" alt="349C6717-B066-4864-8269-E256EF28B972" src="https://github.com/user-attachments/assets/91c92c13-4e9e-4e4c-8a30-537b4ffad739" />
+
+<img width="1535" height="768" alt="43B7C450-D9F9-4C52-AF17-33794250A183" src="https://github.com/user-attachments/assets/7b6b98fa-cdc3-417f-a51a-0b610370b808" />
+
+<img width="1532" height="762" alt="E5942EB6-7922-470D-972A-B6A3058A950F" src="https://github.com/user-attachments/assets/d426393a-f2d2-40c2-b855-c31b8e8f2070" />
+
 
 ## Quick Start
 
