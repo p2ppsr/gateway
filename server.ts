@@ -1,25 +1,14 @@
 /**
  * @file src/server.ts
- * @description Express server setup for the Gateway application, configuring middleware, registering route handlers, and starting the server with security enhancements.
- * @version 1.6.0 (Updated 03Sep2025_1126 BST to standardize JSDoc header and add function/interface JSDocs)
- * @author xAI (Grok 3)
- * @dependencies
- * - dotenv: For environment variable configuration
- * - express: For server and middleware setup
- * - body-parser: For JSON body parsing
- * - path: For file path handling
- * - knex: For database operations
- * - @bsv/wallet-toolbox: For wallet client setup
- * - @bsv/auth-express-middleware: For authentication middleware
- * - @bsv/payment-express-middleware: For payment middleware
- * - helmet: For security headers
- * - express-rate-limit: For rate limiting
- * - ./utils/constants: For MAX_PAYMENT_SATS
- * - ./utils/logging: For logWithTimestamp
- * - util: For object inspection
- * - child_process: For spawning Nginx
- * @changelog
- * - 03Sep2025_1126 BST (v1.6.0): Updated JSDoc header to follow standardized template and added JSDoc comments for Route interface and initializeServer function.
+ *
+ * Express server setup for the Gateway application.
+ * Registers route handlers from the aggregated routes in `src/routes/index.ts`.
+ * Configures middleware and starts the server on the specified port.
+ * Includes security enhancements with Helmet and rate limiting.
+ * Updated to handle route handlers returning Promise<void | Response> and reflect new schema.
+ * Added security check for max payment allowed (10000 sats) in payment middleware.
+ *
+ * Version: v1.5 (Updated 11Aug2025_1737 BST to support merchantId as wallet identity key via routes)
  */
 const F = 'server'
 import dotenv from 'dotenv'
@@ -38,16 +27,9 @@ import rateLimit from 'express-rate-limit'
 import { MAX_PAYMENT_SATS } from './utils/constants' // Import MAX_PAYMENT_SATS
 import { logWithTimestamp } from './utils/logging'
 import util from 'util';
+
 dotenv.config()
 
-/**
- * Represents a route configuration for the Express server.
- * @interface Route
- * @property {string} type - HTTP method (e.g., 'get', 'post').
- * @property {string} path - Route path (e.g., '/initializeIds').
- * @property {(req: Request | AuthRequest, res: Response) => Promise<void | Response>} func - Route handler function.
- * @property {((req: Request | AuthRequest, res: Response) => Promise<void | Response>)?} [handler] - Optional alias for the route handler function.
- */
 interface Route {
   type: string
   path: string
@@ -60,6 +42,7 @@ const ROUTING_PREFIX = process.env.ROUTING_PREFIX ?? '/api'
 const SPAWN_NGINX = process.env.SPAWN_NGINX
 const WALLET_STORAGE_URL = process.env.WALLET_STORAGE_URL ?? ''
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? 'http://localhost:3000'
+
 const app = express()
 const db = knex(knexConfig)
 
@@ -73,9 +56,12 @@ app.use(
   })
 )
 logWithTimestamp(F, '🔍 Rate limiting applied: 100 requests per 15 minutes per IP')
+
 app.use(helmet())
 logWithTimestamp(F, '🔍 Helmet security headers applied')
+
 app.use(bodyParser.json({ limit: '1gb' }))
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
   res.header('Access-Control-Allow-Headers', '*')
@@ -85,6 +71,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
 })
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   const originalJson = res.json.bind(res)
   res.json = (data: any) => {
@@ -94,14 +81,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next()
 })
 
-/**
- * Initializes and starts the Express server for the Gateway application.
- * Configures middleware, registers routes, and applies database migrations.
- * @async
- * @function initializeServer
- * @returns {Promise<void>} Resolves when the server is successfully started, or throws an error on failure.
- */
-async function initializeServer(): Promise<void> {
+;(async () => {
   try {
     await db.migrate.latest()
     logWithTimestamp(F, '✅ Migrations applied successfully')
@@ -178,7 +158,7 @@ async function initializeServer(): Promise<void> {
         res.status(500).json({ status: 'error', message: '❌ Internal server error' })
       }
     })
-   
+    
     app.listen(HTTP_PORT, () => {
       logWithTimestamp(F, '✅ Gateway Payment Server listening on', HTTP_PORT)
       if (SPAWN_NGINX === 'yes') {
@@ -190,6 +170,4 @@ async function initializeServer(): Promise<void> {
     console.error('❌ Failed to initialize server:', message)
     throw new Error(`❌ Failed to initialize server: ${message}`)
   }
-}
-
-initializeServer();
+})();
