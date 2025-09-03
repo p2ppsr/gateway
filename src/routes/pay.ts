@@ -1,24 +1,15 @@
 /**
  * @file src/routes/pay.ts
- *
- * POST route to complete a payment by submitting a transaction.
- * Validates the submitted transaction against the invoice created earlier, ensuring:
- * - The paymentId and buttonId exist in the ids table with colorimetric types (payment and button, respectively), pre-created at gateway launch.
- * - The transaction is well-formed and matches the expected locking script (amount validated from transaction).
- * - The payment exists in the payments table and is not already completed.
- *
- * Upon successful validation, the database is updated to mark the payment as complete,
- * store the atomic BEEF transaction, and record the txid.
- * The txid is received from the client and validated, then stored directly without extraction.
- *
- * Used by the Gateway frontend when submitting an invoice payment using the Metanet client.
- *
- * @version v4.26 (Updated 28Aug2025_1401 BST)
- * Change Log:
- * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
- * - 28Aug2025_1401 BST (v4.26): Removed redundant log and corrected changelog for v4.25.
- * - 27Aug2025_0155 BST (v4.25): Used req.body.amount for variable buttons to match client-provided amount, ensuring identical first payment behavior. * - Previous changes omitted for brevity...
- * - Previous changes omitted for brevity...
+ * @description POST route to complete a payment by submitting a transaction, validating paymentId and buttonId, transaction format, and locking script, then updating the payments table.
+ * @version 4.27.0 (Updated 03Sep2025_0013 BST to standardize header comment)
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - knex: For database operations
+ * - express: For Request and Response types
+ * - @bsv/sdk: For transaction validation and cryptographic operations
+ * - ../utils/logging: For logWithTimestamp
+ * @changelog
+ * - 03Sep2025_0013 BST (v4.27.0): Updated header comment to follow standardized template.
  */
 const F = 'routes/pay'
 import knex, { Knex } from 'knex'

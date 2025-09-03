@@ -1,13 +1,15 @@
 /**
  * @file src/components/PayButton/index.tsx
- * @description Renders a PayButton component for initiating blockchain payments using the Metanet client. Executes a multi-step flow: server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and single-use/multi-use buttons.
- * @version 2.58.10
+ * @description Renders a PayButton component for initiating blockchain payments using the Metanet client, supporting variable amounts and single-use/multi-use buttons with a multi-step flow for verification, invoice request, transaction signing, and payment submission.
+ * @version 2.59.0 (Updated 03Sep2025_1214 BST to standardize JSDoc header and update dependencies)
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - react: For component rendering and state management
+ * - react-toastify: For user notifications
+ * - @bsv/sdk: For blockchain transaction handling and Metanet client integration
+ * - ../../utils/constants: For configuration constants
  * @changelog
- * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
- * - 28Aug2025_1500 BST (v2.58.10): Added invoice failure logging in handleClick; added paid state logging to debug multi-use button disabling.
- * - 28Aug2025_1435 BST (v2.58.9): Added logging in fetchButtonStatus to diagnose incorrect disabling of multi-use buttons.
- * - 28Aug2025_1410 BST (v2.58.8): Fixed incomplete JSDoc description for clarity.
- * - Previous changes omitted for brevity...
+ * - 03Sep2025_1214 BST (v2.59.0): Updated JSDoc header to follow standardized template and included accurate dependencies.
  */
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ReactElement } from 'react'
 import { toast } from 'react-toastify'

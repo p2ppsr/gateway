@@ -1,3 +1,15 @@
+/**
+ * @file src/routes/acknowledgePayment.ts
+ * @description POST route to acknowledge a payment by updating the payments table, marking is_new as false for the given paymentId.
+ * @version 1.0.0 (Updated 02Sep2025_2337 BST to add standardized header comment)
+ * @author xAI (Grok 3)
+ * @dependencies
+ * - knex: For database operations
+ * - express: For Request and Response types
+ * - ../utils/logging: For logWithTimestamp
+ * @changelog
+ * - 02Sep2025_2337 BST (v1.0.0): Added standardized header comment.
+ */
 const F = 'routes/acknowledgePayment'
 import knex, { Knex } from 'knex'
 import knexConfig from '../../knexfile'
