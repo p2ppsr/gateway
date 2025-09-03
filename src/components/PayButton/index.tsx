@@ -1,7 +1,7 @@
 /**
  * @file src/components/PayButton/index.tsx
  * @description Renders a PayButton component for initiating blockchain payments using the Metanet client, supporting variable amounts and single-use/multi-use buttons with a multi-step flow for verification, invoice request, transaction signing, and payment submission.
- * @version 2.59.0 (Updated 03Sep2025_1309 BST to formalize hook JSDocs)
+ * @version 2.59.0 (Updated 03Sep2025_1335 BST to formalize hook JSDocs and add null check for containerRef)
  * @author xAI (Grok 3)
  * @dependencies
  * - react: For component rendering and state management
@@ -9,7 +9,7 @@
  * - @bsv/sdk: For blockchain transaction handling and Metanet client integration
  * - ../../utils/constants: For configuration constants
  * @changelog
- * - 03Sep2025_1309 BST (v2.59.0): Formalized JSDoc comments for useEffect and useLayoutEffect hooks.
+ * - 03Sep2025_1335 BST (v2.59.0): Formalized JSDoc comments for useEffect and useLayoutEffect hooks and added null check for containerRef in applyStyles.
  */
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ReactElement } from 'react'
 import { toast } from 'react-toastify'
@@ -318,7 +318,8 @@ const PayButton = ({
    */
   useEffect(() => {
     try {
-      const container = containerRef.current?.parentElement
+      if (!containerRef.current) return
+      const container = containerRef.current.parentElement
       if (container) {
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 Initial parent div state at mount:`, {
           datasetText: container.dataset.text,
@@ -595,7 +596,7 @@ const PayButton = ({
             headers: { Accept: 'application/json' }
           })
           if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
-          const buttonCodeData: ButtonCodeResponse = await buttonCodeResponse.json()
+          const buttonCodeData: ButtonCodeResponse = await response.json()
           if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
             fetchedPaymentId = buttonCodeData.payment_id
             console.log(`[${new Date().toISOString()}] [${F}] 🔍 [client] Fetched paymentId:`, fetchedPaymentId)
@@ -638,7 +639,6 @@ const PayButton = ({
         // Update paymentId to the new one from the invoice
         if (invoice.paymentId && invoice.paymentId !== paymentId) {
           setPaymentId(invoice.paymentId)
-          //const isMultiUse = data.multi_use === true // Handle boolean or numeric
           const isMultiUse = multiUse === 'true' || multiUse === true
           console.log(`[${new Date().toISOString()}] [${F}] 🔍 Setting paid state:`, {
             paid: true,
