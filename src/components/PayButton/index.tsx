@@ -598,7 +598,7 @@ const PayButton = ({
             headers: { Accept: 'application/json' }
           })
           if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
-          const buttonCodeData: ButtonCodeResponse = await response.json()
+          const buttonCodeData: ButtonCodeResponse = await buttonCodeResponse.json()
           if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
             fetchedPaymentId = buttonCodeData.payment_id
             console.log(`[${new Date().toISOString()}] [${F}] 🔍 [client] Fetched paymentId:`, fetchedPaymentId)
