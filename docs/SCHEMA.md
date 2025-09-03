@@ -1,90 +1,261 @@
-# Database Schema Documentation
+# Database Schema (Gateway)
+**Updated:** 03 Sep 2025 • Source of truth: `migrations/` (see filenames embedded below)
 
-This document outlines the structure of the database for the application. It describes the tables, their fields, and the significance of each field. The database is structured into five main tables: `merchants`, `payment_buttons`, `payments`, `admins`, and `server_settings`. Below is a detailed description of each.
+Gateway stores **satoshi-denominated** payments and embeddable “pay button” definitions.  
+Identifiers for buttons and payments are **12-char tokens** reserved in the `ids` table and then referenced by
+`payment_buttons` and `payments`.
 
-## `merchants`
+---
 
-This table stores information about merchants.
+## Conventions
 
-- `merchant_id` (string, primary key): Unique identifier for the merchant.
-- `custom_fee_rate` (float): Custom fee rate for transactions, expressed as a percentage from 0 to 100.
-- `welcomed` (boolean): Indicates whether the merchant has been introduced to the service with a tutorial (true) or not (false).
-- `custom_fee` (boolean): Indicates whether the merchant receives a custom fee rate (true) or the default rate (false).
-- `created_at` (timestamp): The date and time when the merchant record was created.
-- `updated_at` (timestamp): The date and time when the merchant record was last updated.
+- **Units:** all monetary amounts are **satoshis** (`BIGINT UNSIGNED`). No fiat columns are stored.
+- **Time:** `created_at` / `updated_at` are server-side timestamps (`DEFAULT NOW()`).
+- **IDs:**
+  - `merchant_id` and `admin_id` are compressed public keys (up to **66 chars**).
+  - `button_id` / `payment_id` are **12-char** tokens created in `ids`.
+- **Auth:** rows are owned by a merchant via `merchant_id` FKs with `ON DELETE CASCADE`.
+- **Derivations:** BRC-29 data is stored on `payments` as `derivation_prefix`/`derivation_suffix`.
+- **FK cleanup / ordering / types:** see
+  - `202508210900_initial.ts`
+  - `202508231620_optimize_schema_types.ts`
+  - `202508241018_fix_payments_button_id_fk.ts`
+  - `202508241218_make_payment_buttons_description_nullable.ts`
+  - `20250827_schema_updates.ts`
+  - `202508311200_replace_transaction_id_with_derivation.ts`
 
-## `payment_buttons`
+---
 
-This table stores information about payment buttons.
+## Tables
 
-- `button_id` (string, primary key): Unique identifier for the payment button.
-- `amount` (float): The fixed amount that the button is set to collect. This field is ignored if `variable_amount` is true.
-- `currency` (string): Currency code (e.g., USD, EUR) for the payment button.
-- `variable_amount` (boolean): Indicates whether the button accepts variable payment amounts (true) or only the fixed amount specified (false).
-- `merchant_id` (string): References `merchant_id` in the `merchants` table. Indicates the owner of the payment button.
-- `multi_use` (boolean): Indicates whether the button can be used multiple times (true) or is one-time use (false).
-- `used` (boolean): Indicates whether the button has been used at least once (true) or not (false).
-- `total_paid` (float): The total amount paid through this button.
-- `accepts` (enum): Specifies the payment type accepted by the button - 'BSV', 'fiat', or 'both'.
-- `created_at` (timestamp): The date and time when the payment button record was created.
-- `updated_at` (timestamp): The date and time when the payment button record was last updated.
+### 1) `admins`
+Created in `initial.ts`, widened in `optimize_schema_types.ts`.
 
-## `payments`
+| Column      | Type           | Null | Default           | Notes                                   |
+|-------------|----------------|------|-------------------|-----------------------------------------|
+| `admin_id`  | VARCHAR(66)    | NO   | —                 | **PK**                                  |
+| `created_at`| TIMESTAMP      | YES  | `NOW()`           |                                         |
+| `updated_at`| TIMESTAMP      | YES  | `NOW()`           |                                         |
 
-This table records payment transactions.
+---
 
-- `id` (increments, primary key): Unique identifier for the payment.
-- `merchant_id` (string): References `merchant_id` in the `merchants` table. Specifies the recipient of the payment.
-- `completed` (boolean): Indicates whether the payment was completed successfully (true) or not (false).
-- `transaction_info` (longtext): Detailed transaction information or metadata.
-- `amount` (float): The amount of the payment.
-- `currency` (string): Currency code (e.g., USD, EUR) of the payment.
-- `exchange_rate` (float): The exchange rate applied to the payment at the time of transaction.
-- `payment_button_id` (string): References `button_id` in the `payment_buttons` table. Specifies the payment button used for the transaction.
-- `created_at` (timestamp): The date and time when the payment record was created.
-- `updated_at` (timestamp): The date and time when the payment record was last updated.
+### 2) `merchants`
+Created in `initial.ts`, `merchant_id` width & fee type tuned in `optimize_schema_types.ts`.
 
-## `admins`
+| Column            | Type            | Null | Default | Notes                     |
+|-------------------|-----------------|------|---------|---------------------------|
+| `merchant_id`     | VARCHAR(66)     | NO   | —       | **PK**                    |
+| `custom_fee_rate` | DECIMAL(10,6)   | YES  | `0.0`   | Percentage (0–100)        |
+| `welcomed`        | BOOLEAN         | NO   | `false` | Onboarding shown          |
+| `custom_fee`      | BOOLEAN         | NO   | `false` | Uses `custom_fee_rate`    |
+| `created_at`      | TIMESTAMP       | YES  | `NOW()` |                           |
+| `updated_at`      | TIMESTAMP       | YES  | `NOW()` |                           |
 
-This table stores information about administrators.
+---
 
-- `admin_id` (string, primary key): Unique identifier for the administrator.
-- `created_at` (timestamp): The date and time when the admin record was created.
-- `updated_at` (timestamp): The date and time when the admin record was last updated.
+### 3) `ids`
+Created in `initial.ts`; width aligned in `optimize_schema_types.ts`.
 
-## `server_settings`
+| Column         | Type                     | Null | Default | Notes                                                                 |
+|----------------|--------------------------|------|---------|-----------------------------------------------------------------------|
+| `id`           | CHAR(12)                 | NO   | —       | **PK** – reserved token (button or payment)                           |
+| `merchant_id`  | VARCHAR(66)              | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)                          |
+| `type`         | ENUM('payment','button') | NO   | —       | Resource kind                                                         |
+| `timestamp`    | TIMESTAMP                | YES  | `NOW()` | Reservation time                                                      |
 
-This table contains settings related to the server and third-party integrations.
+> Usage: Clients first call the ID-reservation API; subsequent records in `payment_buttons` / `payments` must point to these tokens.
 
-- `id` (increments, primary key): Unique identifier for the setting record.
-- `stripe_api_key` (string): The Stripe API key used for processing payments.
-- `sendgrid_credentials` (text): Credentials for SendGrid used for sending emails.
-- `default_fee_rate` (float): The default fee rate for transactions, expressed as a percentage from 0 to 100.
-- `setup_complete` (boolean): Indicates whether the initial server setup has been completed (true) or not (false).
-- `created_at` (timestamp): The date and time when the server setting record was created.
-- `updated_at` (timestamp): The date and time when the server setting record was last updated.
+---
 
-# Revised Justification Table for payment_buttons Fields
+### 4) `payment_buttons`
+Created in `initial.ts`; **description removed and `html_code` hardened** in `20250827_schema_updates.ts`.
+`merchant_id` width aligned in `optimize_schema_types.ts`.
 
-Below is the updated table, ordered as follows:
+| Column            | Type           | Null | Default                | Notes                                                                                     |
+|-------------------|----------------|------|------------------------|-------------------------------------------------------------------------------------------|
+| `button_id`       | CHAR(12)       | NO   | —                      | **PK**, **FK** → `ids.id` (`CASCADE`)                                                     |
+| `merchant_id`     | VARCHAR(66)    | NO   | —                      | **FK** → `merchants.merchant_id` (`CASCADE`)                                              |
+| `payment_id`      | CHAR(12)       | YES  | `NULL`                 | Optional **FK** → `ids.id` (`CASCADE`) – last/seed payment token (single-use workflows)   |
+| `amount`          | BIGINT UNSIGNED| NO   | `0`                    | Default `0` for variable-amount buttons                                                   |
+| `html_code`       | TEXT           | NO   | `'<div>Pay Now</div>'` | **NOT NULL** (hardened in `20250827_schema_updates.ts`)                                   |
+| `variable_amount` | BOOLEAN        | NO   | `false`                | Allows payer to enter amount                                                              |
+| `multi_use`       | BOOLEAN        | NO   | `false`                | Button can be used repeatedly                                                             |
+| `used`            | BOOLEAN        | NO   | `false`                | Server/UI mark for single-use buttons after success                                       |
+| `created_at`      | TIMESTAMP      | YES  | `NOW()`                |                                                                                           |
+| `updated_at`      | TIMESTAMP      | YES  | `NOW()`                |                                                                                           |
 
-Primary Key: button_id  
-Foreign Keys: merchant_id, payment_id  
-Non-Nullable Attributes: amount, description, html_code, variable_amount, multi_use, used  
-Nullable Attributes: total_paid  
-Timestamps: created_at, updated_at
+> **Removed columns:**  
+> - `description` (made nullable in `202508241218…`, **dropped** in `20250827_schema_updates.ts`)  
+> - `total_paid` (**dropped** in `20250827_schema_updates.ts`)  
+> **Never existed (old doc):** `currency`, `accepts`
 
-| Field Name      | Data Type            | Nullability  | Default Value                    | Constraints                                               | Justification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --------------- | -------------------- | ------------ | -------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| button_id       | string(12)           | Not Nullable | None                             | Primary Key, References ids.id with onDelete('CASCADE')   | The button_id serves as the unique identifier for each payment button, acting as the primary key. It is a 12-character string referencing the ids table to ensure uniqueness and traceability to a merchant-generated ID. The notNullable constraint is essential as every button must have a valid ID upon creation. The onDelete('CASCADE') ensures that if the associated ID is deleted, all related buttons are removed, maintaining data integrity.                                                                                                                          |
-| merchant_id     | string(255)          | Not Nullable | None                             | References merchants.merchant_id with onDelete('CASCADE') | This field links each payment button to its merchant, ensuring every button is associated with a valid merchant. The 255-character length provides flexibility for merchant identifiers, and notNullable is required as a button cannot exist without a merchant. The onDelete('CASCADE') ensures that deleting a merchant cascades to remove all its buttons, preserving referential integrity.                                                                                                                                                                                  |
-| payment_id      | string(12)           | Nullable     | None                             | References ids.id with onDelete('CASCADE')                | The payment_id optionally links a button to a specific payment, set after the button is used (e.g., for single-use buttons). Its nullability reflects that not all buttons will have an associated payment immediately or ever (e.g., multi-use buttons). The reference to ids.id with onDelete('CASCADE') ensures that if the payment ID is deleted, the button’s reference is cleared, avoiding orphaned data.                                                                                                                                                                  |
-| amount          | bigInteger(unsigned) | Not Nullable | 0                                | None                                                      | The amount represents the initial configured payment amount for the button, mandatory at creation. A default of 0 is set to accommodate variable-amount buttons, where the payer determines the amount, while fixed-amount buttons use a specified value. The notNullable constraint ensures every button has a base value, and unsigned prevents negative amounts. It is not updated post-insert for variable buttons; actual paid amounts are tracked in total_paid or payments, avoiding merchant confusion as discussed, with a UI note clarifying this for variable buttons. |
-| description     | text                 | Not Nullable | 'No description'                 | None                                                      | The description provides context for the payment’s purpose, making it mandatory to ensure customers understand the transaction. Set at button generation, it defaults to 'No description' if not specified, satisfying the non-nullable rule. Its text type allows for flexible length, and the requirement aligns with the need for clarity, preventing optional omission post-creation as agreed.                                                                                                                                                                               |
-| html_code       | text                 | Not Nullable | `&lt;div&gt;Pay Now&lt;/div&gt;` | None                                                      | The html_code defines the button’s display HTML, mandatory to ensure every button has a visible representation. Set at generation, it defaults to a basic `&lt;div&gt;Pay Now&lt;/div&gt;` if not customized, adhering to the non-nullable rule. The text type supports complex HTML, and its mandatory nature guarantees usability, with no post-insert updates expected as discussed.                                                                                                                                                                                           |
-| variable_amount | boolean              | Not Nullable | false                            | None                                                      | This flag indicates if the button allows variable amounts, set at creation. The notNullable constraint with a default of false ensures every button has a defined behavior, aligning with the rule that fields set on insert need not be nullable. It is not updated post-insert, simplifying the schema.                                                                                                                                                                                                                                                                         |
-| multi_use       | boolean              | Not Nullable | false                            | None                                                      | The multi_use flag determines if the button can be used multiple times, set at creation. The notNullable constraint with a default of false ensures a clear initial state, consistent with the non-nullable rule for insert-only fields.                                                                                                                                                                                                                                                                                                                                          |
-| used            | boolean              | Not Nullable | false                            | None                                                      | The used flag tracks if the button has been used, defaulting to false at creation. While it may be updated to true post-insert, the notNullable constraint with a default ensures a valid initial state, fitting the rule as it’s set on insert with potential updates.                                                                                                                                                                                                                                                                                                           |
-| total_paid      | bigInteger(unsigned) | Nullable     | None                             | None                                                      | The total_paid field accumulates the total amount paid through the button, updated after each payment. Its nullability reflects that no payments may have occurred initially, aligning with the rule for fields updated post-insert. The unsigned constraint prevents negative totals.                                                                                                                                                                                                                                                                                            |
-| created_at      | timestamp            | Not Nullable | knex.fn.now()                    | None                                                      | The created_at timestamp records the button’s creation time, automatically set on insert. The notNullable constraint with a default ensures every record has a creation date, consistent with audit field placement.                                                                                                                                                                                                                                                                                                                                                              |
-| updated_at      | timestamp            | Not Nullable | knex.fn.now()                    | None                                                      | The updated_at timestamp records the last update time, automatically set on insert and updated on modification. The notNullable constraint with a default ensures every record has an update date, serving as an audit field.                                                                                                                                                                                                                                                                                                                                                     |
+---
+
+### 5) `payments`
+Created in `initial.ts`, extended/fixed by subsequent migrations:
+- `description` added (`202508211200…`) and constrained to `VARCHAR(80) NOT NULL DEFAULT ''` (`202508231620…`)
+- `exchange_rate` **dropped** (`202508231620…`)
+- `button_id` FK now points to **`payment_buttons.button_id`** (`202508241018…`)
+- `transaction_id` **renamed** to **`derivation_prefix`**, and **`derivation_suffix`** added (`202508311200…`)
+
+| Column                 | Type            | Null | Default | Notes                                                                                     |
+|------------------------|-----------------|------|---------|-------------------------------------------------------------------------------------------|
+| `payment_id`           | CHAR(12)        | NO   | —       | **PK**, **FK** → `ids.id` (`CASCADE`)                                                     |
+| `merchant_id`          | VARCHAR(66)     | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)                                              |
+| `button_id`            | CHAR(12)        | NO   | —       | **FK** → `payment_buttons.button_id` (`CASCADE`)                                          |
+| `derivation_prefix`    | VARCHAR(64)     | NO   | —       | Replaces `transaction_id`; BRC-29 prefix                                                  |
+| `derivation_suffix`    | VARCHAR(64)     | YES  | `NULL`  | BRC-29 suffix (populated `'1'` in migration)                                              |
+| `amount`               | BIGINT UNSIGNED | NO   | `0`     | Satoshis                                                                                  |
+| `payer_id`             | VARCHAR(255)    | YES  | `NULL`  | Optional payer identifier                                                                 |
+| `txid`                 | VARCHAR(64)     | YES  | `NULL`  | Network transaction id                                                                    |
+| `completed`            | BOOLEAN         | NO   | `false` | Server-side completion marker                                                             |
+| `is_new`               | BOOLEAN         | NO   | `true`  | For inbox/ack flow                                                                        |
+| `blockchain_transaction` | LONGTEXT     | YES  | `NULL`  | Raw/atomic (e.g., BEEF)                                                                   |
+| `description`          | VARCHAR(80)     | NO   | `''`    | Short human label (added/constrained by migrations)                                       |
+| `created_at`           | TIMESTAMP       | YES  | `NOW()` |                                                                                           |
+| `updated_at`           | TIMESTAMP       | YES  | `NOW()` |                                                                                           |
+
+> **Removed columns:** `exchange_rate`  
+> **Renamed:** `transaction_id` → `derivation_prefix`
+
+---
+
+### 6) `server_settings`
+Created in `initial.ts`.
+
+| Column                 | Type             | Null | Default | Notes                                |
+|------------------------|------------------|------|---------|--------------------------------------|
+| `id`                   | INT AUTO_INC     | NO   | —       | **PK**                               |
+| `stripe_api_key`       | VARCHAR(255)     | YES  | `NULL`  | Optional                             |
+| `sendgrid_credentials` | TEXT             | YES  | `NULL`  | Optional                             |
+| `default_fee_rate`     | DECIMAL(24,10)   | YES  | `0`     | Percentage                           |
+| `setup_complete`       | BOOLEAN          | NO   | `false` |                                      |
+| `created_at`           | TIMESTAMP        | YES  | `NOW()` |                                      |
+| `updated_at`           | TIMESTAMP        | YES  | `NOW()` |                                      |
+
+---
+
+## Relationships (ER Overview)
+
+- **Merchant → IDs**: `merchants.merchant_id` (1-to-many) ← `ids.merchant_id`
+- **IDs → Buttons**: `ids.id` (1-to-1) → `payment_buttons.button_id`
+- **IDs → Payments**: `ids.id` (1-to-1) → `payments.payment_id`
+- **Merchant → Buttons**: `merchants.merchant_id` (1-to-many) ← `payment_buttons.merchant_id`
+- **Merchant → Payments**: `merchants.merchant_id` (1-to-many) ← `payments.merchant_id`
+- **Button → Payments**: `payment_buttons.button_id` (1-to-many) ← `payments.button_id`
+
+All FKs use **`ON DELETE CASCADE`**.
+
+---
+
+## “payment_buttons” — Field Justification (current)
+
+> Supersedes older table that listed `description`, `total_paid`, `currency`, `accepts` (no longer present).
+
+| Field              | Why it exists / behavior                                                                                                     |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| `button_id`        | Stable 12-char token from `ids`; couples UI embed and ledger.                                                                |
+| `merchant_id`      | Ownership & isolation; cascades on merchant deletion.                                                                        |
+| `payment_id`       | Optional link to a pre-reserved payment token (handy for single-use flows / deep links).                                     |
+| `amount`           | Default amount in sats. `0` when the button is variable and the payer will choose.                                           |
+| `html_code`        | Canonical snippet rendered in the UI; hardened to **NOT NULL** with a safe default so buttons are always embeddable.         |
+| `variable_amount`  | Client UX toggle for variable vs fixed price.                                                                                |
+| `multi_use`        | Governs whether the server/UI should allow repeated successful pays.                                                         |
+| `used`             | Single-use safety latch; prevents replay after success (enforced client & server side).                                      |
+| `created_at/updated_at` | Auditing / ordering.                                                                                                   |
+
+---
+
+## Notable Differences from the Old Document
+
+- **Removed** from schema: `currency`, `accepts`, `total_paid`, and **button** `description`.  
+- **Payments** now store **BRC-29** derivations: `derivation_prefix` + `derivation_suffix`.  
+- **All monetary values are in sats**; `exchange_rate` was dropped.  
+- `merchant_id` / `admin_id` are **VARCHAR(66)** (compressed keys).  
+- `payments.button_id` now **references `payment_buttons.button_id`** (not `ids`).
+
+---
+
+## Suggested Indexes (beyond PK/FKs)
+
+- `payments (merchant_id, is_new, created_at DESC)`
+- `payments (button_id, created_at DESC)`
+- `payment_buttons (merchant_id, created_at DESC)`
+
+> MySQL creates indexes to satisfy FKs, but the above compound indexes help listing endpoints.
+
+---
+
+## DDL Snapshot (pseudo-SQL)
+
+> This is illustrative; exact SQL is generated by Knex during migrations.
+
+```sql
+CREATE TABLE merchants (
+  merchant_id        VARCHAR(66) PRIMARY KEY,
+  custom_fee_rate    DECIMAL(10,6) UNSIGNED DEFAULT 0.0,
+  welcomed           BOOLEAN NOT NULL DEFAULT FALSE,
+  custom_fee         BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ids (
+  id             CHAR(12) PRIMARY KEY,
+  merchant_id    VARCHAR(66) NOT NULL,
+  type           ENUM('payment','button') NOT NULL,
+  timestamp      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE payment_buttons (
+  button_id        CHAR(12) PRIMARY KEY,
+  merchant_id      VARCHAR(66) NOT NULL,
+  payment_id       CHAR(12) NULL,
+  amount           BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  html_code        TEXT NOT NULL DEFAULT '<div>Pay Now</div>',
+  variable_amount  BOOLEAN NOT NULL DEFAULT FALSE,
+  multi_use        BOOLEAN NOT NULL DEFAULT FALSE,
+  used             BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (button_id)  REFERENCES ids(id)         ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (payment_id) REFERENCES ids(id)         ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (merchant_id)REFERENCES merchants(merchant_id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE payments (
+  payment_id            CHAR(12) PRIMARY KEY,
+  merchant_id           VARCHAR(66) NOT NULL,
+  button_id             CHAR(12) NOT NULL,
+  derivation_prefix     VARCHAR(64) NOT NULL,
+  derivation_suffix     VARCHAR(64) NULL DEFAULT NULL,
+  amount                BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  payer_id              VARCHAR(255) NULL,
+  txid                  VARCHAR(64) NULL,
+  completed             BOOLEAN NOT NULL DEFAULT FALSE,
+  is_new                BOOLEAN NOT NULL DEFAULT TRUE,
+  blockchain_transaction LONGTEXT NULL,
+  description           VARCHAR(80) NOT NULL DEFAULT '',
+  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (button_id)   REFERENCES payment_buttons(button_id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (payment_id)  REFERENCES ids(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE admins (
+  admin_id    VARCHAR(66) PRIMARY KEY,
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE server_settings (
+  id                    INT AUTO_INCREMENT PRIMARY KEY,
+  stripe_api_key        VARCHAR(255) NULL,
+  sendgrid_credentials  TEXT NULL,
+  default_fee_rate      DECIMAL(24,10) UNSIGNED DEFAULT 0,
+  setup_complete        BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
