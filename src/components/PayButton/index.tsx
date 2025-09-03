@@ -1,7 +1,7 @@
 /**
  * @file src/components/PayButton/index.tsx
  * @description Renders a PayButton component for initiating blockchain payments using the Metanet client, supporting variable amounts and single-use/multi-use buttons with a multi-step flow for verification, invoice request, transaction signing, and payment submission.
- * @version 2.59.0 (Updated 03Sep2025_1214 BST to standardize JSDoc header and update dependencies)
+ * @version 2.59.0 (Updated 03Sep2025_1309 BST to formalize hook JSDocs)
  * @author xAI (Grok 3)
  * @dependencies
  * - react: For component rendering and state management
@@ -9,13 +9,12 @@
  * - @bsv/sdk: For blockchain transaction handling and Metanet client integration
  * - ../../utils/constants: For configuration constants
  * @changelog
- * - 03Sep2025_1214 BST (v2.59.0): Updated JSDoc header to follow standardized template and included accurate dependencies.
+ * - 03Sep2025_1309 BST (v2.59.0): Formalized JSDoc comments for useEffect and useLayoutEffect hooks.
  */
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ReactElement } from 'react'
 import { toast } from 'react-toastify'
 import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
-
 // Component logging prefix
 const F = 'components/PayButton'
 
@@ -64,6 +63,7 @@ interface ListOutputsArgs {
  * @property {string} [loadingtext] - Optional loading text (defaults to 'Loading, please wait…').
  * @property {boolean} [variable] - Optional flag for variable amount input (defaults to false).
  * @property {string} [width] - Optional width style (defaults to 'fit-content').
+ * @property {string | boolean} [multiUse] - Optional flag for multi-use buttons.
  */
 export interface PayButtonProps {
   text?: string
@@ -85,7 +85,6 @@ export interface PayButtonProps {
  * @property {string} [message] - Optional error message.
  * @property {string} derivation_suffix - BRC29 derivation suffix.
  * @property {string} derivation_prefix - BRC29 derivation prefix.
- //* @property {string} transaction_id - Transaction identifier.
  * @property {string} paymentId - Payment identifier.
  * @property {CreateActionOutput[] | undefined} outputs - Optional transaction outputs.
  */
@@ -94,7 +93,6 @@ interface InvoiceResponse {
   message?: string
   derivation_suffix: string
   derivation_prefix: string
-  //*transaction_id: string
   paymentId: string
   outputs: CreateActionOutput[] | undefined
 }
@@ -186,6 +184,7 @@ const PayButton = ({
 
   /**
    * Validates required props and sets disabled state if invalid.
+   * @function validateProps
    */
   useEffect(() => {
     try {
@@ -221,6 +220,7 @@ const PayButton = ({
 
   /**
    * Fetches button status to determine single-use and usage state.
+   * @function fetchButtonStatus
    */
   useEffect(() => {
     if (!paymentId || disabled) return
@@ -259,10 +259,11 @@ const PayButton = ({
       }
     }
     fetchButtonStatus()
-  }, [server, paymentId, disabled, paid]) // Re-run after payment
+  }, [server, paymentId, disabled, paid])
 
   /**
    * Caches parent dataset values from the DOM.
+   * @function cacheParentDataset
    */
   useEffect(() => {
     try {
@@ -289,6 +290,7 @@ const PayButton = ({
 
   /**
    * Computes and updates the dynamic button label.
+   * @function updateButtonLabel
    */
   useEffect(() => {
     try {
@@ -312,6 +314,7 @@ const PayButton = ({
 
   /**
    * Applies initial styles and sets up DOM structure.
+   * @function applyStyles
    */
   useEffect(() => {
     try {
@@ -354,6 +357,7 @@ const PayButton = ({
 
   /**
    * Initializes DOM class control on mount.
+   * @function initializeDOM
    */
   useLayoutEffect(() => {
     try {
@@ -432,6 +436,7 @@ const PayButton = ({
 
   /**
    * Handles pay.js script loading and DOM mutation observation.
+   * @function handleScriptAndMutations
    */
   useEffect(() => {
     try {
@@ -484,11 +489,12 @@ const PayButton = ({
         error instanceof Error ? error.message : 'Unknown error'
       )
     }
-  }, [disabled, containerRef, nodeTextRef, checkAndCorrectClass])
+  }, [disabled, containerRef, nodeTextRef])
 
   /**
    * Handles changes to the variable amount input.
    * @param {React.ChangeEvent<HTMLInputElement>} event - The input change event.
+   * @returns {void}
    */
   const handleVariableAmountChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>): void => {
