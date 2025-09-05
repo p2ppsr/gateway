@@ -9,13 +9,29 @@ const getArg = (name, short) => {
   const i = argv.findIndex(a => a === name || a === short);
   return i >= 0 ? argv[i + 1] : undefined;
 };
+/** Support multiple flag aliases */
+const getArgAny = (...names) => {
+  for (const n of names) {
+    const v = getArg(n);
+    if (typeof v !== 'undefined') return v;
+  }
+  return undefined;
+};
 
-const PORT = parseInt(getArg('--port','-p') || process.env.SQL_DATABASE_PORT || '3307', 10);
+const PORT = parseInt(getArgAny('--port', '-p') || process.env.SQL_DATABASE_PORT || '3307', 10);
 if (!Number.isInteger(PORT) || PORT < 1024 || PORT > 65535) {
   console.error(`❌ Invalid port: ${PORT}`);
   process.exit(1);
 }
-const DB_NAME = process.env.SQL_DATABASE_DB_NAME || 'gateway';
+
+/** Allow database name to be passed in via CLI */
+const DB_NAME = getArgAny('--db', '-d', '--database') || process.env.SQL_DATABASE_DB_NAME || 'gateway';
+/** Basic safety: MySQL DB names typically allow letters, digits, underscore */
+if (!/^[A-Za-z0-9_]+$/.test(DB_NAME)) {
+  console.error(`❌ Invalid database name: "${DB_NAME}". Use letters, numbers, and underscore only.`);
+  process.exit(1);
+}
+
 const DB_USER = process.env.SQL_DATABASE_USER || 'gateway';
 const DB_PASS = process.env.SQL_DATABASE_PASSWORD || 'gateway123';
 const HOST = '127.0.0.1';
@@ -82,15 +98,17 @@ function ensureContainer() {
     return;
   }
   console.log(`==> Running MySQL container ${MYSQL_CTN} on ${HOST}:${PORT}...`);
+  // Bind to loopback only; use restart policy; allow MYSQL_ROOT_PASSWORD via env with a safe default
   run('docker', [
     'run','-d',
     '--name', MYSQL_CTN,
     '--network', NETWORK,
-    '-p', `${PORT}:3306`,
+    '--restart','unless-stopped',
+    '-p', `127.0.0.1:${PORT}:3306`,
     '-e','MYSQL_DATABASE='+DB_NAME,
     '-e','MYSQL_USER='+DB_USER,
     '-e','MYSQL_PASSWORD='+DB_PASS,
-    '-e','MYSQL_ROOT_PASSWORD=root',
+    '-e','MYSQL_ROOT_PASSWORD='+ (process.env.MYSQL_ROOT_PASSWORD || 'changeMeNow123!'),
     '-v', `${VOLUME}:/var/lib/mysql`,
     'mysql:8.0'
   ]);
@@ -165,9 +183,26 @@ function migrateOnly() {
   if (r.status !== 0) throw new Error('Knex migrations failed');
 }
 
+(function printBanner() {
+  const usage = [
+    '',
+    'Usage:',
+    '  node scripts/startup.js [--port <port>] [--db <database>]',
+    '',
+    'Examples:',
+    '  node scripts/startup.js --port 3310 --db gateway_dev',
+    '  node scripts/startup.js -p 3307 -d gateway',
+    ''
+  ].join('\n');
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log(usage);
+    process.exit(0);
+  }
+})();
+
 (async function main(){
   try {
-    console.log(`==> Project: ${PROJECT}  DB: ${DB_NAME}  User: ${DB_USER}`);
+    console.log(`==> Project: ${PROJECT}  DB: ${DB_NAME}  User: ${DB_USER}  Port: ${PORT}`);
     ensureContainer();
     waitForMysql();
     ensureDbAndUser();

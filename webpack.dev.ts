@@ -4,6 +4,7 @@ import type { Configuration as WebpackConfiguration } from 'webpack'
 import type { Configuration as DevServerConfiguration } from 'webpack-dev-server'
 import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin'
 import 'dotenv/config' // ← still load .env
+import path from 'path'
 
 const API_HOST = process.env.API_HOST ?? 'localhost'
 const API_PORT = process.env.API_PORT ?? process.env.HTTP_PORT ?? '3001'
@@ -12,23 +13,37 @@ const devServer: DevServerConfiguration = {
   open: true,
   port: 3000,
   hot: true, // Enable HMR
-  client: { overlay: true },
-  historyApiFallback: { index: 'index.html' },
+  client: {
+    overlay: true,
+    webSocketURL: { protocol: 'wss', hostname: 'newspaper-investments-demonstrated-mesa.trycloudflare.com', port: 443 },
+  },
+  allowedHosts: 'all', // accept Cloudflare tunnel host
+  static: {
+    directory: path.resolve(__dirname, 'public'),
+    publicPath: '/',
+    watch: true,
+    serveIndex: false, // avoid directory index clashing with SPA fallback
+  },
+  historyApiFallback: {
+    index: '/index.html',   // leading slash prevents double send
+    disableDotRule: true,   // let paths with dots fall back too
+  },
   proxy: [
     {
       context: ['/api', '/.well-known'], // proxy REST + BRC-104
       target: `http://${API_HOST}:${API_PORT}`,
-      changeOrigin: true
-    }
+      changeOrigin: true,
+      secure: false,
+      logLevel: 'debug',
+    },
   ],
-  static: './public',
   watchFiles: {
     paths: ['src/**/*', 'public/**/*'],
     options: {
-      ignored: /node_modules|\.DS_Store|.*\.hot-update\.(js|json)/, // Ignore noise files and HMR artifacts
-      poll: 1000 // Poll every 1 second to reduce sensitivity
-    }
-  }
+      ignored: /node_modules|\.DS_Store|.*\.hot-update\.(js|json)/,
+      poll: 1000,
+    },
+  },
 }
 
 const developmentConfig: WebpackConfiguration = {

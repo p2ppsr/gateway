@@ -16,6 +16,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, React
 import { toast } from 'react-toastify'
 import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
+import { waitForAuthReady } from '../../utils/general'
 // Component logging prefix
 const F = 'components/PayButton'
 
@@ -223,44 +224,48 @@ const PayButton = ({
    * Fetches button status to determine single-use and usage state.
    * @function fetchButtonStatus
    */
-  useEffect(() => {
-    if (!paymentId || disabled) return
-    const fetchButtonStatus = async (): Promise<void> => {
-      try {
-        const response = await fetch(`${server}/api/buttonCode/${paymentId}`, {
-          headers: { Accept: 'application/json' }
-        })
-        if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
-        const data: ButtonCodeResponse = await response.json()
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button status response:`, {
-          multi_use: data.multi_use,
-          used: data.used,
-          paymentId
-        })
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Fetched button status:`, data)
-        if (data.status === 'success') {
-          const isMultiUse = data.multi_use === true // Handle boolean or numeric
-          const isUsed = data.used === true
-          if (!isMultiUse && isUsed) {
-            setDisabled(true)
-            console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use and already used`)
-            toast.error('This button is single-use and has been used.')
-          }
-        }
-      } catch (error) {
-        console.error(
-          `[${new Date().toISOString()}] [${F}] ❌ Error fetching button status:`,
-          error instanceof Error ? error.message : 'Unknown error'
-        )
-        if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
-          console.log(`[${new Date().toISOString()}] [${F}] ⚠️ Proxy server at ${server} unavailable`)
+useEffect(() => {
+  if (!paymentId || disabled) return
+  let cancelled = false
+  const run = async (): Promise<void> => {
+    try {
+      // Wait until some prior authenticated call (e.g., createButton) succeeded
+      await waitForAuthReady(10_000) // 10s max; tweak if needed
+
+      const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
+      const authFetch = new AuthFetch(wallet)
+ const response = await authFetch.fetch(`${server}/api/buttonCode/${paymentId}`, {
+   method: 'GET'
+ })
+      if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
+      const data: ButtonCodeResponse = await response.json()
+      if (cancelled) return
+
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button status response:`, {
+        multi_use: data.multi_use,
+        used: data.used,
+        paymentId
+      })
+      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Fetched button status:`, data)
+      if (data.status === 'success') {
+        const isMultiUse = data.multi_use === true
+        const isUsed = data.used === true
+        if (!isMultiUse && isUsed) {
           setDisabled(true)
-          toast.error('Button disabled due to server unavailability.')
+          console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use and already used`)
+          toast.error('This button is single-use and has been used.')
         }
       }
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] [${F}] ❌ Error fetching button status:`,
+        error instanceof Error ? error.message : 'Unknown error'
+      )
     }
-    fetchButtonStatus()
-  }, [server, paymentId, disabled, paid])
+  }
+  run()
+  return () => { cancelled = true }
+}, [server, paymentId, disabled, paid])
 
   /**
    * Caches parent dataset values from the DOM.
@@ -594,9 +599,7 @@ const PayButton = ({
         console.log(`[${new Date().toISOString()}] [${F}] ✅ Server status checked:`, status)
         let fetchedPaymentId = paymentId // Use current paymentId state
         try {
-          const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`, {
-            headers: { Accept: 'application/json' }
-          })
+const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`)
           if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
           const buttonCodeData: ButtonCodeResponse = await buttonCodeResponse.json()
           if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {

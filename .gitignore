@@ -13,3 +13,29 @@ dist/
 # optional: built artifacts you don't need to version
 public/pay.js
 public/pay.js.LICENSE.txt
+
+# build artifacts
+dist/
+build/
+
+# env & secrets
+.env.* 
+certs/
+
+# knex build byproducts
+knexfile.js
+knexfile.js.map
+
+# logs
+*.log
+npm-debug.log*
+
+# OS/editor cruft
+.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# local demo pages (optional – see note)
+public/fixedMult*.html
+

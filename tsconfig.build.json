@@ -1,0 +1,32 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "sourceMap": false,
+    "noEmitOnError": true,
+    "noEmit": false,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "allowImportingTsExtensions": false,   // 👈 override the base
+    "composite": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "knexfile.ts",
+    "migrations/**/*.ts",
+    "seeds/**/*.ts"
+  ],
+  "exclude": [
+    "**/*.test.ts",
+    "src/**/*.tsx"
+  ]
+}

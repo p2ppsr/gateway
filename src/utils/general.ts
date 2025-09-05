@@ -1,13 +1,123 @@
 /**
  * @file utils/general.ts
- * @description General utility functions for the Gateway application, including ID generation, formatting, timestamp conversion, HTTP request handling, and validation.
+ * @description
+ * General utility functions for the Gateway application, including:
+ * - ID generation (Base58 / hex)
+ * - Formatting helpers (IDs, timestamps)
+ * - Authenticated fetch with timeout
+ * - CSS validation/sanitization helpers
+ * - **Auth-ready event bus** to defer protected API calls until the wallet (BRC-104) handshake completes
+ *
  * @author xAI
  * @date 2025-09-01
- * @version 1.16
+ * @version 1.17
  * @changelog
- * - 2025-09-01: Added input validation for non-string inputs, fixed modulo bias in generateRandomHex, removed global flag from getBase58Regex, fixed formatTimeLocal error handling, removed emoji from fetchWithTimeout error, and updated JSDoc.
+ * - 2025-09-04 (v1.17): Added lightweight client-side **auth-ready event bus** helpers
+ *   (`markAuthReady`, `onAuthReady`, `waitForAuthReady`) so UI code can postpone protected
+ *   API calls until the wallet session is established. Expanded JSDocs.
+ * - 2025-09-01 (v1.16): Added input validation for non-string inputs, fixed modulo bias in
+ *   `generateRandomHex`, removed global flag from `getBase58Regex`, fixed `formatTimeLocal`
+ *   error handling, removed emoji from `fetchWithTimeout` error, and updated JSDoc.
  */
+
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
+
+/* =============================================================================
+   Auth-ready event bus (client-side helper)
+   -----------------------------------------------------------------------------
+   Purpose:
+   - Let components and utilities defer *protected* API calls until the wallet
+     (BRC-104) handshake is done.
+   - Avoids race conditions where the UI loads before the authenticated session
+     exists.
+
+   Usage:
+   - After a successful wallet session is established, call `markAuthReady()`.
+   - Call `onAuthReady(cb)` in components to perform actions once ready.
+   - Or `await waitForAuthReady()` where awaiting is more convenient.
+
+   Notes:
+   - Idempotent: calling `markAuthReady()` multiple times is safe.
+   - In non-browser contexts this becomes a no-op shim and never fires.
+============================================================================= */
+
+/** Internal event bus (falls back to a no-op shim outside the browser). */
+const _authBus =
+  typeof window !== 'undefined' && typeof window.EventTarget !== 'undefined'
+    ? new EventTarget()
+    : ({ addEventListener() {}, dispatchEvent() { return true } } as unknown as EventTarget)
+
+/** Internal readiness flag for wallet/auth handshake. */
+let _authReady = false
+
+/**
+ * Marks the wallet/auth handshake as complete and notifies listeners.
+ *
+ * @function markAuthReady
+ * @returns {void}
+ * @example
+ * // After establishing the BRC-104 session:
+ * markAuthReady();
+ */
+export function markAuthReady(): void {
+  if (_authReady) return
+  _authReady = true
+  try {
+    _authBus.dispatchEvent(new Event('auth-ready'))
+  } catch {
+    // no-op if Event isn't available
+  }
+}
+
+/**
+ * Registers a callback to run once auth is ready. If already ready, runs immediately.
+ *
+ * @function onAuthReady
+ * @param {() => void} cb - Callback invoked when auth is ready.
+ * @returns {void}
+ * @example
+ * onAuthReady(() => {
+ *   // safe to call protected APIs now
+ *   void fetchButtonStatus();
+ * });
+ */
+export function onAuthReady(cb: () => void): void {
+  if (_authReady) {
+    cb()
+    return
+  }
+  _authBus.addEventListener('auth-ready', cb as EventListener, { once: true })
+}
+
+/**
+ * Returns a Promise that resolves when auth is ready, or rejects on timeout.
+ *
+ * @function waitForAuthReady
+ * @param {number} [timeoutMs=15000] - Maximum time to wait, in milliseconds.
+ * @returns {Promise<void>} Resolves when auth is ready; rejects if the timeout elapses first.
+ * @throws {Error} If the timeout is reached before auth becomes ready.
+ * @example
+ * await waitForAuthReady(10000);
+ * // now it’s safe to call protected APIs
+ */
+export function waitForAuthReady(timeoutMs: number = 15000): Promise<void> {
+  if (_authReady) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('auth-ready timed out')), timeoutMs)
+    _authBus.addEventListener(
+      'auth-ready',
+      () => {
+        clearTimeout(t)
+        resolve()
+      },
+      { once: true }
+    )
+  })
+}
+
+/* =============================================================================
+   ID generation
+============================================================================= */
 
 /**
  * Generates a cryptographically secure random Base58-encoded string of specified length.
@@ -17,21 +127,21 @@ import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
  */
 export function generateBase58(n: number = 12): string {
   if (!Number.isInteger(n) || n <= 0) {
-    throw new Error('Length must be a positive integer');
+    throw new Error('Length must be a positive integer')
   }
-  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let result = '';
-  const maxSafeValue = Math.floor((2 ** 32 - 1) / 58) * 58;
-  const randomValues = crypto.getRandomValues(new Uint32Array(n));
+  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let result = ''
+  const maxSafeValue = Math.floor((2 ** 32 - 1) / 58) * 58
+  const randomValues = crypto.getRandomValues(new Uint32Array(n))
   for (let i = 0; i < n; i++) {
-    let randomValue = randomValues[i];
+    let randomValue = randomValues[i]
     while (randomValue >= maxSafeValue) {
-      randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+      randomValue = crypto.getRandomValues(new Uint32Array(1))[0]
     }
-    const randomIndex = randomValue % 58;
-    result += base58Alphabet[randomIndex];
+    const randomIndex = randomValue % 58
+    result += base58Alphabet[randomIndex]
   }
-  return result;
+  return result
 }
 
 /**
@@ -42,21 +152,21 @@ export function generateBase58(n: number = 12): string {
  */
 export function generateRandomHex(length: number = 12): string {
   if (!Number.isInteger(length) || length <= 0) {
-    throw new Error('Length must be a positive integer');
+    throw new Error('Length must be a positive integer')
   }
-  const hexChars = '0123456789abcdef';
-  let result = '';
-  const maxSafeValue = Math.floor((2 ** 32 - 1) / 16) * 16;
-  const randomValues = crypto.getRandomValues(new Uint32Array(length));
+  const hexChars = '0123456789abcdef'
+  let result = ''
+  const maxSafeValue = Math.floor((2 ** 32 - 1) / 16) * 16
+  const randomValues = crypto.getRandomValues(new Uint32Array(length))
   for (let i = 0; i < length; i++) {
-    let randomValue = randomValues[i];
+    let randomValue = randomValues[i]
     while (randomValue >= maxSafeValue) {
-      randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+      randomValue = crypto.getRandomValues(new Uint32Array(1))[0]
     }
-    const randomIndex = randomValue % 16;
-    result += hexChars[randomIndex];
+    const randomIndex = randomValue % 16
+    result += hexChars[randomIndex]
   }
-  return result;
+  return result
 }
 
 /**
@@ -67,9 +177,9 @@ export function generateRandomHex(length: number = 12): string {
  */
 export function getBase58Regex(length: number = 12): RegExp {
   if (!Number.isInteger(length) || length <= 0) {
-    throw new Error('Length must be a positive integer');
+    throw new Error('Length must be a positive integer')
   }
-  return new RegExp(`^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{${length}}$`);
+  return new RegExp(`^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{${length}}$`)
 }
 
 /**
@@ -80,9 +190,9 @@ export function getBase58Regex(length: number = 12): RegExp {
  */
 export function isBase58(id: string, length: number = 12): boolean {
   if (typeof id !== 'string' || id.length === 0) {
-    return false;
+    return false
   }
-  return getBase58Regex(length).test(id);
+  return getBase58Regex(length).test(id)
 }
 
 /**
@@ -92,26 +202,30 @@ export function isBase58(id: string, length: number = 12): boolean {
  */
 export const isMerchantId = (value: string): boolean => {
   if (typeof value !== 'string' || value.length === 0) {
-    return false;
+    return false
   }
   if (![64, 66].includes(value.length)) {
-    return false;
+    return false
   }
-  const hexRegex = /^[0-9a-fA-F]+$/;
+  const hexRegex = /^[0-9a-fA-F]+$/
   if (!hexRegex.test(value)) {
-    return false;
+    return false
   }
   if (value.length === 66 && !value.startsWith('02') && !value.startsWith('03')) {
-    return false;
+    return false
   }
   try {
-    PublicKey.fromString(value);
-    return true;
+    PublicKey.fromString(value)
+    return true
   } catch (error) {
-    console.warn(`Invalid public key format for merchant ID: ${value}`, error);
-    return false;
+    console.warn(`Invalid public key format for merchant ID: ${value}`, error)
+    return false
   }
-};
+}
+
+/* =============================================================================
+   Formatting helpers
+============================================================================= */
 
 /**
  * Formats an ID (e.g., derivation_prefix, derivation_suffix, button_id) as 'first4...last4' with ellipses.
@@ -120,10 +234,10 @@ export const isMerchantId = (value: string): boolean => {
  */
 export function formatId(id: string): string {
   if (typeof id !== 'string' || id.length === 0) {
-    return '';
+    return ''
   }
-  if (id.length < 8) return id;
-  return `${id.slice(0, 4)}...${id.slice(-4)}`;
+  if (id.length < 8) return id
+  return `${id.slice(0, 4)}...${id.slice(-4)}`
 }
 
 /**
@@ -133,13 +247,13 @@ export function formatId(id: string): string {
  */
 export function formatTimeLocal(dateStr: string | null | undefined): string {
   if (!dateStr) {
-    return 'N/A';
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date string: ${dateStr}`);
-      return 'N/A';
+      console.warn(`Invalid date string: ${dateStr}`)
+      return 'N/A'
     }
     return date
       .toLocaleString('en-GB', {
@@ -151,10 +265,10 @@ export function formatTimeLocal(dateStr: string | null | undefined): string {
         second: '2-digit',
         hour12: false
       })
-      .replace(',', '');
+      .replace(',', '')
   } catch (error) {
-    console.warn(`Error formatting date string: ${dateStr}`, error);
-    return 'N/A';
+    console.warn(`Error formatting date string: ${dateStr}`, error)
+    return 'N/A'
   }
 }
 
@@ -165,20 +279,24 @@ export function formatTimeLocal(dateStr: string | null | undefined): string {
  */
 export function formatTimestamp(dateStr: string | null | undefined): string {
   if (!dateStr) {
-    return 'N/A';
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date string: ${dateStr}`);
-      return 'N/A';
+      console.warn(`Invalid date string: ${dateStr}`)
+      return 'N/A'
     }
-    return date.toISOString().replace('T', ' ').slice(0, 19);
+    return date.toISOString().replace('T', ' ').slice(0, 19)
   } catch (error) {
-    console.warn(`Error formatting timestamp: ${dateStr}`, error);
-    return 'N/A';
+    console.warn(`Error formatting timestamp: ${dateStr}`, error)
+    return 'N/A'
   }
 }
+
+/* =============================================================================
+   Networking
+============================================================================= */
 
 /**
  * Performs an HTTP fetch with a configurable timeout using the provided wallet for authentication.
@@ -190,7 +308,7 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
  * @param {WalletClient} wallet The WalletClient instance for authentication.
  * @param {number} [timeoutMs=15000] The timeout duration in milliseconds (default: 15000).
  * @returns {Promise<Response>} A Promise resolving to the Response object.
- * @throws {Error} If the request times out or fails, with detailed context.
+ * @throws {Error} If the request times out or the response is non-2xx.
  */
 export const fetchWithTimeout = async (
   url: string,
@@ -199,35 +317,39 @@ export const fetchWithTimeout = async (
   timeoutMs: number = 15000
 ): Promise<Response> => {
   if (typeof url !== 'string' || url.length === 0) {
-    throw new Error('URL must be a non-empty string');
+    throw new Error('URL must be a non-empty string')
   }
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
-    throw new Error('Timeout must be a positive integer');
+    throw new Error('Timeout must be a positive integer')
   }
-  const authFetch = new AuthFetch(wallet);
+  const authFetch = new AuthFetch(wallet)
   const timeoutId = setTimeout(() => {
-    throw new Error(`Request timed out after ${timeoutMs}ms for URL: ${url}`);
-  }, timeoutMs);
+    throw new Error(`Request timed out after ${timeoutMs}ms for URL: ${url}`)
+  }, timeoutMs)
   try {
-    const response = await authFetch.fetch(url, options);
+    const response = await authFetch.fetch(url, options)
     if (!response.ok) {
-      let errorDetail = '';
+      let errorDetail = ''
       try {
-        errorDetail = await response.text();
-      } catch (textError) {
-        errorDetail = 'Failed to retrieve error details';
+        errorDetail = await response.text()
+      } catch {
+        errorDetail = 'Failed to retrieve error details'
       }
       throw new Error(
         `Failed to fetch ${url} with method ${options.method || 'GET'}: Status ${response.status} ${response.statusText}, Details: ${errorDetail}`
-      );
+      )
     }
-    return response;
+    return response
   } catch (err) {
-    throw err instanceof Error ? err : new Error(`Failed to fetch ${url}: ${String(err)}`);
+    throw err instanceof Error ? err : new Error(`Failed to fetch ${url}: ${String(err)}`)
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timeoutId)
   }
-};
+}
+
+/* =============================================================================
+   CSS utilities
+============================================================================= */
 
 /**
  * Validates CSS input by checking syntax, balanced parentheses, hex color formats, and linear gradients.
@@ -236,45 +358,45 @@ export const fetchWithTimeout = async (
  */
 export const validateCSS = (css: string): boolean => {
   if (typeof css !== 'string' || css.length === 0) {
-    return false;
+    return false
   }
   try {
     const rules = css
       .split('}')
       .map(rule => rule.trim())
-      .filter(rule => rule.length > 0);
+      .filter(rule => rule.length > 0)
     for (const rule of rules) {
-      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim());
-      if (!selectorPart || !propertiesPart) return false;
+      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim())
+      if (!selectorPart || !propertiesPart) return false
       const properties = propertiesPart
         .split(';')
         .map(prop => prop.trim())
-        .filter(prop => prop.length > 0);
+        .filter(prop => prop.length > 0)
       for (const prop of properties) {
-        const [key, value] = prop.split(':').map(part => part.trim());
-        if (!key || !value) return false;
+        const [key, value] = prop.split(':').map(part => part.trim())
+        if (!key || !value) return false
         if (value.includes('#')) {
-          const hexMatch = value.match(/#[0-9a-fA-F]{3,6}/g);
-          if (!hexMatch) return false;
+          const hexMatch = value.match(/#[0-9a-fA-F]{3,6}/g)
+          if (!hexMatch) return false
         }
         if (value.includes('(')) {
-          const openCount = (value.match(/\(/g) || []).length;
-          const closeCount = (value.match(/\)/g) || []).length;
-          if (openCount !== closeCount) return false;
+          const openCount = (value.match(/\(/g) || []).length
+          const closeCount = (value.match(/\)/g) || []).length
+          if (openCount !== closeCount) return false
           if (value.includes('linear-gradient')) {
-            if (!value.match(/linear-gradient\s*\([^)]+\)/)) return false;
-            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g);
-            if (!colorMatches || colorMatches.length < 2) return false;
+            if (!value.match(/linear-gradient\s*\([^)]+\)/)) return false
+            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g)
+            if (!colorMatches || colorMatches.length < 2) return false
           }
         }
       }
     }
-    return true;
+    return true
   } catch (error) {
-    console.warn(`Invalid CSS: ${css}`, error);
-    return false;
+    console.warn(`Invalid CSS: ${css}`, error)
+    return false
   }
-};
+}
 
 /**
  * Extracts CSS content from a <style> tag.
@@ -283,15 +405,15 @@ export const validateCSS = (css: string): boolean => {
  */
 export const extractCSS = (input: string): string => {
   if (typeof input !== 'string' || input.length === 0) {
-    return '';
+    return ''
   }
-  const match = input.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i);
+  const match = input.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i)
   if (!match) {
-    console.warn(`No style tags found in input: ${input.slice(0, 50)}...`);
-    return input.trim();
+    console.warn(`No style tags found in input: ${input.slice(0, 50)}...`)
+    return input.trim()
   }
-  return match[1].trim();
-};
+  return match[1].trim()
+}
 
 /**
  * Sanitizes input by escaping HTML characters to prevent injection.
@@ -300,12 +422,12 @@ export const extractCSS = (input: string): string => {
  */
 export const sanitizeInput = (input: string): string => {
   if (typeof input !== 'string') {
-    return '';
+    return ''
   }
   return input
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-};
+    .replace(/'/g, '&#x27;')
+}

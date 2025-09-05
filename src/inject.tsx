@@ -21,7 +21,7 @@ import { createRoot } from 'react-dom/client'
 import PayButton, { PayButtonProps } from './components/PayButton'
 import { logWithTimestamp } from './utils/logging'
 import { initializeIds } from './utils/initializeIds'
-import { fetchWithTimeout } from './utils/general'
+import { fetchWithTimeout, markAuthReady } from './utils/general'
 import { WalletClient } from '@bsv/sdk'
 import { CONFIG } from './utils/constants'
 
@@ -147,6 +147,13 @@ const createButton = async (
         paymentId: data.paymentId,
         buttonId: data.buttonId
       })
+
+logWithTimestamp(F, '✅ [createButton] success:', {
+  paymentId: data.paymentId,
+  buttonId: data.buttonId
+})
+markAuthReady() // auth/session established via AuthFetch -> let others proceed
+
       // Prefer server-confirmed paymentId
       if (!props.paymentId && data.paymentId) props.paymentId = String(data.paymentId)
     } else {
