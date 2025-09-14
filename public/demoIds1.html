@@ -1,0 +1,30 @@
+<!doctype html>
+<meta charset="utf-8"/>
+<title>Gateway demo</title>
+<button id="init">Initialize IDs</button>
+<pre id="out"></pre>
+<script>
+(async function () {
+  // Small helper: same-origin absolute path
+  const call = (path, init={}) =>
+    fetch(path, { credentials: 'include', ...init });
+
+  // If your UI normally waits for wallet auth, simulate that here if needed:
+  // await window.waitForAuthReady?.(10000);
+
+  document.getElementById('init').onclick = async () => {
+    try {
+      const r = await call('/api/initializeIds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      const t = await r.text();
+      document.getElementById('out').textContent =
+        r.status + ' ' + r.statusText + '\n' + t;
+    } catch (e) {
+      document.getElementById('out').textContent = 'Error: ' + e;
+    }
+  };
+})();
+</script>

@@ -1,33 +1,50 @@
+// src/utils/checkForMetanetclient.ts
 /**
  * @file src/utils/checkForMetanetclient.ts
- * @description Utility function to check if the Metanet Client is running and determine its network (mainnet or testnet) using WalletClient.
- * @version 1.0.0 (Updated 02Sep2025_1919 BST to standardize header comment)
- * @author xAI (Grok 3)
+ * @description Utility functions to check if the Metanet Client is running and determine its network (mainnet or testnet), plus a helper to probe multiple ports.
+ * @version 1.1.0 (Updated 07Sep2025: add findWalletOrigin named export for runtime port probing)
+ * author xAI (Grok 3)
  * @dependencies
  * - @bsv/sdk: For WalletClient
  * @changelog
  * - 02Sep2025_1919 BST (v1.0.0): Updated header comment to follow standardized template.
+ * - 07Sep2025_1830 UTC (v1.1.0): Added findWalletOrigin helper.
  */
 import { WalletClient } from '@bsv/sdk'
 
 /**
  * Check if the Metanet Client is running, and whether it's connected to mainnet or testnet.
  *
- * @param {string} walletOrigin - The origin (host) where the Metanet Client is expected to run (e.g., 'http://localhost:4000').
+ * @param {string} walletOrigin - The origin (host) where the Metanet Client is expected to run (e.g., 'http://localhost:3321').
  * @returns {Promise<number>} - Resolves to:
  *   - `1` if the client is running and on mainnet,
  *   - `-1` if running and on testnet,
  *   - `0` if the client is not running or an error occurs.
  */
-export default async (walletOrigin: string): Promise<number> => {
+export default async function checkForMetanetclient(walletOrigin: string): Promise<number> {
   try {
     const { network } = await new WalletClient('auto', walletOrigin).getNetwork()
-    if (network === 'mainnet') {
-      return 1
-    } else {
-      return -1
-    }
-  } catch (error) {
+    return network === 'mainnet' ? 1 : -1
+  } catch {
     return 0
   }
+}
+
+/**
+ * Probe a list of localhost ports and return the first working wallet origin.
+ *
+ * @param {number[]} ports - Array of port numbers to try (e.g., [3321, 3301]).
+ * @returns {Promise<string | null>} - First working origin (e.g., "http://localhost:3321"), or null if none work.
+ */
+export async function findWalletOrigin(ports: number[]): Promise<string | null> {
+  for (const port of ports) {
+    const origin = `http://localhost:${port}`
+    try {
+      await new WalletClient('auto', origin).getNetwork()
+      return origin
+    } catch {
+      // continue trying next port
+    }
+  }
+  return null
 }

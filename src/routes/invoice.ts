@@ -15,7 +15,7 @@
  */
 const F = 'routes/invoice'
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import { randomBytes } from 'crypto'
 import { Hash, P2PKH, PrivateKey, PublicKey, Utils } from '@bsv/sdk'
 import { Request, Response } from 'express'
@@ -81,7 +81,7 @@ export default {
   func: async (req: Request, res: Response): Promise<void> => {
     let derivationPrefix: string = randomBytes(12).toString('hex').slice(0, 12)
     let derivationSuffix: string = randomBytes(12).toString('hex').slice(0, 12)
-    //*let transactionIdNew: string = randomBytes(12).toString('hex').slice(0, 12)
+
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
       logWithTimestamp(F, '❌ [invoice] Validation errors:', errors.array())

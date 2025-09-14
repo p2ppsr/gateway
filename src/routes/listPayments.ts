@@ -16,7 +16,7 @@
  * ... [Previous changelog entries]
  */
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import { Request, Response } from 'express'
 import { logWithTimestamp } from '../utils/logging'
 

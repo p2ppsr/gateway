@@ -9,7 +9,7 @@ import { Knex } from 'knex'
 import type { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 
 const F = 'routes/cleanupIds'
 const db: Knex = require('knex')(knexConfig)
@@ -20,6 +20,7 @@ interface RequestBody {
   merchantId: string
 }
 
+// ------------------ cleanupIds route ------------------
 export default {
   type: 'post',
   path: '/cleanupIds',
@@ -53,11 +54,15 @@ export default {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
       logWithTimestamp(F, '❌ [cleanupIds] Validation errors:', errors.array())
-      res.status(400).json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() })
+      res
+        .status(400)
+        .json({ status: 'error', message: '❌ Invalid parameters', errors: errors.array() })
       return
     }
 
     const { buttonId, paymentId, merchantId }: RequestBody = req.body
+    const allowFallback = (process.env.ALLOW_UNAUTH_FALLBACK ?? '').toLowerCase() === 'yes'
+    logWithTimestamp(F, '⚙️ [cleanupIds] Starting cleanup', { buttonId, paymentId, merchantId, allowFallback })
 
     try {
       await db.transaction(async trx => {
@@ -65,6 +70,11 @@ export default {
         await db('ids').transacting(trx).where({ id: buttonId, type: 'button', merchant_id: merchantId }).delete()
         logWithTimestamp(F, '✅ [cleanupIds] Cleaned up orphaned IDs:', { paymentId, buttonId, merchantId })
       })
+
+      // In fallback mode, short-circuit success to avoid frontend peer send
+      if (allowFallback) {
+        logWithTimestamp(F, '⚠️ [cleanupIds] Skipping peer messaging (ALLOW_UNAUTH_FALLBACK=yes)')
+      }
 
       res.status(200).json({
         status: 'success',

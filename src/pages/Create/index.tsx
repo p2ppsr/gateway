@@ -45,9 +45,13 @@ import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { logWithTimestamp } from '../../utils/logging'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
-import { fetchWithTimeout, validateCSS } from '../../utils/general'
+import { validateCSS } from '../../utils/general'
 import { initializeIds, InitializeIdsResponse } from '../../utils/initializeIds'
 import { generateBase58 } from '../../utils/general'
+import { fetchJsonWithAuth, fetchWithAuth, setApiDefaultWallet } from '../../utils/api'
+
+// Vite injects this at build time, declare for TS
+declare const __SERVER_IDENTITY_KEY__: string
 
 const debounce = (func: (...args: any[]) => void, wait: number) => {
   let timeout: number | null = null
@@ -71,8 +75,6 @@ const extractCSS = (html: string): string => {
   return styleMatch ? styleMatch[1].trim() : ''
 }
 
-const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-
 interface CodeSnippetProps {
   code: string
   language: string
@@ -85,6 +87,14 @@ interface ButtonResponse {
   buttonId: string
 }
 
+// Add just below `interface ButtonResponse`:
+type ButtonCodeResponse = {
+  status: 'success' | 'error'
+  button_id: string
+  payment_id: string
+  message?: string
+}
+
 // Normalize CSS to use 4-space indentation for properties
 const normalizeCSS = (css: string): string => {
   const lines = css.trim().split('\n')
@@ -93,7 +103,7 @@ const normalizeCSS = (css: string): string => {
   for (const line of lines) {
     const trimmedLine = line.trim()
     if (!trimmedLine) continue
-    if (trimmedLine.startsWith('}') || trimmedLine.startsWith('}')) {
+    if (trimmedLine.startsWith('}')) {
       indentLevel = Math.max(0, indentLevel - 1)
     }
     output += `${'    '.repeat(indentLevel)}${trimmedLine}\n`
@@ -106,12 +116,13 @@ const normalizeCSS = (css: string): string => {
 
 const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   const theme = useTheme()
-  // Normalize indentation to 2 spaces for HTML structure, CSS handled by normalizeCSS
-  const normalizedCode = code
-    .split('\n')
-    .map(line => line.replace(/^\s{2,}/, '  ')) // Replace 2+ spaces with 2 spaces for HTML
-    .join('\n')
-    .trim()
+  const normalizedCode = code.trim()
+  // // Normalize indentation to 2 spaces for HTML structure, CSS handled by normalizeCSS
+  // const normalizedCode = code
+  //   .split('\n')
+  //   .map(line => line.replace(/^\s{2,}/, '  ')) // Replace 2+ spaces with 2 spaces for HTML
+  //   .join('\n')
+  //   .trim()
   return (
     <SyntaxHighlighter
       language={language}
@@ -129,6 +140,8 @@ const Create: React.FC = () => {
   const copyIconRef = useRef<HTMLSpanElement | null>(null)
   const previewContainerRef = useRef<HTMLDivElement | null>(null)
   const isMounted = useRef(false)
+  const walletRef = useRef<WalletClient | null>(null)
+
   const [buttonText_fixed, setButtonText_fixed] = useState('Pay Now')
   const [buttonText_variable, setButtonText_variable] = useState('Pay Now')
   const [spendingDescription_fixed, setSpendingDescription_fixed] = useState('')
@@ -221,11 +234,17 @@ const Create: React.FC = () => {
   const [renderKey, setRenderKey] = useState(0)
   const [isCopyHovered, setIsCopyHovered] = useState(false)
   const [updateCounter, setUpdateCounter] = useState(0)
-  const [isWalletReady, setIsWalletReady] = useState(!!wallet)
+const [isWalletReady, setIsWalletReady] = useState(false)
   const [ids, setIds] = useState<{ buttonId: string; paymentId: string }>({
     buttonId: '',
     paymentId: ''
   })
+
+// Canonical API host for embeds (no trailing slash)
+const PAY_BASE = CONFIG.PAY_BASE.replace(/\/+$/, '')
+logWithTimestamp(F, 'PAY_BASE:', PAY_BASE)
+const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
+logWithTimestamp(F, 'API_BASE:', API_BASE)
 
   const generatePreviewHtml = useCallback(
     (type: 'fixed' | 'variable', description: string) => {
@@ -252,7 +271,6 @@ ${normalizeCSS(cssToUse)}
   data-text="${text}"
   data-description="${safeDescription}"
   data-width="fit-content"
-  data-server="${location.protocol}//${location.host}"
   data-multi-use="${!isSingleUse}">${text}</div>`
         setPreviewFixedHtml(previewHtml)
         setPreviewCode_fixed(codeHtml)
@@ -272,7 +290,6 @@ ${normalizeCSS(cssToUse)}
   data-description="${safeDescription}"
   data-variable="true"
   data-width="fit-content"
-  data-server="${location.protocol}//${location.host}"
   data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
         setPreviewVariableHtml(previewHtml)
         setPreviewCode_variable(codeHtml)
@@ -324,9 +341,7 @@ ${normalizeCSS(cssToUse)}
       isSingleUse ? ' disabled' : ''
     }"\n data-merchant="${
       merchant || 'temp-merchant'
-    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${fixedDescription}"\n data-width="fit-content"\n data-server="${
-      location.protocol
-    }//${location.host}"\n data-multi-use="${!isSingleUse}">${fixedText}</div>`
+    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(fixedDescription)}"\n data-width="fit-content"\n data-multi-use="${!isSingleUse}">${fixedText}</div>`
     const variableCode = `<style>\n${
       validateCSS(extractCSS(customCSS_variable))
         ? extractCSS(customCSS_variable).trim()
@@ -335,11 +350,7 @@ ${normalizeCSS(cssToUse)}
       isSingleUse ? ' disabled' : ''
     }"\n data-merchant="${
       merchant || 'temp-merchant'
-    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${variableDescription}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
-      location.protocol
-    }//${
-      location.host
-    }"\n data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(variableDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
     logWithTimestamp(
       F,
       'updatePreviewCodes: Generated HTML code - fixed:',
@@ -536,20 +547,26 @@ ${normalizeCSS(cssToUse)}
             )
             wallet = new WalletClient(substrate, CONFIG.WALLET_ORIGIN)
             await wallet.connectToSubstrate()
-            const authResult = await wallet.isAuthenticated({})
-            if (authResult.authenticated) {
-              logWithTimestamp(
-                F,
-                `useEffect: Wallet authenticated with ${type}`
-              )
-              return true
-            }
-            await wallet.waitForAuthentication({})
-            logWithTimestamp(
-              F,
-              `useEffect: Wallet authentication completed with ${type}`
-            )
-            return true
+const authResult = await wallet.isAuthenticated({})
+if (authResult.authenticated) {
+  logWithTimestamp(
+    F,
+    `useEffect: Wallet authenticated with ${type}`
+  )
+  walletRef.current = wallet
+  setApiDefaultWallet(wallet)
+  setIsWalletReady(true)
+  return true
+}
+await wallet.waitForAuthentication({})
+logWithTimestamp(
+  F,
+  `useEffect: Wallet authentication completed with ${type}`
+)
+walletRef.current = wallet
+setApiDefaultWallet(wallet)
+setIsWalletReady(true)
+return true
           } catch (walletErr) {
             logWithTimestamp(
               F,
@@ -677,17 +694,13 @@ ${normalizeCSS(cssToUse)}
       const sessionFlag = sessionStorage.getItem('createPageLoaded')
       const navType = performance.navigation.type
       let serverStatus = { isRestarted: false }
-      try {
-        const response = await fetchWithTimeout(
-          `${CONFIG.API_BASE}/getStatus`,
-          { method: 'GET', headers: { 'x-bsv-auth-identity-key': merchantId } },
-          wallet
-        )
-        serverStatus = await response.json()
-        logWithTimestamp(F, 'useEffect: Server status:', serverStatus)
-      } catch (err: any) {
-        logWithTimestamp(F, '❌ useEffect: Failed to fetch server status:', err)
-      }
+try {
+  const res = await fetchWithAuth('/getStatus', { method: 'GET' })
+  serverStatus = await res.json()
+  logWithTimestamp(F, 'useEffect: Server status:', serverStatus)
+} catch (err: any) {
+  logWithTimestamp(F, '❌ useEffect: Failed to fetch server status:', err)
+}
       const validReferrers = ['/buttons', '/actions', '/payments']
       const referrer = document.referrer || ''
       const isValidReferrer = validReferrers.some(path =>
@@ -809,15 +822,10 @@ ${normalizeCSS(cssToUse)}
         })
         const validateIds = async () => {
           try {
-            const response = await fetchWithTimeout(
-              `${location.protocol}//${location.host}/api/buttonCode/${validButtonID}`,
-              {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-              },
-              wallet
-            )
-            const data = await response.json()
+const data = await fetchJsonWithAuth<ButtonCodeResponse>(
+  `/buttonCode/${encodeURIComponent(validButtonID)}`,
+  { method: 'GET' }
+)
             logWithTimestamp(F, 'useEffect: Button code response', {
               status: data.status,
               buttonId: data.button_id,
@@ -1097,15 +1105,13 @@ ${normalizeCSS(cssToUse)}
         'useEffect: Generated fixed preview HTML in container'
       )
     }
-    return () => {
-      if (styleElement_fixed) {
-        document.head.removeChild(styleElement_fixed)
-        logWithTimestamp(
-          F,
-          'useEffect: Removed fixed style element from document head'
-        )
-      }
-    }
+return () => {
+  document.head.removeChild(newStyleElement)
+  logWithTimestamp(
+    F,
+    'useEffect: Removed fixed style element from document head'
+  )
+}
   }, [customCSS_fixed, lastValidCSS_fixed, paymentID])
 
   useEffect(() => {
@@ -1135,15 +1141,13 @@ ${normalizeCSS(cssToUse)}
         'useEffect: Generated variable preview HTML in container'
       )
     }
-    return () => {
-      if (styleElement_variable) {
-        document.head.removeChild(styleElement_variable)
-        logWithTimestamp(
-          F,
-          'useEffect: Removed variable style element from document head'
-        )
-      }
-    }
+return () => {
+  document.head.removeChild(newStyleElement)
+  logWithTimestamp(
+    F,
+    'useEffect: Removed variable style element from document head'
+  )
+}
   }, [customCSS_variable, lastValidCSS_variable, paymentID])
 
   useEffect(() => {
@@ -1441,13 +1445,33 @@ ${normalizeCSS(cssToUse)}
   const resetAll = async () => {
     logWithTimestamp(F, 'resetAll: Starting full reset of page fields')
     try {
-      localStorage.clear()
-      logWithTimestamp(F, 'resetAll: Cleared all localStorage keys')
+const keysToClear = [
+  `buttonID_${merchant}`,
+  `paymentID_${merchant}`,
+  `spendingDescription_fixed_${merchant}`,
+  `spendingDescription_variable_${merchant}`,
+  `buttonText_fixed_${merchant}`,
+  `buttonText_variable_${merchant}`,
+  `paymentType_${merchant}`,
+  `fixedSatAmount_${merchant}`,
+  `isSingleUse_${merchant}`,
+  `customCSS_fixed_${merchant}`,
+  `customCSS_variable_${merchant}`,
+  `idsInitializedbutton_${merchant}`,
+  `idsInitializedpayment_${merchant}`
+]
+keysToClear.forEach(k => localStorage.removeItem(k))
+logWithTimestamp(F, 'resetAll: Cleared merchant-scoped localStorage keys')
+      // localStorage.clear()
+      // logWithTimestamp(F, 'resetAll: Cleared all localStorage keys')
       const newButtonId = generateBase58(12)
       const newPaymentId = generateBase58(12)
+const w = walletRef.current
+if (!w) { toast.error('❌ Wallet not ready'); return }
+
       await initializeIds(
         'button',
-        wallet,
+w,
         newButtonId,
         merchant,
         setButtonID,
@@ -1456,7 +1480,7 @@ ${normalizeCSS(cssToUse)}
       )
       await initializeIds(
         'payment',
-        wallet,
+w,
         newPaymentId,
         merchant,
         setPaymentID,
@@ -1689,101 +1713,88 @@ ${normalizeCSS(cssToUse)}
             merchant || 'temp-merchant'
           }"\n data-buttonId="${currentButtonId}"\n data-paymentId="${currentPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
             updatedDescription
-          )}"\n data-width="fit-content"\n data-server="${location.protocol}//${
-            location.host
-          }"\n data-multi-use="${multiUse}">${fixedText}</div>`
+          )}"\n data-width="fit-content"\n data-multi-use="${multiUse}">${fixedText}</div>`
         : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${currentButtonId}"\n class="${buttonClass}"\n data-merchant="${
             merchant || 'temp-merchant'
           }"\n data-buttonId="${currentButtonId}"\n data-paymentId="${currentPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(
             updatedDescription
-          )}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
-            location.protocol
-          }//${
-            location.host
-          }"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+          )}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
     const payload = {
       variableAmount: paymentType === 'variable',
       multiUse,
       description: updatedDescription,
-      customCSS: cssToUse,
+      htmlCode: cssToUse,
       paymentId: currentPaymentId,
       buttonId: currentButtonId,
       amount:
-        paymentType === 'fixed' ? parseInt(fixedSatAmount || '5') : undefined,
-      htmlCode
+        paymentType === 'fixed' ? parseInt(fixedSatAmount || '5') : undefined
     }
     try {
-      logWithTimestamp(F, 'handleCopyCode: Registering button with payload:', {
-        ...payload,
-        multiUse
-      })
-      const response = await fetchWithTimeout(
-        `${location.protocol}//${location.host}/api/createButton`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        },
-        wallet
-      )
-      const responseText = await response.text()
-      logWithTimestamp(F, 'handleCopyCode: Raw response text:', responseText)
-      const data: ButtonResponse = responseText ? JSON.parse(responseText) : {}
-      logWithTimestamp(F, 'handleCopyCode: Parsed response data:', data)
-      if (data.status !== 'success') {
-        throw new Error(
-          data.message || '❌ Failed to create button due to invalid response'
-        )
-      }
-      const serverButtonId = data.buttonId || currentButtonId
-      const serverPaymentId = data.paymentId || currentPaymentId
-      htmlCode =
-        paymentType === 'fixed'
-          ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
-              merchant || 'temp-merchant'
-            }"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
-              updatedDescription
-            )}"\n data-width="fit-content"\n data-server="${
-              location.protocol
-            }//${
-              location.host
-            }"\n data-multi-use="${multiUse}">${fixedText}</div>`
-          : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
-              merchant || 'temp-merchant'
-            }"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(
-              updatedDescription
-            )}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
-              location.protocol
-            }//${
-              location.host
-            }"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-      setPreviewCode_fixed(
-        paymentType === 'fixed' ? htmlCode : previewCode_fixed
-      )
-      setPreviewCode_variable(
-        paymentType === 'variable' ? htmlCode : previewCode_variable
-      )
-      const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
-        updatedDescription
-      )}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`
-      const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
-        updatedDescription
-      )}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-      setPreviewFixedHtml(fixedPreviewHtml)
-      setPreviewVariableHtml(variablePreviewHtml)
-      generatePreviewHtml(paymentType, updatedDescription)
-      setShowCode(true)
-      logWithTimestamp(
-        F,
-        'handleCopyCode: Button registered with ID:',
-        serverButtonId,
-        'and paymentId:',
-        serverPaymentId,
-        'multiUse:',
-        multiUse
-      )
+logWithTimestamp(F, 'handleCopyCode: Registering button with payload:', {
+  ...payload,
+  multiUse
+})
 
-      // Generate new IDs for the next button
+// Call API (typed JSON helper) — no raw Response/responseText usage
+const createData = await fetchJsonWithAuth<ButtonResponse>('/createButton', {
+  method: 'POST',
+headers: { 
+'Content-Type': 'application/json',
+'x-bsv-server': __SERVER_IDENTITY_KEY__   // ✅ injected constant
+},
+  body: JSON.stringify(payload)
+})
+
+logWithTimestamp(F, 'handleCopyCode: Parsed response data:', createData)
+
+if (createData.status !== 'success') {
+  throw new Error(createData.message || '❌ Failed to create button due to invalid response')
+}
+
+const serverButtonId = createData.buttonId || currentButtonId
+const serverPaymentId = createData.paymentId || currentPaymentId
+
+// Build final HTML with server-confirmed IDs
+htmlCode =
+  paymentType === 'fixed'
+    ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
+        merchant || 'temp-merchant'
+      }"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
+        updatedDescription
+      )}"\n data-width="fit-content"\n data-multi-use="${multiUse}">${fixedText}</div>`
+    : `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
+        merchant || 'temp-merchant'
+      }"\n data-buttonId="${serverButtonId}"\n data-paymentId="${serverPaymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(
+        updatedDescription
+      )}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+
+setPreviewCode_fixed(paymentType === 'fixed' ? htmlCode : previewCode_fixed)
+setPreviewCode_variable(paymentType === 'variable' ? htmlCode : previewCode_variable)
+
+const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+  updatedDescription
+)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`
+
+const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+  updatedDescription
+)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+
+setPreviewFixedHtml(fixedPreviewHtml)
+setPreviewVariableHtml(variablePreviewHtml)
+generatePreviewHtml(paymentType, updatedDescription)
+setShowCode(true)
+
+logWithTimestamp(
+  F,
+  'handleCopyCode: Button registered with ID:',
+  serverButtonId,
+  'and paymentId:',
+  serverPaymentId,
+  'multiUse:',
+  multiUse
+)
+
+    // Generate new IDs for the next button
       try {
         // Clear localStorage to force new ID generation
         localStorage.removeItem(`buttonID_${merchant}`)
@@ -1801,9 +1812,11 @@ ${normalizeCSS(cssToUse)}
           newButtonId,
           newPaymentId
         })
+const w = walletRef.current
+if (!w) { toast.error('❌ Wallet not ready'); return }
         const buttonResponse = await initializeIds(
           'button',
-          wallet,
+w,
           newButtonId,
           merchant,
           setButtonID,
@@ -1820,7 +1833,7 @@ ${normalizeCSS(cssToUse)}
         const validatedButtonId = buttonResponse.id || newButtonId
         const paymentResponse = await initializeIds(
           'payment',
-          wallet,
+w,
           newPaymentId,
           merchant,
           setPaymentID,
@@ -1877,7 +1890,8 @@ ${normalizeCSS(cssToUse)}
         })
       }
 
-      const codeToCopy = `${htmlCode}\n<script src="${location.protocol}//${location.host}/pay.js"></script>`
+const scriptTag = `<script src="${PAY_BASE}/pay.js" defer></script>`
+const codeToCopy = `${htmlCode}\n${scriptTag}`
       logWithTimestamp(
         F,
         'handleCopyCode: Attempting to copy code:',
@@ -1905,28 +1919,44 @@ ${normalizeCSS(cssToUse)}
       )
     } catch (err: any) {
       setCopySuccess('failed')
+// ✅ Safe fallback: if no wallet auth available, call cleanupIds via plain fetch
+if (!merchant) {
+  logWithTimestamp(F, '⚠️ No merchant available, using HTTP cleanup fallback')
+  await fetch(`${API_BASE}/cleanupIds`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      buttonId: currentButtonId,
+      paymentId: currentPaymentId,
+      merchantId: merchant
+    })
+  })
+  return
+}
       try {
-        const response = await fetch('/api/cleanupIds', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            buttonId: currentButtonId,
-            paymentId: currentPaymentId,
-            merchantId: merchant
-          })
-        })
-        if (response.ok) {
-          logWithTimestamp(F, '✅ handleCopyCode: Cleaned up orphaned IDs:', {
-            currentPaymentId,
-            currentButtonId
-          })
-        } else {
-          logWithTimestamp(
-            F,
-            '❌ handleCopyCode: Failed to clean up orphaned IDs:',
-            { status: response.status }
-          )
-        }
+const res = await fetchWithAuth('/cleanupIds', {
+  method: 'POST',
+headers: { 
+'Content-Type': 'application/json',
+'x-bsv-server': __SERVER_IDENTITY_KEY__
+},
+  body: JSON.stringify({
+    buttonId: currentButtonId,
+    paymentId: currentPaymentId,
+    merchantId: merchant
+  })
+})
+
+if (res.ok) {
+  logWithTimestamp(F, '✅ handleCopyCode: Cleaned up orphaned IDs:', {
+    currentPaymentId,
+    currentButtonId
+  })
+} else {
+  logWithTimestamp(F, '❌ handleCopyCode: Failed to clean up orphaned IDs:', {
+    status: res.status
+  })
+}
       } catch (cleanupErr: any) {
         logWithTimestamp(
           F,
@@ -2193,11 +2223,7 @@ ${normalizeCSS(cssToUse)}
                                 merchant || 'temp-merchant'
                               }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
                                 fixedDescription
-                              )}"\n data-width="fit-content"\n data-server="${
-                                location.protocol
-                              }//${
-                                location.host
-                              }"\n data-multi-use="${!value}">${fixedText}</div>`
+                              )}"\n data-width="fit-content"\n data-multi-use="${!value}">${fixedText}</div>`
                               const variableCode = `<style>\n${extractCSS(
                                 value
                                   ? variableCSS
@@ -2206,11 +2232,7 @@ ${normalizeCSS(cssToUse)}
                                 merchant || 'temp-merchant'
                               }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${variableText}"\n data-description="${sanitizeInput(
                                 variableDescription
-                              )}"\n data-variable="true"\n data-width="fit-content"\n data-server="${
-                                location.protocol
-                              }//${
-                                location.host
-                              }"\n data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+                              )}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
                               setPreviewFixedHtml(fixedPreviewHtml)
                               setPreviewVariableHtml(variablePreviewHtml)
                               setPreviewCode_fixed(fixedCode)
@@ -2374,10 +2396,10 @@ ${normalizeCSS(cssToUse)}
                   Script for Head Tag
                 </Typography>
                 <Box>
-                  <CodeSnippet
-                    language="javascript"
-                    code={`<script src="${location.protocol}//${location.host}/pay.js"></script>`}
-                  />
+<CodeSnippet
+  language="html"
+  code={`<script src="${PAY_BASE}/pay.js" defer></script>`}
+/>
                 </Box>
               </Card>
             </Grid>

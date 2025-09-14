@@ -13,7 +13,7 @@
  */
 const F = 'routes/pay'
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import { Hash, P2PKH, PrivateKey, PublicKey, Transaction, Utils } from '@bsv/sdk'
 import { Request, Response } from 'express'
 import { logWithTimestamp } from '../utils/logging'

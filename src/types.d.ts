@@ -95,3 +95,5 @@ declare module '@bsv/sdk' {
     privilegedReason?: string
   }
 }
+
+declare const __SERVER_IDENTITY_KEY__: string;

@@ -10,7 +10,7 @@
 // - 24Aug2025_1145 BST (v1.0.1): Replaced regex with replaceAll using previous ID from database for description updates.
 // - Initial version: ID generation and validation with regex-based description updates.
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import { generateBase58 } from './general'
 import { logWithTimestamp } from './logging'
 import { ensureMerchantExists } from './merchant'

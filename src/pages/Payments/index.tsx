@@ -35,10 +35,10 @@ import {
 import { FirstPage, LastPage, ReceiptLong } from '@mui/icons-material'
 import { Link } from 'react-router-dom'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import { formatId, formatTimeLocal } from '../../utils/general'
+import { fetchWithTimeout, formatId, formatTimeLocal } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
 import { CONFIG } from '../../utils/constants'
-import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { WalletClient } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
 
 interface Payment {
@@ -113,7 +113,6 @@ const formatPayerId = (payerId: string | null) => {
 }
 
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-const authFetch = new AuthFetch(wallet)
 
 const PaymentsList = () => {
   const [payments, setPayments] = useState<Payment[]>([])
@@ -142,6 +141,7 @@ const PaymentsList = () => {
     'Button Id': null,
     'Payer Id': null
   })
+const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
   const fetchPayments = async (retries = 2): Promise<void> => {
     setLoading(true)
@@ -153,15 +153,15 @@ const PaymentsList = () => {
         window.localStorage.removeItem('payments_cache')
         window.sessionStorage.removeItem('payments_cache')
       }
-      const url = `${location.protocol}//${location.host}/api/listPayments?limit=500&status=${statusFilter}&t=${Date.now()}`
+const url = `${API_BASE}/listPayments?limit=500&status=${statusFilter}&t=${Date.now()}`
       logWithTimestamp(F, 'Fetching payments with URL:', url)
-      const response = await authFetch.fetch(url, { method: 'GET' })
+const response = await fetchWithTimeout(
+  url,
+  { method: 'GET' },
+  wallet
+)
       logWithTimestamp(F, 'Fetch response status:', response.status, 'Headers:', response.headers)
       const data: PaymentResponse = await response.json()
-      const targetPayments = data.data.filter(p =>
-        ['MZgHoSGBGbu5', 'WQq5HoqKwFBS', '3rKCwcmZ7kqt'].includes(p.payment_id || '')
-      )
-      logWithTimestamp(F, 'Raw payment data for target payments:', JSON.stringify(targetPayments, null, 2))
       logWithTimestamp(F, 'Full API response:', JSON.stringify(data))
       if (data.status === 'error') throw new Error(`❌ ${data.message ?? 'Failed to fetch payments'}`)
       if (!Array.isArray(data.data)) {
@@ -452,18 +452,20 @@ const PaymentsList = () => {
       return
     }
     try {
-      logWithTimestamp(
-        F,
-        'Attempting to acknowledge payment with paymentId:',
-        paymentId,
-        'URL:',
-        `http://localhost:3001/api/acknowledgePayment`
-      )
-      const response = await authFetch.fetch(`http://localhost:3001/api/acknowledgePayment?t=${Date.now()}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentId })
-      })
+logWithTimestamp(
+  F,
+  'URL:',
+  `${API_BASE}/acknowledgePayment`
+)
+const response = await fetchWithTimeout(
+  `${API_BASE}/acknowledgePayment?t=${Date.now()}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paymentId })
+  },
+  wallet
+)
       if (!response.ok) {
         const errorText = await response.text()
         logWithTimestamp(F, '❌ Acknowledgment failed with response:', errorText)

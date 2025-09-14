@@ -10,8 +10,9 @@
  *
  * @author xAI
  * @date 2025-09-01
- * @version 1.17
+ * @version 1.18 (2025-09-08: add safe URL join + clientConfig integration to avoid "Invalid URL")
  * @changelog
+ * - 2025-09-08 (v1.18): Integrate client config, add safe URL resolution for fetchWithTimeout.
  * - 2025-09-04 (v1.17): Added lightweight client-side **auth-ready event bus** helpers
  *   (`markAuthReady`, `onAuthReady`, `waitForAuthReady`) so UI code can postpone protected
  *   API calls until the wallet session is established. Expanded JSDocs.
@@ -21,6 +22,7 @@
  */
 
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
+import { loadClientConfig } from './clientConfig'
 
 /* =============================================================================
    Auth-ready event bus (client-side helper)
@@ -298,23 +300,109 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
    Networking
 ============================================================================= */
 
+/** Cache client config so we don’t reload on every call. */
+const _clientConfigPromise = loadClientConfig()
+
+/** Trim trailing slashes from a base URL; allow '' for same-origin. */
+function normalizeBase(v?: string | null): string {
+  const s = (v ?? '').trim()
+  return s ? s.replace(/\/+$/, '') : ''
+}
+
+/** Ensure prefix starts with a single leading '/' and no trailing slash. */
+function normalizePrefix(v?: string | null, fallback = '/api'): string {
+  let s = (v ?? '').trim()
+  if (!s) s = fallback
+  if (!s.startsWith('/')) s = `/${s}`
+  return s.replace(/\/+$/, '')
+}
+
 /**
- * Performs an HTTP fetch with a configurable timeout using the provided wallet for authentication.
- * @param {string} url The URL to fetch.
- * @param {object} options Fetch options compatible with SimplifiedFetchRequestOptions from @bsv/sdk.
- * @param {Record<string, string>} [options.headers] Optional HTTP headers.
- * @param {string} [options.method] HTTP method (e.g., 'GET', 'POST').
- * @param {string} [options.body] Request body as a string.
- * @param {WalletClient} wallet The WalletClient instance for authentication.
- * @param {number} [timeoutMs=15000] The timeout duration in milliseconds (default: 15000).
- * @returns {Promise<Response>} A Promise resolving to the Response object.
- * @throws {Error} If the request times out or the response is non-2xx.
+ * Resolve any input into a valid URL string:
+ * - absolute (`http(s)://...`) → returned as-is
+ * - relative like `/getStatus` → joined with config routingPrefix and optional apiBase
+ *   - apiBase present → `${apiBase}${routingPrefix}${path}`
+ *   - apiBase ''      → `${routingPrefix}${path}` (same-origin; works with dev proxy)
+ */
+async function resolveApiUrl(input: string): Promise<string> {
+  if (typeof input !== 'string' || input.length === 0) {
+    throw new Error('URL must be a non-empty string')
+  }
+  if (/^https?:\/\//i.test(input)) return input
+
+  const cfg = await _clientConfigPromise
+  const base = normalizeBase(cfg.apiBase)
+  const pfx = normalizePrefix(cfg.routingPrefix)
+  const path = input.startsWith('/') ? input : `/${input}`
+
+  const origin =
+typeof window !== 'undefined' && (window as any)?.location?.origin
+  ? window.location.origin
+  : ''
+return base ? `${base}${pfx}${path}` : (origin ? `${origin}${pfx}${path}` : `${pfx}${path}`)
+  // return base ? `${base}${pfx}${path}` : `${pfx}${path}`
+}
+
+/**
+ * Authenticated fetch with timeout for all `/api/*` calls.
+ *
+ * Uses {@link AuthFetch} to sign the request with the provided {@link WalletClient},
+ * automatically attaching the `Authorization` header. Preserves any caller-supplied
+ * headers (e.g., `Content-Type`) and aborts the in-flight request if it exceeds
+ * the configured timeout via `AbortController`.
+ *
+ * **Important**
+ * - For mutual-auth to succeed, the signed URL must match the actual request origin.
+ *   Prefer `API_BASE = window.location.origin` (e.g., `https://gateway.local`) and
+ *   avoid mixing hosts like `http://localhost:3001` from the browser.
+ * - Do **not** set `Authorization` yourself; it is added by `AuthFetch`.
+ * - Timeout cancels the request and surfaces a clear error.
+ *
+ * @param {string} url
+ *   Absolute or relative URL to fetch. Relative `/...` will be resolved using client config.
+ *
+ * @param {object} options
+ *   Fetch options (subset compatible with `SimplifiedFetchRequestOptions` from `@bsv/sdk`).
+ *
+ * @param {Record<string,string>} [options.headers]
+ *   Additional HTTP headers to merge (e.g., `Content-Type`).
+ *
+ * @param {string} [options.method='GET']
+ *   HTTP method.
+ *
+ * @param {string} [options.body]
+ *   Serialized request body (e.g., `JSON.stringify(...)` for POSTs).
+ *
+ * @param {WalletClient} wallet
+ *   Wallet instance used by `AuthFetch` to create the `Authorization` header.
+ *   Required for authenticated endpoints (all `/api/*` in this app).
+ *
+ * @param {number} [timeoutMs=15000]
+ *   Maximum time in milliseconds before the request is aborted.
+ *
+ * @returns {Promise<Response>}
+ *   Resolves with the successful `Response`. The caller may still read the body
+ *   (`response.json()`, `response.text()`, etc.).
+ *
+ * @throws {TypeError}
+ *   If `url` is empty/invalid or `timeoutMs` is not a positive integer.
+ *
+ * @throws {Error}
+ *   - If the request is aborted due to timeout (message includes the URL).
+ *   - If the response status is non-2xx. The error message includes method,
+ *     URL, status code/text, and any response text available.
+ *
+ * @remarks
+ * - This helper centralizes auth + timeout for consistency with known-working
+ *   flows (e.g., `/api/invoice`). Route **all** `/api/*` calls through it.
+ * - Keep client and server clocks reasonably in sync to avoid time-based
+ *   signature failures.
  */
 export const fetchWithTimeout = async (
   url: string,
   options: { headers?: Record<string, string>; method?: string; body?: string },
   wallet: WalletClient,
-  timeoutMs: number = 15000
+  timeoutMs: number = 30000
 ): Promise<Response> => {
   if (typeof url !== 'string' || url.length === 0) {
     throw new Error('URL must be a non-empty string')
@@ -322,28 +410,43 @@ export const fetchWithTimeout = async (
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
     throw new Error('Timeout must be a positive integer')
   }
+
+  // Resolve to a valid absolute-or-relative URL (never throws "Invalid URL")
+  const resolvedUrl = await resolveApiUrl(url)
+
+  // Build auth-capable fetch
   const authFetch = new AuthFetch(wallet)
-  const timeoutId = setTimeout(() => {
-    throw new Error(`Request timed out after ${timeoutMs}ms for URL: ${url}`)
-  }, timeoutMs)
+
+  // Abort on timeout
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(new Error(`Timeout after ${timeoutMs}ms: ${resolvedUrl}`)), timeoutMs)
+
   try {
-    const response = await authFetch.fetch(url, options)
-    if (!response.ok) {
-      let errorDetail = ''
-      try {
-        errorDetail = await response.text()
-      } catch {
-        errorDetail = 'Failed to retrieve error details'
-      }
+    // Merge headers, attach signal
+    const reqOptions = {
+      ...options,
+      headers: { ...(options?.headers ?? {}) },
+      signal: controller.signal as any, // SimplifiedFetchRequestOptions supports signal
+    }
+
+    const res = await authFetch.fetch(resolvedUrl, reqOptions)
+
+    if (!res.ok) {
+      let detail = ''
+      try { detail = await res.text() } catch { /* ignore */ }
       throw new Error(
-        `Failed to fetch ${url} with method ${options.method || 'GET'}: Status ${response.status} ${response.statusText}, Details: ${errorDetail}`
+        `Failed ${reqOptions.method || 'GET'} ${resolvedUrl} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ''}`
       )
     }
-    return response
+    return res
   } catch (err) {
-    throw err instanceof Error ? err : new Error(`Failed to fetch ${url}: ${String(err)}`)
+    // If aborted, surface a clear message
+    if ((err as any)?.name === 'AbortError') {
+      throw new Error(`Request aborted: ${resolvedUrl}`)
+    }
+    throw err instanceof Error ? err : new Error(String(err))
   } finally {
-    clearTimeout(timeoutId)
+    clearTimeout(timer)
   }
 }
 
@@ -430,4 +533,33 @@ export const sanitizeInput = (input: string): string => {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;')
+}
+
+// --- server key helpers -------------------------------------------------------
+
+/**
+ * Normalizes a server private key for wallet initialization.
+ *
+ * Accepts either:
+ * - a 64-character hexadecimal string, or
+ * - a 0x-prefixed 66-character hexadecimal string,
+ * and returns a normalized **64-character lowercase hex** (without `0x`).
+ *
+ * @function normalizeServerPrivateKey
+ * @param {string | null | undefined} raw - The raw key value (e.g., from `process.env.SERVER_PRIVATE_KEY`).
+ * @returns {string | null} A 64-char lowercase hex string if valid; otherwise `null`.
+ * @example
+ * const key = normalizeServerPrivateKey(process.env.SERVER_PRIVATE_KEY);
+ * if (!key) {
+ *   throw new Error('❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex chars; 0x prefix allowed)');
+ * }
+ */
+export function normalizeServerPrivateKey(raw?: string | null): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  const without0x = trimmed.startsWith('0x') || trimmed.startsWith('0X') ? trimmed.slice(2) : trimmed
+  if (/^[0-9a-fA-F]{64}$/.test(without0x)) {
+    return without0x.toLowerCase()
+  }
+  return null
 }

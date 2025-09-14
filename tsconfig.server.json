@@ -2,8 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "outDir": "dist",
+    "rootDir": "src",
     "module": "commonjs",
     "target": "ES2021",
     "lib": [
@@ -15,9 +15,7 @@
     "noEmitOnError": false
   },
   "include": [
-    "src/**/*.ts",
-    "src/types.d.ts",
-    "knexfile.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",

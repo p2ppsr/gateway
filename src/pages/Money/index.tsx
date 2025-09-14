@@ -22,14 +22,18 @@ const MyMoney: React.FC = (): JSX.Element => {
   //     setLoading(true)
   //     setError('')
   //     try {
-  //         let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
+  //         let url = `${API_BASE}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
   //         if (usedFilter !== 'all') {
-  //             url += `&usage=${usedFilter}`
+  //             url += `&usage=${usedFilter}` 
   //         }
-  //         const response = await AuthFetch.request(url, {
-  //             method: 'GET',
-  //             // Include headers as necessary, e.g., for authentication
-  //         })
+  // const response = await fetchWithTimeout(
+  //   url,
+  //   {
+  //     method: 'GET',
+  //     // headers: { 'x-bsv-auth-identity-key': merchantId } // (only if your route needs it)
+  //   },
+  //   wallet
+  // ) 
   //         const data = JSON.parse(
   //             new TextDecoder().decode(response.body)
   //         )

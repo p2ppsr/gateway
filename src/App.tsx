@@ -25,23 +25,23 @@ import Actions from './pages/Actions'
 import Money from './pages/Money'
 import checkForMetanetclient from './utils/checkForMetanetclient'
 import { CssBaseline } from '@mui/material'
-import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { WalletClient } from '@bsv/sdk'
 import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 import { CONFIG } from './utils/constants'
 import { logWithTimestamp } from './utils/logging'
+import { fetchWithTimeout } from './utils/general'
 
-// AuthFetch – constructed once per session
 logWithTimestamp(F, `CONFIG:${CONFIG}`)
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-const authFetch = new AuthFetch(wallet)
-const API_BASE = CONFIG.API_BASE
+const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
+
 
 /**
  * The main React component for the application.
  *
  * - Applies global MUI theming.
- * - Loads admin status using `/api/getStatus`.
+ * - Loads admin status using `/getStatus`.
  * - Checks every 2 seconds whether the Metanet client is running and sets `isMncMissing` accordingly.
  * - Displays a modal if Metanet client is not detected.
  * - Defines all app routes using React Router.
@@ -67,9 +67,11 @@ const App: React.FC = () => {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await authFetch.fetch(`${API_BASE}/api/getStatus`, {
-          method: 'GET'
-        })
+const res = await fetchWithTimeout(
+  `${API_BASE}/getStatus`,
+  { method: 'GET' },
+  wallet
+)
         if (!res.ok) throw new Error(`❌ HTTP ${res.status}`)
         const { isAdmin } = await res.json()
         setIsAdmin(isAdmin)

@@ -16,7 +16,7 @@
  */
 const F = 'routes/listButtons'
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import type { Request, Response } from 'express'
 import { query } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'

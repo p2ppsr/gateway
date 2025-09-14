@@ -8,7 +8,7 @@
  * - Loads logging configuration from logging.config.ts with fallback to default settings if the config file fails.
  * - Colorizes log timestamps based on elapsed time (red > 1s, orange > 0.5s, yellow > 0.3s, default otherwise).
  * - Supports file-specific logging enablement/disablement via configuration.
- * - Updated to safely handle objects with JSON.stringify, falling back to util.inspect for circular references (v1.2.1).
+ * - Updated to safely handle objects with JSON.stringify, falling back to util.inspect for circular references (v1.2.2).
  *
  * Intended to help diagnose performance issues across the application.
  */
@@ -41,28 +41,45 @@ const colorize = (elapsed: number) => {
     return '\x1b[0m' // default
   }
 }
-export const logWithTimestamp = (file: string = 'unknown', message: string = 'No message', ...args: any[]) => {
+
+export const logWithTimestamp = (
+  file: string = 'unknown',
+  message: any = 'No message',
+  ...args: any[]
+) => {
   // Check if logging is enabled for this file (fall back to default if not set)
-  const isEnabled = loggingConfig[file] !== undefined ? loggingConfig[file] : loggingConfig['default']
+  const isEnabled =
+    loggingConfig[file] !== undefined
+      ? loggingConfig[file]
+      : loggingConfig['default']
   if (!isEnabled) return
+
   const now = performance.now()
   const elapsedSec = (now - lastLogTime) / 1000
   lastLogTime = now
+
   const timestamp = new Date().toISOString()
   const elapsed = elapsedSec.toFixed(3)
   const color = colorize(elapsedSec)
-  // Construct the log message with timestamp and color
-  const logMessage = `[${timestamp}] ${color}[${elapsed}s]\x1b[0m [${file}] ${message}`
-  // Safely format arguments, handling circular references
-  const formattedArgs = args.map(arg => {
-    if (typeof arg === 'object' && arg !== null) {
+
+  // Safely format values (handles objects and circular references)
+  const safeFormat = (val: any) => {
+    if (typeof val === 'object' && val !== null) {
       try {
-        return JSON.stringify(arg, null, 2) // Attempt to stringify with indentation
+        return JSON.stringify(val, null, 2)
       } catch (e) {
-        return util.inspect(arg, { depth: 2, colors: true }) // Fallback for circular references
+        return util.inspect(val, { depth: 2, colors: true })
       }
     }
-    return arg // Preserve non-objects
-  })
-  console.log(logMessage, ...formattedArgs)
+    return val
+  }
+
+  const formattedMessage = safeFormat(message)
+  const formattedArgs = args.map(safeFormat)
+
+  // Construct the log line
+  const logMessage = `[${timestamp}] ${color}[${elapsed}s]\x1b[0m [${file}]`
+
+  console.log(logMessage, formattedMessage, ...formattedArgs)
 }
+

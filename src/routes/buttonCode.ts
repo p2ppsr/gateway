@@ -1,13 +1,13 @@
 /**
  * @file src/routes/buttonCode.ts
  * @description GET route to retrieve payment button code details for a given paymentId.
- * @version v2.37 (Updated 21Aug2025_2359 BST to use DOM manipulation for reliable class handling)
+ * @version v2.38 (Updated 12Sep2025 — fixed duplicate /api/api bug by separating script src and API base)
  */
 const F = 'routes/buttonCode'
 import { Request, Response } from 'express'
 import { Knex } from 'knex'
 import knex from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import { param, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
 import { WalletClient } from '@bsv/sdk'
@@ -16,6 +16,9 @@ import { isMerchantId } from '../utils/general'
 import { JSDOM } from 'jsdom'
 const db: Knex = knex(knexConfig)
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
+
+// Canonical API host for embeds (no trailing slash)
+const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
 interface PaymentButton {
   button_id: string
@@ -58,7 +61,11 @@ export default {
       logWithTimestamp(F, '[buttonCode] [Step 2] Checking database connection...')
       await db.raw('SELECT 1')
       logWithTimestamp(F, '[buttonCode] [Step 2] Database connection successful')
-      const query = db('payment_buttons').where({ payment_id: paymentId }).first()
+      const query = db('payment_buttons')
+        .leftJoin('payments', 'payment_buttons.payment_id', 'payments.payment_id')
+        .select('payment_buttons.*', 'payments.description as description')
+        .where('payment_buttons.payment_id', paymentId)
+        .first()
       logWithTimestamp(F, '[buttonCode] [Step 3] Query constructed:', query.toString())
       const button: PaymentButton | undefined = await query
       logWithTimestamp(
@@ -82,11 +89,6 @@ export default {
         res.status(400).json({ status: 'error', message: 'html_code is required and cannot be empty' })
         return
       }
-      if (!button.description || button.description.trim() === '') {
-        logWithTimestamp(F, '[buttonCode] [Step 5] Missing or empty description for paymentId:', paymentId)
-        res.status(400).json({ status: 'error', message: 'description is required and cannot be empty' })
-        return
-      }
       logWithTimestamp(F, '[buttonCode] [Step 5] Found and validated button:', JSON.stringify(button))
       let modifiedCode = button.html_code
       const divId = button.button_id
@@ -107,7 +109,7 @@ export default {
         modifiedCode = dom.serialize()
         const styleMatch = modifiedCode.match(/<style>[\s\S]*?<\/style>/i)
         const styles = styleMatch ? styleMatch[0] : ''
-        buttonCode = `${styles}${div.outerHTML}<script src="${CONFIG.API_BASE}/pay.js"></script>`
+        buttonCode = `${styles}${div.outerHTML}<script src="${API_BASE}/pay.js"></script>`
       } else {
         logWithTimestamp(F, '[buttonCode] [Step 6a] No div match found, using default:', modifiedCode)
         const domDefault = new JSDOM('')
@@ -119,11 +121,10 @@ export default {
         defaultDiv.setAttribute('data-amount', button.amount.toString())
         defaultDiv.setAttribute('data-variable', button.variable_amount.toString())
         defaultDiv.setAttribute('data-description', button.description)
-        defaultDiv.setAttribute('data-server', CONFIG.API_BASE)
         defaultDiv.textContent = `Pay Now ${button.amount} Sats`
         const styleMatchDefault = modifiedCode.match(/<style>[\s\S]*?<\/style>/i)
         const stylesDefault = styleMatchDefault ? styleMatchDefault[0] : ''
-        buttonCode = `${stylesDefault}${defaultDiv.outerHTML}<script src="${CONFIG.API_BASE}/pay.js"></script>`
+        buttonCode = `${stylesDefault}${defaultDiv.outerHTML}<script src="${API_BASE}/pay.js"></script>`
       }
       logWithTimestamp(F, '[buttonCode] [Step 6c] Generated button code:', buttonCode)
       if (!isMerchantId(button.merchant_id)) {

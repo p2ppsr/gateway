@@ -40,16 +40,15 @@ import {
   Collapse
 } from '@mui/material'
 import { FirstPage, LastPage, ReceiptLong, ExpandMore, ExpandLess } from '@mui/icons-material'
-import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { WalletClient } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
 import { Link } from 'react-router-dom'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import { formatId, formatTimeLocal } from '../../utils/general'
+import { fetchWithTimeout, formatId, formatTimeLocal } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
 import { CONFIG, DUP_FIELD_PLACEHOLDER } from '../../utils/constants'
 
 const wallet = new WalletClient('json-api', CONFIG.WALLET_ORIGIN)
-const authFetch = new AuthFetch(wallet)
 
 interface Payment {
   payment_id: string
@@ -162,6 +161,7 @@ const subTableRefs = useRef<(HTMLTableRowElement | null)[]>([])
     borderRight: 'none'
   }
   const expandedRowBg = '#4c4a4aff'
+const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
   const handleMouseEnter = (fullValue: string, columnName: string, rowIndex: number) => {
     logWithTimestamp(F, 'Mouse enter, fullValue:', fullValue, 'column:', columnName, 'rowIndex:', rowIndex)
@@ -226,9 +226,13 @@ const subTableRefs = useRef<(HTMLTableRowElement | null)[]>([])
     setLoading(true)
     setButtons([])
     try {
-      const url = `${location.protocol}//${location.host}/api/listButtons?limit=500&t=${Date.now()}`
+const url = `${API_BASE}/listButtons?limit=500&t=${Date.now()}`
       logWithTimestamp(F, 'Fetching buttons with URL:', url)
-      const response = await authFetch.fetch(url, { method: 'GET' })
+const response = await fetchWithTimeout(
+  url,
+  { method: 'GET' },
+  wallet
+)
       logWithTimestamp(F, 'Fetch response status:', response.status, 'Headers:', response.headers)
       const data: ButtonResponse = await response.json()
       logWithTimestamp(F, 'API response:', JSON.stringify(data))

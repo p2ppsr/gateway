@@ -12,7 +12,7 @@
  */
 
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import type { Request, Response } from 'express'
 
 const db: Knex = knex(knexConfig)

@@ -14,9 +14,9 @@
  */
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ReactElement } from 'react'
 import { toast } from 'react-toastify'
-import { WalletClient, AuthFetch, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
+import { WalletClient, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
-import { waitForAuthReady } from '../../utils/general'
+import { fetchWithTimeout, waitForAuthReady } from '../../utils/general'
 // Component logging prefix
 const F = 'components/PayButton'
 
@@ -61,7 +61,6 @@ interface ListOutputsArgs {
  * @property {string} merchant - Required merchant identifier.
  * @property {string} paymentId - Required payment identifier.
  * @property {string} buttonId - Required button identifier.
- * @property {string} server - Required server URL.
  * @property {string} [loadingtext] - Optional loading text (defaults to 'Loading, please wait…').
  * @property {boolean} [variable] - Optional flag for variable amount input (defaults to false).
  * @property {string} [width] - Optional width style (defaults to 'fit-content').
@@ -73,7 +72,6 @@ export interface PayButtonProps {
   merchant: string
   paymentId: string
   buttonId: string
-  server: string
   loadingtext?: string
   variable?: boolean
   width?: string
@@ -129,6 +127,9 @@ interface ButtonCodeResponse {
   used?: boolean
 }
 
+declare const __SERVER_IDENTITY_KEY__: string
+const serverIdentityKey = __SERVER_IDENTITY_KEY__
+
 /**
  * PayButton component for initiating blockchain payments.
  * Handles a multi-step payment flow with server verification, invoice generation,
@@ -142,7 +143,6 @@ const PayButton = ({
   merchant,
   paymentId: initialPaymentId,
   buttonId,
-  server,
   loadingtext = 'Loading, please wait…',
   variable = false,
   width = 'fit-content',
@@ -196,21 +196,20 @@ const PayButton = ({
         merchant,
         paymentId: initialPaymentId,
         buttonId,
-        server,
         variable,
         width,
         multiUse
       })
-      if (!initialPaymentId || !buttonId || !merchant || !server || (!variable && amount <= 0)) {
-        const errors = []
-        if (!initialPaymentId) errors.push('Missing data-paymentId attribute.')
-        if (!buttonId) errors.push('Missing data-buttonId attribute.')
-        if (!merchant) errors.push('Missing data-merchant attribute.')
-        if (!server) errors.push('Missing data-server attribute.')
-        if (!variable && amount <= 0) errors.push('Missing valid data-amount attribute.')
-        errors.forEach(error => toast.error(error))
-        setDisabled(true) // Disabled due to invalid props
-      }
+
+if (!initialPaymentId || !buttonId || !merchant || (!variable && amount <= 0)) {
+  const errors: string[] = []
+  if (!initialPaymentId) errors.push('Missing data-paymentId attribute.')
+  if (!buttonId) errors.push('Missing data-buttonId attribute.')
+  if (!merchant) errors.push('Missing data-merchant attribute.')
+  if (!variable && amount <= 0) errors.push('Missing valid data-amount attribute.')
+  errors.forEach(err => toast.error(err))
+  setDisabled(true)
+}
     } catch (error) {
       console.error(
         `[${new Date().toISOString()}] [${F}] ❌ Failed to validate props:`,
@@ -218,7 +217,7 @@ const PayButton = ({
       )
       setDisabled(true) // Fallback to disabled state
     }
-  }, [initialPaymentId, buttonId, merchant, server, amount, variable, width, multiUse])
+  }, [initialPaymentId, buttonId, merchant, amount, variable, width, multiUse])
 
   /**
    * Fetches button status to determine single-use and usage state.
@@ -233,10 +232,11 @@ useEffect(() => {
       await waitForAuthReady(10_000) // 10s max; tweak if needed
 
       const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-      const authFetch = new AuthFetch(wallet)
- const response = await authFetch.fetch(`${server}/api/buttonCode/${paymentId}`, {
-   method: 'GET'
- })
+const response = await fetchWithTimeout(
+  `${CONFIG.API_BASE}/buttonCode/${paymentId}`,
+  { method: 'GET' },
+  wallet
+)
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
       const data: ButtonCodeResponse = await response.json()
       if (cancelled) return
@@ -265,7 +265,7 @@ useEffect(() => {
   }
   run()
   return () => { cancelled = true }
-}, [server, paymentId, disabled, paid])
+}, [paymentId, disabled, paid])
 
   /**
    * Caches parent dataset values from the DOM.
@@ -378,20 +378,19 @@ useEffect(() => {
         merchant,
         paymentId: initialPaymentId,
         buttonId,
-        server,
         variable,
         multiUse
       })
-      if (!initialPaymentId || !buttonId || !merchant || !server || (!variable && amount <= 0)) {
-        const errors = []
-        if (!initialPaymentId) errors.push('Missing data-paymentId attribute.')
-        if (!buttonId) errors.push('Missing data-buttonId attribute.')
-        if (!merchant) errors.push('Missing data-merchant attribute.')
-        if (!server) errors.push('Missing data-server attribute.')
-        if (!variable && amount <= 0) errors.push('Missing valid data-amount attribute.')
-        errors.forEach(error => toast.error(error))
-        setDisabled(true) // Disabled due to invalid props
-      }
+
+if (!initialPaymentId || !buttonId || !merchant || (!variable && amount <= 0)) {
+  const errors: string[] = []
+  if (!initialPaymentId) errors.push('Missing data-paymentId attribute.')
+  if (!buttonId) errors.push('Missing data-buttonId attribute.')
+  if (!merchant) errors.push('Missing data-merchant attribute.')
+  if (!variable && amount <= 0) errors.push('Missing valid data-amount attribute.')
+  errors.forEach(err => toast.error(err))
+  setDisabled(true)
+}
       container.className = `gateway-paybutton gateway-paybutton-fixed ${disabled ? 'disabled' : ''}`
       textNode.className = `nodeText ${disabled ? 'disabled' : ''}`
       if (parentContainer?.className.includes('disabled') && !disabled) {
@@ -439,65 +438,98 @@ useEffect(() => {
         error instanceof Error ? error.message : 'Unknown error'
       )
     }
-  }, [initialPaymentId, buttonId, merchant, server, amount, variable, disabled, multiUse])
+  }, [initialPaymentId, buttonId, merchant, amount, variable, disabled, multiUse])
 
-  /**
-   * Handles pay.js script loading and DOM mutation observation.
-   * @function handleScriptAndMutations
-   */
-  useEffect(() => {
-    try {
-      const container = containerRef.current
-      const textNode = nodeTextRef.current
-      const parentContainer = container?.parentElement
-      if (!container || !textNode || !parentContainer) return
-      checkAndCorrectClass(textNode, container, parentContainer)
-      const scripts = document.getElementsByTagName('script')
-      let payScript = null
-      for (let i = 0; i < scripts.length; i++) {
-        const src = scripts[i].getAttribute('src')
-        if (src && src.includes('http://localhost:3000/pay.js')) {
-          payScript = scripts[i]
+/**
+ * Handles pay.js script loading and DOM mutation observation.
+ * @function handleScriptAndMutations
+ */
+useEffect(() => {
+  try {
+    const container = containerRef.current
+    const textNode = nodeTextRef.current
+    const parentContainer = container?.parentElement
+    if (!container || !textNode || !parentContainer) return
+
+    checkAndCorrectClass(textNode, container, parentContainer)
+
+    // --- robust pay.js detection (no hard-coded host) ---
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const baseGuess =
+      ((window as any).__GATEWAY_API_BASE__ as string | undefined)?.replace(/\/+$/, '') ||
+      CONFIG.API_BASE.replace(/\/+$/, '')
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    const scripts = document.getElementsByTagName('script')
+    let payScript: HTMLScriptElement | null = null
+
+    for (let i = 0; i < scripts.length; i++) {
+      const src = scripts[i].getAttribute('src') || ''
+      try {
+        const u = new URL(src, window.location.href)
+        // accept any origin; just ensure it’s the pay.js asset (with optional query/hash)
+        if (/\/pay\.js(?:[?#].*)?$/i.test(u.pathname + u.search + u.hash)) {
+          payScript = scripts[i] as HTMLScriptElement
           break
         }
+      } catch {
+        // ignore malformed src values
       }
-      if (payScript) {
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 pay.js script detected:`, payScript.getAttribute('src'))
-        const originalScript = payScript.outerHTML
-        if (payScript.getAttribute('src') && document.querySelector(`script[src="${payScript.getAttribute('src')}"]`)) {
-          console.log(`[${new Date().toISOString()}] [${F}] 🔍 pay.js already loaded, original state:`, originalScript)
-          checkAndCorrectClass(textNode, container, parentContainer)
-        } else {
-          payScript.addEventListener('load', () => {
-            console.log(`[${new Date().toISOString()}] [${F}] 🔍 pay.js loaded, original state:`, originalScript)
-            checkAndCorrectClass(textNode, container, parentContainer)
-          })
-        }
+    }
+
+    if (payScript) {
+      console.log(
+        `[${new Date().toISOString()}] [${F}] 🔍 pay.js script detected:`,
+        payScript.getAttribute('src')
+      )
+      const originalScript = payScript.outerHTML
+      if (
+        payScript.getAttribute('src') &&
+        document.querySelector(`script[src="${payScript.getAttribute('src')}"]`)
+      ) {
+        console.log(
+          `[${new Date().toISOString()}] [${F}] 🔍 pay.js already loaded, original state:`,
+          originalScript
+        )
+        checkAndCorrectClass(textNode, container, parentContainer)
       } else {
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 No pay.js script found`)
-      }
-      const observer = new MutationObserver(mutations => {
-        mutations.forEach(mutation => {
-          if (mutation.type === 'attributes' && mutation.target === parentContainer) {
-            checkAndCorrectClass(textNode, container, parentContainer)
-          } else if (
-            mutation.type === 'childList' &&
-            (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)
-          ) {
-            checkAndCorrectClass(textNode, container, parentContainer)
-          }
+        payScript.addEventListener('load', () => {
+          console.log(
+            `[${new Date().toISOString()}] [${F}] 🔍 pay.js loaded, original state:`,
+            originalScript
+          )
+          checkAndCorrectClass(textNode, container, parentContainer)
         })
-      })
-      if (!parentContainer) return
-      observer.observe(parentContainer, { attributes: true, childList: true, subtree: true })
-      return () => observer.disconnect() // Cleanup observer
-    } catch (error) {
-      console.error(
-        `[${new Date().toISOString()}] [${F}] ❌ Failed to handle pay.js or mutations:`,
-        error instanceof Error ? error.message : 'Unknown error'
+      }
+    } else {
+      console.log(
+        `[${new Date().toISOString()}] [${F}] 🔍 No pay.js script found (base guess: ${baseGuess})`
       )
     }
-  }, [disabled, containerRef, nodeTextRef])
+
+    // Observe DOM changes to keep classes corrected
+    const observer = new MutationObserver(mutations => {
+      mutations.forEach(mutation => {
+        if (mutation.type === 'attributes' && mutation.target === parentContainer) {
+          checkAndCorrectClass(textNode, container, parentContainer)
+        } else if (
+          mutation.type === 'childList' &&
+          (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)
+        ) {
+          checkAndCorrectClass(textNode, container, parentContainer)
+        }
+      })
+    })
+    observer.observe(parentContainer, { attributes: true, childList: true, subtree: true })
+
+    return () => observer.disconnect() // Cleanup observer
+  } catch (error) {
+    console.error(
+      `[${new Date().toISOString()}] [${F}] ❌ Failed to handle pay.js or mutations:`,
+      error instanceof Error ? error.message : 'Unknown error'
+    )
+  }
+}, [disabled, containerRef, nodeTextRef])
 
   /**
    * Handles changes to the variable amount input.
@@ -554,7 +586,6 @@ useEffect(() => {
         }
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 1] Client requested amount (sats):`, effectiveAmount)
         const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-        const authFetch = new AuthFetch(wallet)
         let walletOutputs: ListOutputsResult | null = null
         const substrates = [
           { type: 'HTTPWalletJSON', substrate: 'json-api', skip: false },
@@ -592,14 +623,22 @@ useEffect(() => {
           }
         }
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet selected inputs:`, walletOutputs)
-        const resStatus = await authFetch.fetch(`${server}/api/getStatus`, { method: 'GET' })
+const resStatus = await fetchWithTimeout(
+  `${CONFIG.API_BASE}/getStatus`,
+  { method: 'GET' },
+  wallet
+)
         if (!resStatus.ok) throw new Error('Server status request failed')
         const status = await resStatus.json()
         if (status.status !== 'success') throw new Error('Cannot reach server')
         console.log(`[${new Date().toISOString()}] [${F}] ✅ Server status checked:`, status)
         let fetchedPaymentId = paymentId // Use current paymentId state
         try {
-const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`)
+const buttonCodeResponse = await fetchWithTimeout(
+  `${CONFIG.API_BASE}/buttonCode/${paymentId}`,
+  { method: 'GET' },
+  wallet
+)
           if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
           const buttonCodeData: ButtonCodeResponse = await buttonCodeResponse.json()
           if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
@@ -612,18 +651,28 @@ const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`)
             fetchError instanceof Error ? fetchError.message : 'Unknown error'
           )
         }
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 2] Requesting invoice from server:`, server)
-        const resInv = await authFetch.fetch(`${server}/api/invoice`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            merchantId: merchant,
-            buttonId,
-            paymentId: fetchedPaymentId,
-            amount: effectiveAmount,
-            description: containerRef.current?.parentElement?.getAttribute('data-description') || 'Default Description'
-          })
-        })
+
+const resInv = await fetchWithTimeout(
+  `${CONFIG.API_BASE}/invoice`,
+  {
+    method: 'POST',
+headers: { 
+  'Content-Type': 'application/json', 
+    'x-bsv-server': serverIdentityKey
+},
+    body: JSON.stringify({
+      merchantId: merchant,
+      buttonId,
+      paymentId: fetchedPaymentId,
+      amount: effectiveAmount,
+      description:
+        containerRef.current?.parentElement?.getAttribute('data-description') ||
+        'Default Description'
+    })
+  },
+  wallet
+)
+
         if (!resInv.ok) {
           console.log(`[${new Date().toISOString()}] [${F}] ❌ Invoice request failed:`, {
             status: resInv.status,
@@ -692,14 +741,20 @@ const buttonCodeResponse = await fetch(`${server}/api/buttonCode/${paymentId}`)
         }
         console.log(
           `[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`,
-          server,
           payPayload
         )
-        const resPay = await authFetch.fetch(`${server}/api/pay`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payPayload)
-        })
+ const resPay = await fetchWithTimeout(
+  `${CONFIG.API_BASE}/pay`,
+  {
+    method: 'POST',
+headers: { 
+  'Content-Type': 'application/json', 
+    'x-bsv-server': serverIdentityKey
+},
+    body: JSON.stringify(payPayload)
+  },
+  wallet
+)
         if (!resPay.ok) throw new Error('Payment request failed')
         const pay: PayResponse = await resPay.json()
         if (pay.status !== 'success') throw new Error(`Payment processing failed: ${pay.message ?? ''}`)

@@ -16,7 +16,7 @@
  */
 const F = 'routes/initializeIds'
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import type { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
@@ -74,7 +74,7 @@ export default {
       .withMessage('description exceeds maximum length of 80 characters')
   ],
   func: async (req: Request, res: Response): Promise<void> => {
-    logWithTimestamp(F, '[initializeIds] Route hit for /api/initializeIds', {
+    logWithTimestamp(F, '[initializeIds] Route hit for /initializeIds', {
       method: req.method,
       url: req.url,
       body: req.body,

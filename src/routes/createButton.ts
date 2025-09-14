@@ -21,7 +21,7 @@
  */
 const F = 'routes/createButton'
 import knex, { Knex } from 'knex'
-import knexConfig from '../../knexfile'
+import knexConfig from '../knexfile'
 import type { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
 import { MAX_PAYMENT_SATS } from '../utils/constants'
@@ -108,30 +108,48 @@ export default {
       })
       return
     }
-    const merchantId = (req as any).auth?.identityKey || 'unknown' // Default to 'unknown' if not authenticated
-    const {
-      amount = 0,
-      variableAmount = false,
-      multiUse = false,
-      description,
-      htmlCode = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
-      paymentId,
-      buttonId
-    }: RequestBody = req.body as RequestBody // Type assertion to match validated structure
-    logWithTimestamp(
-      F,
-      '🔍 [createButton] [Step 1] Create button request (sats):',
-      {
-        merchantId,
-        amount,
-        variableAmount,
-        multiUse,
-        description,
-        htmlCode,
-        paymentId,
-        buttonId
-      }
-    )
+    const merchantId = (req as any).auth?.identityKey
+if (!merchantId) {
+  logWithTimestamp(F, '❌ [createButton] Missing authenticated merchant identity, halting execution')
+  res.status(401).json({
+    status: 'error',
+    message: 'Unauthorized: merchant identity required'
+  })
+  return
+}
+const {
+  amount = 0,
+  variableAmount = false,
+  multiUse = false,
+  description,
+  htmlCode = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
+  paymentId,
+  buttonId
+}: RequestBody = req.body as RequestBody
+    //* const merchantId = (req as any).auth?.identityKey || 'unknown' // Default to 'unknown' if not authenticated
+    // const {
+    //   amount = 0,
+    //   variableAmount = false,
+    //   multiUse = false,
+    //   description,
+    //   htmlCode = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
+    //   paymentId,
+    //   buttonId
+    // }: RequestBody = req.body as RequestBody // Type assertion to match validated structure
+    // logWithTimestamp(
+    //   F,
+    //   '🔍 [createButton] [Step 1] Create button request (sats):',
+    //   {
+    //     merchantId,
+    //     amount,
+    //     variableAmount,
+    //     multiUse,
+    //     description,
+    //     htmlCode,
+    //     paymentId,
+    //     buttonId
+    //   }
+    //)
     try {
       await ensureMerchantExists(db, merchantId)
       // Verify or initialize IDs in ids table

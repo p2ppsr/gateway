@@ -4,6 +4,7 @@ const defaultLogging = false
 // Specific file logging overrides
 const loggingConfig: { [file: string]: boolean } = {
   default: defaultLogging,
+  'demo/demoIdsAuth': true,
   'pages/Create': true,
   'pages/Buttons': true,
   'pages/Actions': false,
