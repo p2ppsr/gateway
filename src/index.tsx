@@ -8,7 +8,7 @@ import './index.css'
 import { loadClientConfig } from './utils/clientConfig'
 import { ClientConfigProvider } from './contexts/ClientConfigContext'
 import { findWalletOrigin } from './utils/checkForMetanetclient'
-import { PORTS } from './utils/constants'
+import { CONFIG, PORTS } from './utils/constants'
 
 // Minimal context to expose the discovered wallet origin app-wide
 export const WalletRuntimeContext = React.createContext<{ walletOrigin: string | null }>({
@@ -48,10 +48,12 @@ loadClientConfig()
       <BrowserRouter>
         <ClientConfigProvider value={{ 
           walletLocalPorts: [PORTS.WALLET_PRIMARY],
-          apiBase: '',                 // empty = use same-origin + dev proxy
+          apiBase: '',
           routingPrefix: '/api',
           wellKnownPath: '/.well-known/auth',
-          serverIdentityKey: '' }}>
+          serverIdentityKey: CONFIG.SERVER_IDENTITY_KEY,
+          walletBase: ''
+           }}>
           <WalletRuntimeContext.Provider value={{ walletOrigin: null }}>
             <App />
           </WalletRuntimeContext.Provider>

@@ -12,7 +12,6 @@
  * - ./components/PayButton: For the PayButton component
  * - ./utils/logging: For logWithTimestamp
  * - ./utils/initializeIds: For provisioning IDs client-side
- * - ./utils/general: For fetchWithTimeout and markAuthReady
  * - @bsv/sdk: For WalletClient
  * @changelog
 * - 06Sep2025_0045 UTC (v2.61.1): Documented all public/utility APIs with JSDoc for auto-docs; no functional changes.
@@ -23,11 +22,13 @@ import { createRoot } from 'react-dom/client'
 import PayButton, { PayButtonProps } from './components/PayButton'
 import { logWithTimestamp } from './utils/logging'
 import { initializeIds } from './utils/initializeIds'
-import { fetchWithTimeout, markAuthReady } from './utils/general'
+import { fetchWithTimeout } from './utils/general'
 import { WalletClient } from '@bsv/sdk'
 import { CONFIG } from './utils/constants'
+import { getScriptOrigin } from './utils/scriptOrigin'
 
 const F = 'inject'
+logWithTimestamp(F, '🔍 INJECT')
 declare const __SERVER_IDENTITY_KEY__: string
 const serverIdentityKey = __SERVER_IDENTITY_KEY__
 
@@ -136,9 +137,6 @@ const createButton = async (
   walletClient: WalletClient
 ): Promise<void> => {
   try {
-    logWithTimestamp(F, '🔧 CONFIG.API_BASE:', CONFIG.API_BASE)
-    const url = `${CONFIG.API_BASE}/createButton`
-
     const htmlCode =
       `<style>${(props.htmlCode as string) || '.gateway-paybutton { background: #8484FA; color: white; }'}</style>` +
       `<div>${props.text || 'Pay'}</div>`
@@ -156,7 +154,8 @@ const createButton = async (
       paymentId: props.paymentId || '',
       buttonId: props.buttonId || ''
     }
-
+    const base = getScriptOrigin()
+    const url = `${base}/api/createButton`
     const res = await (fetchWithTimeout as any)(
       url,
       {
@@ -182,7 +181,6 @@ headers: {
         paymentId: data.paymentId,
         buttonId: data.buttonId
       })
-      markAuthReady()
 
       // Prefer server-confirmed paymentId if the caller didn’t provide one
       if (!props.paymentId && data.paymentId) props.paymentId = String(data.paymentId)

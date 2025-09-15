@@ -39,7 +39,7 @@ interface RequestBody {
 }
 export default {
   type: 'post',
-  path: '/createButton', // Handled by ROUTING_PREFIX in server.ts
+  path: '/createButton',
   middlewares: [
     body('description')
       .trim()

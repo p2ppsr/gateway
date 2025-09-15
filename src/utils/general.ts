@@ -22,100 +22,7 @@
  */
 
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
-import { loadClientConfig } from './clientConfig'
-
-/* =============================================================================
-   Auth-ready event bus (client-side helper)
-   -----------------------------------------------------------------------------
-   Purpose:
-   - Let components and utilities defer *protected* API calls until the wallet
-     (BRC-104) handshake is done.
-   - Avoids race conditions where the UI loads before the authenticated session
-     exists.
-
-   Usage:
-   - After a successful wallet session is established, call `markAuthReady()`.
-   - Call `onAuthReady(cb)` in components to perform actions once ready.
-   - Or `await waitForAuthReady()` where awaiting is more convenient.
-
-   Notes:
-   - Idempotent: calling `markAuthReady()` multiple times is safe.
-   - In non-browser contexts this becomes a no-op shim and never fires.
-============================================================================= */
-
-/** Internal event bus (falls back to a no-op shim outside the browser). */
-const _authBus =
-  typeof window !== 'undefined' && typeof window.EventTarget !== 'undefined'
-    ? new EventTarget()
-    : ({ addEventListener() {}, dispatchEvent() { return true } } as unknown as EventTarget)
-
-/** Internal readiness flag for wallet/auth handshake. */
-let _authReady = false
-
-/**
- * Marks the wallet/auth handshake as complete and notifies listeners.
- *
- * @function markAuthReady
- * @returns {void}
- * @example
- * // After establishing the BRC-104 session:
- * markAuthReady();
- */
-export function markAuthReady(): void {
-  if (_authReady) return
-  _authReady = true
-  try {
-    _authBus.dispatchEvent(new Event('auth-ready'))
-  } catch {
-    // no-op if Event isn't available
-  }
-}
-
-/**
- * Registers a callback to run once auth is ready. If already ready, runs immediately.
- *
- * @function onAuthReady
- * @param {() => void} cb - Callback invoked when auth is ready.
- * @returns {void}
- * @example
- * onAuthReady(() => {
- *   // safe to call protected APIs now
- *   void fetchButtonStatus();
- * });
- */
-export function onAuthReady(cb: () => void): void {
-  if (_authReady) {
-    cb()
-    return
-  }
-  _authBus.addEventListener('auth-ready', cb as EventListener, { once: true })
-}
-
-/**
- * Returns a Promise that resolves when auth is ready, or rejects on timeout.
- *
- * @function waitForAuthReady
- * @param {number} [timeoutMs=15000] - Maximum time to wait, in milliseconds.
- * @returns {Promise<void>} Resolves when auth is ready; rejects if the timeout elapses first.
- * @throws {Error} If the timeout is reached before auth becomes ready.
- * @example
- * await waitForAuthReady(10000);
- * // now it’s safe to call protected APIs
- */
-export function waitForAuthReady(timeoutMs: number = 15000): Promise<void> {
-  if (_authReady) return Promise.resolve()
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('auth-ready timed out')), timeoutMs)
-    _authBus.addEventListener(
-      'auth-ready',
-      () => {
-        clearTimeout(t)
-        resolve()
-      },
-      { once: true }
-    )
-  })
-}
+import { CONFIG } from './constants'
 
 /* =============================================================================
    ID generation
@@ -301,7 +208,7 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
 ============================================================================= */
 
 /** Cache client config so we don’t reload on every call. */
-const _clientConfigPromise = loadClientConfig()
+//*const _clientConfigPromise = loadClientConfig()
 
 /** Trim trailing slashes from a base URL; allow '' for same-origin. */
 function normalizeBase(v?: string | null): string {
@@ -324,24 +231,24 @@ function normalizePrefix(v?: string | null, fallback = '/api'): string {
  *   - apiBase present → `${apiBase}${routingPrefix}${path}`
  *   - apiBase ''      → `${routingPrefix}${path}` (same-origin; works with dev proxy)
  */
-async function resolveApiUrl(input: string): Promise<string> {
-  if (typeof input !== 'string' || input.length === 0) {
-    throw new Error('URL must be a non-empty string')
-  }
-  if (/^https?:\/\//i.test(input)) return input
+// async function resolveApiUrl(input: string): Promise<string> {
+//   if (typeof input !== 'string' || input.length === 0) {
+//     throw new Error('URL must be a non-empty string')
+//   }
+//   if (/^https?:\/\//i.test(input)) return input
 
-  const cfg = await _clientConfigPromise
-  const base = normalizeBase(cfg.apiBase)
-  const pfx = normalizePrefix(cfg.routingPrefix)
-  const path = input.startsWith('/') ? input : `/${input}`
+//   //const cfg = await _clientConfigPromise
+//   //const base = normalizeBase(cfg.apiBase)
+//   //const pfx = normalizePrefix(cfg.routingPrefix)
+//   const path = input.startsWith('/') ? input : `/${input}`
 
-  const origin =
-typeof window !== 'undefined' && (window as any)?.location?.origin
-  ? window.location.origin
-  : ''
-return base ? `${base}${pfx}${path}` : (origin ? `${origin}${pfx}${path}` : `${pfx}${path}`)
-  // return base ? `${base}${pfx}${path}` : `${pfx}${path}`
-}
+//   const origin =
+// typeof window !== 'undefined' && (window as any)?.location?.origin
+//   ? window.location.origin
+//   : ''
+// //return base ? `${base}${pfx}${path}` : (origin ? `${origin}${pfx}${path}` : `${pfx}${path}`)
+//   // return base ? `${base}${pfx}${path}` : `${pfx}${path}`
+// }
 
 /**
  * Authenticated fetch with timeout for all `/api/*` calls.
@@ -412,14 +319,14 @@ export const fetchWithTimeout = async (
   }
 
   // Resolve to a valid absolute-or-relative URL (never throws "Invalid URL")
-  const resolvedUrl = await resolveApiUrl(url)
+  const resolvedUrl =`${url}`
 
   // Build auth-capable fetch
   const authFetch = new AuthFetch(wallet)
 
   // Abort on timeout
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(new Error(`Timeout after ${timeoutMs}ms: ${resolvedUrl}`)), timeoutMs)
+  const timer = setTimeout(() => controller.abort(new Error(`Timeout after ${timeoutMs}ms: ${CONFIG.API_BASE}`)), timeoutMs)
 
   try {
     // Merge headers, attach signal
@@ -435,14 +342,14 @@ export const fetchWithTimeout = async (
       let detail = ''
       try { detail = await res.text() } catch { /* ignore */ }
       throw new Error(
-        `Failed ${reqOptions.method || 'GET'} ${resolvedUrl} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ''}`
+        `Failed ${reqOptions.method || 'GET'} ${CONFIG.API_BASE} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ''}`
       )
     }
     return res
   } catch (err) {
     // If aborted, surface a clear message
     if ((err as any)?.name === 'AbortError') {
-      throw new Error(`Request aborted: ${resolvedUrl}`)
+      throw new Error(`Request aborted: ${CONFIG.API_BASE}`)
     }
     throw err instanceof Error ? err : new Error(String(err))
   } finally {

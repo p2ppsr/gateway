@@ -1,14 +1,15 @@
 import React, { createContext, useContext } from 'react'
 import type { ClientConfig } from '../utils/clientConfig'
+import { CONFIG, PORTS } from '../utils/constants'
 
 const defaultClientConfig: ClientConfig = {
-  walletLocalPorts: [3321],
+  walletLocalPorts: [PORTS.WALLET_PRIMARY],
   apiBase: '', // empty = use same-origin + dev proxy
   routingPrefix: '/',
   //****** NEEDED FOR PROD ****
-  //routingPrefix: '/api',
   wellKnownPath: '/.well-known/auth',
-  serverIdentityKey: '3c164fce7834d831bbc96975f9717ad8af7d94d7df0d36de0b4c13e009540589'
+  serverIdentityKey: CONFIG.SERVER_IDENTITY_KEY,
+  walletBase: ''
 }
 
 export const ClientConfigContext = createContext<ClientConfig>(defaultClientConfig)

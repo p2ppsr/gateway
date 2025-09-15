@@ -71,9 +71,10 @@ const DEV_API_BASE = `${DEV_BASE}${process.env.API_ROUTING_PREFIX ?? '/api'}`
  * @property WALLET_ORIGIN - Canonical local wallet URL (primary port).
  */
 export const CONFIG = {
+  SERVER_IDENTITY_KEY: (process as any)?.env?.SERVER_IDENTITY_KEY ?? '03f7c1fe6aaccabb06b9897a5c1f4bfa45230556a771d5b08aec5f48b94f09b61b',
+  PRIVATE_IDENTITY_KEY: (process as any)?.env?.PRIVATE_IDENTITY_KEY ?? '3c164fce7834d831bbc96975f9717ad8af7d94d7df0d36de0b4c13e009540589',
   PAY_BASE: IS_PROD ? `${SCHEMES.HTTPS}://${HOSTS.GATEWAY}` : DEV_BASE,
-  API_BASE: IS_PROD ? `${SCHEMES.HTTPS}://${HOSTS.GATEWAY}` : DEV_API_BASE,
-
+  API_BASE: IS_PROD ? `${SCHEMES.HTTPS}://${HOSTS.GATEWAY}/api` : DEV_API_BASE,
   WALLET_ORIGIN: `${SCHEMES.HTTP}://${HOSTS.WALLET}:${PORTS.WALLET_PRIMARY}`,
 } as const
 

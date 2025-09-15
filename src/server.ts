@@ -34,7 +34,7 @@ import routes from './routes'
 import knexConfig from './knexfile'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
-import { MAX_PAYMENT_SATS } from './utils/constants'
+import { CONFIG, MAX_PAYMENT_SATS } from './utils/constants'
 import { logWithTimestamp } from './utils/logging'
 import util from 'util'
 
@@ -126,7 +126,17 @@ async function initializeServer(): Promise<void> {
     })
     logWithTimestamp(F, '🔍 Wallet initialized:', util.inspect(wallet, { depth: 2, colors: true } as any))
 
-    app.set('trust proxy', 1)
+// In dev (localhost) → keep strict
+// In prod/VM → trust all proxies so Host/X-Forwarded headers validate correctly
+if (process.env.NODE_ENV === 'production' || process.env.GATEWAY_ENV === 'vm') {
+  app.set('trust proxy', true)   // trust ALL hops
+  logWithTimestamp(F, '⚙️ trust proxy set to TRUE (prod/vm)')
+} else {
+  app.set('trust proxy', 1)      // keep single-hop for dev safety
+  logWithTimestamp(F, '⚙️ trust proxy set to 1 (dev)')
+}
+
+    //app.set('trust proxy', 1)
 
     // --- Global preflight/trace
     app.use(tap('00 - request received'))
@@ -145,15 +155,22 @@ async function initializeServer(): Promise<void> {
     // =====================================================
     app.get('/healthz', (_req, res) => res.status(200).json({ status: 'ok' }))
 
-    // 🌐 WELL-KNOWN CORS (OPTIONS + all requests)
-    app.use('/.well-known', (req: Request, res: Response, next: NextFunction) => {
-      res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
-      res.header('Access-Control-Allow-Headers', '*')
-      res.header('Access-Control-Allow-Methods', '*')
-      res.header('Access-Control-Allow-Credentials', 'true')
-      if (req.method === 'OPTIONS') return res.sendStatus(200)
-      next()
-    })
+// 🌐 WELL-KNOWN CORS (OPTIONS + all requests) — reflect caller origin
+app.use('/.well-known', (req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin)
+    res.header('Vary', 'Origin')
+  }
+  res.header('Access-Control-Allow-Headers', '*')
+  res.header('Access-Control-Allow-Methods', '*')
+  res.header('Access-Control-Allow-Credentials', 'true')
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200)
+  }
+  next()
+})
 
     // =====================================================
     // 🔑 AUTH MIDDLEWARE — create BEFORE mounting
@@ -171,7 +188,7 @@ async function initializeServer(): Promise<void> {
     } as any)
 
     // =====================================================
-    // 🛡️ Security headers + RateLimit (apply EARLY)
+    // 🛡️ Security headers (apply EARLY)
     // =====================================================
     app.use(tap('05 - before helmet'))
     app.use(helmet.hsts({ maxAge: 31536000, includeSubDomains: true, preload: true }))
@@ -236,45 +253,59 @@ async function initializeServer(): Promise<void> {
       })
     })
 
-    app.use(tap('07 - before rateLimit'))
-    app.use(
-      rateLimit({
-        windowMs: 15 * 60 * 1000,
-        max: 100,
-        standardHeaders: true,
-        legacyHeaders: false,
-        keyGenerator: (req: Request) => {
-          return req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown'
-        }
-      })
-    )
-    app.use(tap('08 - after rateLimit'))
+    // Removed for prod
+    // app.use(tap('07 - before rateLimit'))
+    // app.use(
+    //   rateLimit({
+    //     windowMs: 15 * 60 * 1000,
+    //     max: 100,
+    //     standardHeaders: true,
+    //     legacyHeaders: false,
+    //     keyGenerator: (req: Request) => {
+    //       return req.ip || (req.headers['x-forwarded-for'] as string) || 'unknown'
+    //     }
+    //   })
+    // )
+    // app.use(tap('08 - after rateLimit'))
 
     // After createAuthMiddleware → now check/fallback
-    app.use((req, _res, next) => {
-      logWithTimestamp(F, '[auth-check]', {
-        hasAuth: !!(req as any).auth,
-        auth: (req as any).auth,
-        allowFallback: process.env.ALLOW_UNAUTH_FALLBACK
-      })
-      next()
-    })
+const serverIdentityKey = CONFIG.SERVER_IDENTITY_KEY
+
+// 🌐 CORS (reflect caller origin globally)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin)
+    res.header('Vary', 'Origin')
+  }
+  res.header('Access-Control-Allow-Headers', '*')
+  res.header('Access-Control-Allow-Methods', '*')
+  res.header('Access-Control-Expose-Headers', '*')
+  res.header('Access-Control-Allow-Credentials', 'true')
+  res.header('Access-Control-Allow-Private-Network', 'true')
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200)
+  }
+  next()
+})
+
     app.use(authMiddleware as any)
 
-    // =====================================================
-    // 🌐 CORS (headers only)
-    // =====================================================
-    app.use(tap('09 - before CORS'))
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
-      res.header('Access-Control-Allow-Headers', '*')
-      res.header('Access-Control-Allow-Methods', '*')
-      res.header('Access-Control-Expose-Headers', '*')
-      res.header('Access-Control-Allow-Private-Network', 'true')
-      if (req.method === 'OPTIONS') return res.sendStatus(200)
-      next()
-    })
-    app.use(tap('10 - after CORS'))
+    // // =====================================================
+    // // 🌐 CORS (headers only)
+    // // =====================================================
+    // app.use(tap('09 - before CORS'))
+    // app.use((req: Request, res: Response, next: NextFunction) => {
+    //   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+    //   res.header('Access-Control-Allow-Headers', '*')
+    //   res.header('Access-Control-Allow-Methods', '*')
+    //   res.header('Access-Control-Expose-Headers', '*')
+    //   res.header('Access-Control-Allow-Private-Network', 'true')
+    //   if (req.method === 'OPTIONS') return res.sendStatus(200)
+    //   next()
+    // })
+    // app.use(tap('10 - after CORS'))
 
 // =====================================================
 // 🔄 WALLET PROXY (relay to local wallet on 3321)
@@ -374,6 +405,15 @@ app.use('/wallet-proxy', async (req: Request, res: Response) => {
     // 🛣️ API routes
     // =====================================================
     const apiRouter: Router = express.Router()
+
+    // Explicit /getStatus route (only for prod/vm)
+if (process.env.NODE_ENV === 'production' || process.env.GATEWAY_ENV === 'vm') {
+  apiRouter.get('/getStatus', (_req: Request, res: Response) => {
+    logWithTimestamp(F, '↪ /api/getStatus probe', { env: process.env.NODE_ENV })
+    res.json({ status: 'ok', env: process.env.NODE_ENV, ts: Date.now() })
+  })
+}
+
     try {
       const routeModules = await routes
       ;(routeModules as Route[]).forEach((route: Route) => {

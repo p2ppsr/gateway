@@ -64,22 +64,22 @@ const App: React.FC = () => {
     return () => clearInterval(intervalId)
   }, [])
 
-  useEffect(() => {
-    void (async () => {
-      try {
-const res = await fetchWithTimeout(
-  `${API_BASE}/getStatus`,
-  { method: 'GET' },
-  wallet
-)
-        if (!res.ok) throw new Error(`❌ HTTP ${res.status}`)
-        const { isAdmin } = await res.json()
-        setIsAdmin(isAdmin)
-      } catch (err) {
-        console.error('❌ getStatus failed:', err)
-      }
-    })()
-  }, [])
+//   useEffect(() => {
+//     void (async () => {
+//       try {
+// // const res = await fetchWithTimeout(
+// //   `${API_BASE}/getStatus`,
+// //   { method: 'GET' },
+// //   wallet
+// // )
+//       // if (!res.ok) throw new Error(`❌ HTTP ${res.status}`)
+//       //   const { isAdmin } = await res.json()
+//       //   setIsAdmin(isAdmin)
+//       // } catch (err) {
+//       //   console.error('❌ getStatus failed:', err)
+//       // }
+//     })()
+//   }, [])
 
   return (
     <Theme>

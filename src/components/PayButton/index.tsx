@@ -16,7 +16,8 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, React
 import { toast } from 'react-toastify'
 import { WalletClient, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
-import { fetchWithTimeout, waitForAuthReady } from '../../utils/general'
+import { fetchWithTimeout } from '../../utils/general'
+import { getScriptOrigin } from '../../utils/scriptOrigin'
 // Component logging prefix
 const F = 'components/PayButton'
 
@@ -228,32 +229,34 @@ useEffect(() => {
   let cancelled = false
   const run = async (): Promise<void> => {
     try {
-      // Wait until some prior authenticated call (e.g., createButton) succeeded
-      await waitForAuthReady(10_000) // 10s max; tweak if needed
-
       const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-const response = await fetchWithTimeout(
-  `${CONFIG.API_BASE}/buttonCode/${paymentId}`,
-  { method: 'GET' },
-  wallet
-)
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
-      const data: ButtonCodeResponse = await response.json()
-      if (cancelled) return
+      if(multiUse){
+        const base = getScriptOrigin()
+        const url = `${base}/api/buttonCode/${paymentId}`
+        const response = await fetchWithTimeout(
+          url,
+          { method: 'GET' },
+          wallet
+        )
+        if (!response.ok) throw new Error(`HTTP error: ${response.status}`)
+        const data: ButtonCodeResponse = await response.json()
+    
+        if (cancelled) return
 
-      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button status response:`, {
-        multi_use: data.multi_use,
-        used: data.used,
-        paymentId
-      })
-      console.log(`[${new Date().toISOString()}] [${F}] 🔍 Fetched button status:`, data)
-      if (data.status === 'success') {
-        const isMultiUse = data.multi_use === true
-        const isUsed = data.used === true
-        if (!isMultiUse && isUsed) {
-          setDisabled(true)
-          console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use and already used`)
-          toast.error('This button is single-use and has been used.')
+        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button status response:`, {
+          multi_use: multiUse,
+          used: data.used,
+          paymentId
+        })
+        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Fetched button status:`, data)
+        if (data.status === 'success') {
+          const isMultiUse = data.multi_use === true
+          const isUsed = data.used === true
+          if (!isMultiUse && isUsed) {
+            setDisabled(true)
+            console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use and already used`)
+            toast.error('This button is single-use and has been used.')
+          }
         }
       }
     } catch (error) {
@@ -623,23 +626,16 @@ useEffect(() => {
           }
         }
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet selected inputs:`, walletOutputs)
-const resStatus = await fetchWithTimeout(
-  `${CONFIG.API_BASE}/getStatus`,
-  { method: 'GET' },
-  wallet
-)
-        if (!resStatus.ok) throw new Error('Server status request failed')
-        const status = await resStatus.json()
-        if (status.status !== 'success') throw new Error('Cannot reach server')
-        console.log(`[${new Date().toISOString()}] [${F}] ✅ Server status checked:`, status)
-        let fetchedPaymentId = paymentId // Use current paymentId state
+        let fetchedPaymentId = paymentId
         try {
-const buttonCodeResponse = await fetchWithTimeout(
-  `${CONFIG.API_BASE}/buttonCode/${paymentId}`,
-  { method: 'GET' },
-  wallet
-)
-          if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
+        const base = getScriptOrigin()
+        const url = `${base}/api/buttonCode/${paymentId}`
+        const buttonCodeResponse = await fetchWithTimeout(
+          url,
+          { method: 'GET' },
+          wallet
+        )
+        if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
           const buttonCodeData: ButtonCodeResponse = await buttonCodeResponse.json()
           if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
             fetchedPaymentId = buttonCodeData.payment_id
@@ -651,15 +647,16 @@ const buttonCodeResponse = await fetchWithTimeout(
             fetchError instanceof Error ? fetchError.message : 'Unknown error'
           )
         }
-
-const resInv = await fetchWithTimeout(
-  `${CONFIG.API_BASE}/invoice`,
-  {
-    method: 'POST',
-headers: { 
-  'Content-Type': 'application/json', 
-    'x-bsv-server': serverIdentityKey
-},
+        const base = getScriptOrigin()
+        const url = `${base}/api/invoice`
+        const resInv = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+            'x-bsv-server': serverIdentityKey
+        },
     body: JSON.stringify({
       merchantId: merchant,
       buttonId,
@@ -743,18 +740,21 @@ headers: {
           `[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`,
           payPayload
         )
- const resPay = await fetchWithTimeout(
-  `${CONFIG.API_BASE}/pay`,
-  {
-    method: 'POST',
-headers: { 
-  'Content-Type': 'application/json', 
-    'x-bsv-server': serverIdentityKey
-},
-    body: JSON.stringify(payPayload)
-  },
-  wallet
-)
+        {
+        const base = getScriptOrigin()
+        const url = `${base}/api/pay`
+        const resPay = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json', 
+            'x-bsv-server': serverIdentityKey
+        },
+            body: JSON.stringify(payPayload)
+          },
+          wallet
+        )
         if (!resPay.ok) throw new Error('Payment request failed')
         const pay: PayResponse = await resPay.json()
         if (pay.status !== 'success') throw new Error(`Payment processing failed: ${pay.message ?? ''}`)
@@ -783,6 +783,7 @@ headers: {
           })
         }
         console.log(`[${new Date().toISOString()}] [${F}] ✅ Payment successful:`, pay)
+      }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unexpected error'
         console.error(`[${new Date().toISOString()}] [${F}] ❌ Payment flow error:`, {

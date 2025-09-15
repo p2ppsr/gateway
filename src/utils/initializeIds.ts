@@ -11,8 +11,9 @@ import { generateBase58, isBase58 } from './general';
 import { toast } from 'react-toastify';
 import { WalletClient, AuthFetch } from '@bsv/sdk';
 import type { Dispatch, SetStateAction } from 'react';
-import { loadClientConfig } from './clientConfig';
-import type { ClientConfig } from './clientConfig';
+// import { loadClientConfig } from './clientConfig';
+// import type { ClientConfig } from './clientConfig';
+import { CONFIG } from './constants';
 
 const F = 'utils/initializeIds';
 
@@ -79,9 +80,7 @@ export const initializeIds = async (
   setSpendingDescription_variable?: Dispatch<SetStateAction<string>>,
   buttonId?: string,
   force: boolean = true,
-  configOverride?: ClientConfig
 ): Promise<InitializeIdsResponse> => {
-  const config: ClientConfig = configOverride ?? (await loadClientConfig());
 
   // Validate type + inputs
   if (type !== 'payment' && type !== 'button') {
@@ -135,64 +134,20 @@ export const initializeIds = async (
     currentId = generateBase58(12);
   }
 
-  // Derived config + URLs
-  const prefix = config.routingPrefix || '/api';
-  logWithTimestamp(F, `cfg.routingPrefix = ${prefix}`);
-
-  const apiBaseCfg = config.apiBase ?? '';
-  logWithTimestamp(F, `cfg.apiBase      = ${JSON.stringify(apiBaseCfg)}`);
-
-  const originGuess = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001';
-  logWithTimestamp(F, `originGuess      = ${originGuess}`);
-
-  const base = (apiBaseCfg && /^https?:\/\//.test(apiBaseCfg) ? apiBaseCfg : '') || originGuess;
-  logWithTimestamp(F, `resolvedBase     = ${base}`);
-
-  const GET_STATUS_URL = `${base}${prefix}/getStatus`;
-  const INIT_URL = `${base}${prefix}/initializeIds`;
-  logWithTimestamp(F, `GET_STATUS_URL   = ${GET_STATUS_URL}`);
-  logWithTimestamp(F, `INIT_URL         = ${INIT_URL}`);
+  const INIT_URL = `${CONFIG.API_BASE}/initializeIds`;
+  logWithTimestamp(F, `INIT_URL= ${INIT_URL}`);
 
   // Ensure working substrate
   await ensureWalletSubstrate(wallet);
-
-  // 1) Native GET (no auth)
-  logWithTimestamp(F, `GET (native) → ${GET_STATUS_URL}`);
-  const nativeRes = await fetch(GET_STATUS_URL, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    cache: 'no-store',
-    credentials: 'omit',
-    mode: 'cors'
-  });
-  logWithTimestamp(F, `GET (native) status: ok=${nativeRes.ok} http=${nativeRes.status}`);
-  const nativeText = await nativeRes.text();
-  logWithTimestamp(F, `GET (native) body (first 300): ${nativeText.slice(0, 300)}`);
-  if (!nativeRes.ok) {
-    const msg = `Server status check failed (native GET): HTTP ${nativeRes.status}`;
-    logWithTimestamp(F, msg);
-    toast.error(msg);
-    return { status: 'error', message: msg };
-  }
 
   // 2) Auth GET (signed). Some servers may reject auth headers on this route; log & continue.
   const authFetch = new AuthFetch(wallet);
   const subName = (wallet as any)?.substrate?.name ?? 'unknown';
   const walletOrigin = (wallet as any)?.origin ?? 'n/a';
   logWithTimestamp(F, `AuthFetch ready. substrate=${subName}, wallet.origin=${walletOrigin}`);
-  logWithTimestamp(F, `GET (auth) → ${GET_STATUS_URL}`);
-  try {
-    const resAuthGet = await authFetch.fetch(GET_STATUS_URL, { method: 'GET' });
-    logWithTimestamp(F, `GET (auth) status: ok=${resAuthGet.ok} http=${resAuthGet.status}`);
-    const t = await resAuthGet.text();
-    logWithTimestamp(F, `GET (auth) body (first 300): ${t.slice(0, 300)}`);
-    // No hard requirement to succeed; this is diagnostic
-  } catch (e: any) {
-    logWithTimestamp(F, `GET (auth) failed (non-fatal): ${e?.message ?? e}`);
-  }
 
-  const serverIdentityKey = (config as any).serverIdentityKey;
-logWithTimestamp(F, `serverIdentityKey (cfg) = ${serverIdentityKey?.slice(0, 10) ?? 'missing'}…`);
+  const serverIdentityKey = CONFIG.SERVER_IDENTITY_KEY
+  logWithTimestamp(F, `serverIdentityKey=${serverIdentityKey}`);
 
 if (!serverIdentityKey) {
   const msg = 'Missing serverIdentityKey in client config; cannot send signed POST.';

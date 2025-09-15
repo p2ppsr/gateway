@@ -2,7 +2,7 @@ import path from 'path'
 import HtmlWebpackPlugin from 'html-webpack-plugin'
 import NodePolyfillPlugin from 'node-polyfill-webpack-plugin'
 import CopyWebpackPlugin from 'copy-webpack-plugin'
-import webpack, { Configuration } from 'webpack'   // 👈 default import, not named
+import webpack, { Configuration } from 'webpack'
 
 const common: Configuration = {
   target: 'web',
