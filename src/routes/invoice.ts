@@ -168,7 +168,6 @@ export default {
         await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
           derivation_prefix: derivationPrefix,
           derivation_suffix: derivationSuffix,
-          //*transaction_id: transactionIdNew,
           payer_id: senderIdentityKey,
           updated_at: db.fn.now()
         })
@@ -176,7 +175,6 @@ export default {
           paymentId,
           derivation_prefix: derivationPrefix,
           derivation_suffix: derivationSuffix,
-          //*transactionId: transactionIdNew,
           payer_id: senderIdentityKey
         })
       } else {
@@ -188,7 +186,6 @@ export default {
           await db('payments').where({ payment_id: paymentId, button_id: buttonId }).update({
             derivation_prefix: derivationPrefix,
             derivation_suffix: derivationSuffix,
-            //*transaction_id: transactionIdNew,
             payer_id: senderIdentityKey,
             updated_at: db.fn.now()
           })
@@ -196,7 +193,6 @@ export default {
             paymentId,
             derivation_prefix: derivationPrefix,
             derivation_suffix: derivationSuffix,
-            //*transactionId: transactionIdNew,
             payer_id: senderIdentityKey
           })
         } else {
@@ -218,7 +214,6 @@ export default {
           await db('payments').insert({
             derivation_prefix: derivationPrefix,
             derivation_suffix: derivationSuffix,
-            //*transaction_id: transactionIdNew,
             payment_id: paymentId,
             button_id: buttonId,
             payer_id: senderIdentityKey,
@@ -263,7 +258,6 @@ export default {
       const existingPayments = await db('payments')
         .where({ button_id: buttonId })
         .select('derivation_prefix', 'derivation_suffix', 'payment_id')
-        //*.select('transaction_id', 'payment_id')
       logWithTimestamp(F, '🔍 [invoice] [Step 6] Existing payments for buttonId:', {
         buttonId,
         existingPayments
@@ -285,7 +279,6 @@ export default {
           buttonId,
           derivationPrefix,
           derivationSuffix,
-          //*transactionId: transactionIdNew
         })
       } catch (insertError) {
         const errorMessage = insertError instanceof Error ? insertError.message : 'Unknown error'
@@ -295,7 +288,6 @@ export default {
           paymentId,
           derivationPrefix,
           derivationSuffix,
-          //*transactionId: transactionIdNew
         })
         if (errorMessage.includes('Duplicate entry') && !button.multi_use) {
           await db('payment_buttons')
@@ -327,7 +319,6 @@ export default {
       }
       const recipientPublicKey = PublicKey.fromString(button.merchant_id)
       const invoiceNumber: string = `2-3241645161d8-${derivationPrefix} ${derivationSuffix}`
-      //*const invoiceNumber = `2-3241645161d8-${transactionIdNew} 1`
       const combined = Utils.toArray(
         `${senderPrivateKey.toString()}${recipientPublicKey.toString()}${invoiceNumber}`,
         'utf8'
@@ -367,7 +358,6 @@ export default {
         errorDetails: error,
         derivation_prefix: derivationPrefix,
         derivation_suffix: derivationSuffix,
-        //*transaction_id: transactionIdNew ? transactionIdNew : 'N/A'
       })
       if (message.includes('Duplicate entry') && !req.body.multi_use) {
         await db('payment_buttons')
@@ -385,7 +375,6 @@ export default {
       res.status(500).json({
         status: 'error',
         message: `❌ Internal server error: ${message} (derivation_prefix,derivation_suffix: ${derivationPrefix && derivationSuffix} ?? 'N/A'})`
-        //*message: `❌ Internal server error: ${message} (transaction_id: ${transactionIdNew ?? 'N/A'})`
       })
     }
   }

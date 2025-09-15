@@ -126,30 +126,6 @@ const {
   paymentId,
   buttonId
 }: RequestBody = req.body as RequestBody
-    //* const merchantId = (req as any).auth?.identityKey || 'unknown' // Default to 'unknown' if not authenticated
-    // const {
-    //   amount = 0,
-    //   variableAmount = false,
-    //   multiUse = false,
-    //   description,
-    //   htmlCode = '<style>.gateway-paybutton { background: #8484FA; color: white; }</style>',
-    //   paymentId,
-    //   buttonId
-    // }: RequestBody = req.body as RequestBody // Type assertion to match validated structure
-    // logWithTimestamp(
-    //   F,
-    //   '🔍 [createButton] [Step 1] Create button request (sats):',
-    //   {
-    //     merchantId,
-    //     amount,
-    //     variableAmount,
-    //     multiUse,
-    //     description,
-    //     htmlCode,
-    //     paymentId,
-    //     buttonId
-    //   }
-    //)
     try {
       await ensureMerchantExists(db, merchantId)
       // Verify or initialize IDs in ids table
@@ -251,7 +227,6 @@ const {
             merchant_id: merchantId,
             derivation_prefix: '',
             derivation_suffix: '',
-            //*transaction_id: '',
             amount: amountInSats,
             description: finalDescription.slice(0, 80),
             completed: 0,

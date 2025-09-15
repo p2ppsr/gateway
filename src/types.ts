@@ -21,7 +21,6 @@ export interface UTXOReference {
  * @property {string} buttonId - ID of the payment button used.
  * @property {string} derivationPrefix - BRC29 derivation prefix.
  * @property {string} derivationSuffix - BRC29 derivation suffix.
- //** @property {string} transactionId - Application-level transaction reference.
  * @property {string} status - Current status of the payment.
  * @property {Date} createdAt - Timestamp when the record was created.
  * @property {string} searchableAttributes - Serialized string for overlay indexing.
@@ -36,7 +35,6 @@ export interface GatewayRecord {
   buttonId: string
   derivationPrefix: string
   derivationSuffix: string
-  //*transactionId: string
   status: string
   createdAt: Date
   searchableAttributes: string
@@ -52,7 +50,6 @@ export interface GatewayRecord {
  * @property {string} [buttonId] - Filter by button ID.
  * @property {string} [derivationPrefix] - BRC29 derivation prefix.
  * @property {string} [derivationSuffix] - BRC29 derivation suffix.
- //** @property {string} [transactionId] - Filter by transaction ID.
  * @property {string} [status] - Filter by payment status.
  */
 export interface GatewayAttributes {
@@ -63,7 +60,6 @@ export interface GatewayAttributes {
   buttonId?: string
   derivationPrefix?: string
   derivationSuffix?: string
-  //*transactionId?: string
   status?: string
 }
 
@@ -162,7 +158,6 @@ export interface FindByAmountQuery {
  * @property {Object} [value] - Optional filters for narrowing the result set.
  * @property {string} [value.derivastionPrefix] - Filter by derivastion prefix.
  * @property {string} [value.derivastionSuffix] - Filter by derivastion suffix.
-//** @property {string} [value.transactionId] - Filter by transaction ID.
  * @property {string} [value.merchantId] - Filter by merchant ID.
  */
 export interface FindAllQuery {
@@ -170,7 +165,6 @@ export interface FindAllQuery {
   value?: {
     derivationPrefix?: string
     derivationSuffix?: string
-    //*transactionId?: string
     merchantId?: string
   }
 }

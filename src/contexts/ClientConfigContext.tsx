@@ -4,9 +4,8 @@ import { CONFIG, PORTS } from '../utils/constants'
 
 const defaultClientConfig: ClientConfig = {
   walletLocalPorts: [PORTS.WALLET_PRIMARY],
-  apiBase: '', // empty = use same-origin + dev proxy
+  apiBase: '',
   routingPrefix: '/',
-  //****** NEEDED FOR PROD ****
   wellKnownPath: '/.well-known/auth',
   serverIdentityKey: CONFIG.SERVER_IDENTITY_KEY,
   walletBase: ''

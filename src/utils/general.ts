@@ -11,14 +11,6 @@
  * @author xAI
  * @date 2025-09-01
  * @version 1.18 (2025-09-08: add safe URL join + clientConfig integration to avoid "Invalid URL")
- * @changelog
- * - 2025-09-08 (v1.18): Integrate client config, add safe URL resolution for fetchWithTimeout.
- * - 2025-09-04 (v1.17): Added lightweight client-side **auth-ready event bus** helpers
- *   (`markAuthReady`, `onAuthReady`, `waitForAuthReady`) so UI code can postpone protected
- *   API calls until the wallet session is established. Expanded JSDocs.
- * - 2025-09-01 (v1.16): Added input validation for non-string inputs, fixed modulo bias in
- *   `generateRandomHex`, removed global flag from `getBase58Regex`, fixed `formatTimeLocal`
- *   error handling, removed emoji from `fetchWithTimeout` error, and updated JSDoc.
  */
 
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
@@ -203,53 +195,6 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
   }
 }
 
-/* =============================================================================
-   Networking
-============================================================================= */
-
-/** Cache client config so we don’t reload on every call. */
-//*const _clientConfigPromise = loadClientConfig()
-
-/** Trim trailing slashes from a base URL; allow '' for same-origin. */
-function normalizeBase(v?: string | null): string {
-  const s = (v ?? '').trim()
-  return s ? s.replace(/\/+$/, '') : ''
-}
-
-/** Ensure prefix starts with a single leading '/' and no trailing slash. */
-function normalizePrefix(v?: string | null, fallback = '/api'): string {
-  let s = (v ?? '').trim()
-  if (!s) s = fallback
-  if (!s.startsWith('/')) s = `/${s}`
-  return s.replace(/\/+$/, '')
-}
-
-/**
- * Resolve any input into a valid URL string:
- * - absolute (`http(s)://...`) → returned as-is
- * - relative like `/getStatus` → joined with config routingPrefix and optional apiBase
- *   - apiBase present → `${apiBase}${routingPrefix}${path}`
- *   - apiBase ''      → `${routingPrefix}${path}` (same-origin; works with dev proxy)
- */
-// async function resolveApiUrl(input: string): Promise<string> {
-//   if (typeof input !== 'string' || input.length === 0) {
-//     throw new Error('URL must be a non-empty string')
-//   }
-//   if (/^https?:\/\//i.test(input)) return input
-
-//   //const cfg = await _clientConfigPromise
-//   //const base = normalizeBase(cfg.apiBase)
-//   //const pfx = normalizePrefix(cfg.routingPrefix)
-//   const path = input.startsWith('/') ? input : `/${input}`
-
-//   const origin =
-// typeof window !== 'undefined' && (window as any)?.location?.origin
-//   ? window.location.origin
-//   : ''
-// //return base ? `${base}${pfx}${path}` : (origin ? `${origin}${pfx}${path}` : `${pfx}${path}`)
-//   // return base ? `${base}${pfx}${path}` : `${pfx}${path}`
-// }
-
 /**
  * Authenticated fetch with timeout for all `/api/*` calls.
  *
@@ -309,7 +254,7 @@ export const fetchWithTimeout = async (
   url: string,
   options: { headers?: Record<string, string>; method?: string; body?: string },
   wallet: WalletClient,
-  timeoutMs: number = 30000
+  timeoutMs: number = 15_000
 ): Promise<Response> => {
   if (typeof url !== 'string' || url.length === 0) {
     throw new Error('URL must be a non-empty string')
@@ -333,7 +278,7 @@ export const fetchWithTimeout = async (
     const reqOptions = {
       ...options,
       headers: { ...(options?.headers ?? {}) },
-      signal: controller.signal as any, // SimplifiedFetchRequestOptions supports signal
+      signal: controller.signal as any,
     }
 
     const res = await authFetch.fetch(resolvedUrl, reqOptions)
@@ -456,10 +401,6 @@ export const sanitizeInput = (input: string): string => {
  * @param {string | null | undefined} raw - The raw key value (e.g., from `process.env.SERVER_PRIVATE_KEY`).
  * @returns {string | null} A 64-char lowercase hex string if valid; otherwise `null`.
  * @example
- * const key = normalizeServerPrivateKey(process.env.SERVER_PRIVATE_KEY);
- * if (!key) {
- *   throw new Error('❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex chars; 0x prefix allowed)');
- * }
  */
 export function normalizeServerPrivateKey(raw?: string | null): string | null {
   if (!raw) return null

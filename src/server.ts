@@ -269,7 +269,6 @@ app.use('/.well-known', (req: Request, res: Response, next: NextFunction) => {
     // app.use(tap('08 - after rateLimit'))
 
     // After createAuthMiddleware → now check/fallback
-const serverIdentityKey = CONFIG.SERVER_IDENTITY_KEY
 
 // 🌐 CORS (reflect caller origin globally)
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -291,21 +290,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 })
 
     app.use(authMiddleware as any)
-
-    // // =====================================================
-    // // 🌐 CORS (headers only)
-    // // =====================================================
-    // app.use(tap('09 - before CORS'))
-    // app.use((req: Request, res: Response, next: NextFunction) => {
-    //   res.header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
-    //   res.header('Access-Control-Allow-Headers', '*')
-    //   res.header('Access-Control-Allow-Methods', '*')
-    //   res.header('Access-Control-Expose-Headers', '*')
-    //   res.header('Access-Control-Allow-Private-Network', 'true')
-    //   if (req.method === 'OPTIONS') return res.sendStatus(200)
-    //   next()
-    // })
-    // app.use(tap('10 - after CORS'))
 
 // =====================================================
 // 🔄 WALLET PROXY (relay to local wallet on 3321)

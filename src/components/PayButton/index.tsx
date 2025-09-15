@@ -14,7 +14,7 @@
  */
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, ReactElement } from 'react'
 import { toast } from 'react-toastify'
-import { WalletClient, Transaction, Utils, CreateActionOutput } from '@bsv/sdk'
+import { WalletClient, Transaction, Utils, CreateActionOutput, CreateActionResult, WERR_REVIEW_ACTIONS } from '@bsv/sdk'
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
 import { fetchWithTimeout } from '../../utils/general'
 import { getScriptOrigin } from '../../utils/scriptOrigin'
@@ -610,7 +610,7 @@ useEffect(() => {
             console.log(
               `[${new Date().toISOString()}] [${F}] 🔍 Attempting wallet connection with ${type} on ${CONFIG.WALLET_ORIGIN}`
             )
-            const instance = new WalletClient(substrate as any, CONFIG.WALLET_ORIGIN) // Type cast needed due to substrate type mismatch
+            const instance = new WalletClient(substrate as any, CONFIG.WALLET_ORIGIN)
             await Promise.race([
               instance.getVersion({}),
               new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout on ${type}`)), 2000))
@@ -628,14 +628,10 @@ useEffect(() => {
         console.log(`[${new Date().toISOString()}] [${F}] 🔍 Wallet selected inputs:`, walletOutputs)
         let fetchedPaymentId = paymentId
         try {
-        const base = getScriptOrigin()
-        const url = `${base}/api/buttonCode/${paymentId}`
-        const buttonCodeResponse = await fetchWithTimeout(
-          url,
-          { method: 'GET' },
-          wallet
-        )
-        if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
+          const base = getScriptOrigin()
+          const url = `${base}/api/buttonCode/${paymentId}`
+          const buttonCodeResponse = await fetchWithTimeout(url, { method: 'GET' }, wallet)
+          if (!buttonCodeResponse.ok) throw new Error(`HTTP error: ${buttonCodeResponse.status}`)
           const buttonCodeData: ButtonCodeResponse = await buttonCodeResponse.json()
           if (buttonCodeData.status === 'success' && buttonCodeData.payment_id) {
             fetchedPaymentId = buttonCodeData.payment_id
@@ -653,22 +649,22 @@ useEffect(() => {
           url,
           {
             method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-            'x-bsv-server': serverIdentityKey
-        },
-    body: JSON.stringify({
-      merchantId: merchant,
-      buttonId,
-      paymentId: fetchedPaymentId,
-      amount: effectiveAmount,
-      description:
-        containerRef.current?.parentElement?.getAttribute('data-description') ||
-        'Default Description'
-    })
-  },
-  wallet
-)
+            headers: {
+              'Content-Type': 'application/json',
+              'x-bsv-server': serverIdentityKey
+            },
+            body: JSON.stringify({
+              merchantId: merchant,
+              buttonId,
+              paymentId: fetchedPaymentId,
+              amount: effectiveAmount,
+              description:
+                containerRef.current?.parentElement?.getAttribute('data-description') ||
+                'Default Description'
+            })
+          },
+          wallet
+        )
 
         if (!resInv.ok) {
           console.log(`[${new Date().toISOString()}] [${F}] ❌ Invoice request failed:`, {
@@ -687,7 +683,6 @@ useEffect(() => {
           throw new Error(`Invoice creation failed: ${invoice.message ?? ''}`)
         }
         console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 3] Invoice received:`, invoice)
-        // Update paymentId to the new one from the invoice
         if (invoice.paymentId && invoice.paymentId !== paymentId) {
           setPaymentId(invoice.paymentId)
           const isMultiUse = multiUse === 'true' || multiUse === true
@@ -711,79 +706,116 @@ useEffect(() => {
             effectiveAmount
           )
         }
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 [Step 4] Client received outputs (sats):`, outputsWithSats)
-        const tx = await wallet.createAction({ description: invoice.paymentId, outputs: outputsWithSats })
-        if (tx.tx == null || !Array.isArray(tx.tx)) {
-          throw new Error('Invalid transaction: tx.tx is undefined or not an array')
-        }
-        console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 6] Action created:`, tx)
-        let transaction, atomicBeefTx, txid
-        try {
-          transaction = Transaction.fromAtomicBEEF(tx.tx)
-          txid = transaction.id('hex')
-          atomicBeefTx = Utils.toHex(tx.tx)
-          console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 8] Transaction serialized:`, {
-            txid,
-            atomicBeefTx
-          })
-        } catch (e) {
-          throw new Error('Failed to serialize transaction')
-        }
-        const payPayload = {
-          paymentId: invoice.paymentId,
-          buttonId,
-          transaction: { txid, atomicBeefTx },
-          lockingScript: outputsWithSats[0]?.lockingScript,
-          amount: effectiveAmount
-        }
         console.log(
-          `[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`,
-          payPayload
+          `[${new Date().toISOString()}] [${F}] 🔍 [Step 4] Client received outputs (sats):`,
+          outputsWithSats
         )
-        {
-        const base = getScriptOrigin()
-        const url = `${base}/api/pay`
-        const resPay = await fetchWithTimeout(
-          url,
-          {
-            method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-            'x-bsv-server': serverIdentityKey
-        },
-            body: JSON.stringify(payPayload)
-          },
-          wallet
-        )
-        if (!resPay.ok) throw new Error('Payment request failed')
-        const pay: PayResponse = await resPay.json()
-        if (pay.status !== 'success') throw new Error(`Payment processing failed: ${pay.message ?? ''}`)
-        console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 10] Payment processed by server:`, pay)
-        setPaid(true)
-        setTxid(pay.txid)
-        setPaymentId(initialPaymentId) // Reset paymentId for next payment
-        const isMultiUse = multiUse === 'true' || multiUse === true
-        if (isMultiUse) setPaid(false) // Reset paid state for multi-use buttons
-        // Disable button if single-use after successful payment
-        console.log(`[${new Date().toISOString()}] [${F}] 🔍 Evaluating multiUse before check:`, {
-          multiUse,
-          type: typeof multiUse
-        })
-        if (!isMultiUse && !variable && amount > 0) {
-          setDisabled(true)
-          console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use payment completed`, {
-            multiUse,
-            isMultiUse
+
+        try {
+          const createActionResult: CreateActionResult = await wallet.createAction({
+            description: invoice.paymentId,
+            outputs: outputsWithSats
           })
-          toast.info('This single-use button has been used and is now disabled.')
-        } else if (isMultiUse) {
-          console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button remains enabled: multi-use button`, {
+          console.log('result=', createActionResult)
+
+          if (!createActionResult.tx) {
+            throw new Error('Transaction is undefined. Action may be delayed.')
+          }
+          if (!Array.isArray(createActionResult.tx)) {
+            throw new Error('Invalid transaction: tx is not an array')
+          }
+
+          console.log(
+            `[${new Date().toISOString()}] [${F}] ✅ [Step 6] Action created:`,
+            createActionResult
+          )
+          let transaction, atomicBeefTx, txid
+          try {
+            transaction = Transaction.fromAtomicBEEF(createActionResult.tx)
+            txid = transaction.id('hex')
+            atomicBeefTx = Utils.toHex(createActionResult.tx)
+            console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 8] Transaction serialized:`, {
+              txid,
+              atomicBeefTx
+            })
+          } catch (e) {
+            throw new Error('Failed to serialize transaction')
+          }
+          const payPayload = {
+            paymentId: invoice.paymentId,
+            buttonId,
+            transaction: { txid, atomicBeefTx },
+            lockingScript: outputsWithSats[0]?.lockingScript,
+            amount: effectiveAmount
+          }
+          console.log(
+            `[${new Date().toISOString()}] [${F}] 🔍 [Step 9] Sending pay request to server:`,
+            payPayload
+          )
+          const payUrl = `${getScriptOrigin()}/api/pay`
+          const resPay = await fetchWithTimeout(
+            payUrl,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-bsv-server': serverIdentityKey
+              },
+              body: JSON.stringify(payPayload)
+            },
+            wallet
+          )
+          if (!resPay.ok) throw new Error('Payment request failed')
+          const pay: PayResponse = await resPay.json()
+          if (pay.status !== 'success')
+            throw new Error(`Payment processing failed: ${pay.message ?? ''}`)
+          console.log(`[${new Date().toISOString()}] [${F}] ✅ [Step 10] Payment processed by server:`, pay)
+          setPaid(true)
+          setTxid(pay.txid)
+          setPaymentId(initialPaymentId)
+          const isMultiUse = multiUse === 'true' || multiUse === true
+          if (isMultiUse) setPaid(false)
+          console.log(`[${new Date().toISOString()}] [${F}] 🔍 Evaluating multiUse before check:`, {
             multiUse,
-            isMultiUse
+            type: typeof multiUse
           })
+          if (!isMultiUse && !variable && amount > 0) {
+            setDisabled(true)
+            console.log(`[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use payment completed`, {
+              multiUse,
+              isMultiUse
+            })
+            toast.info('This single-use button has been used and is now disabled.')
+          } else if (isMultiUse) {
+            console.log(`[${new Date().toISOString()}] [${F}] 🔍 Button remains enabled: multi-use button`, {
+              multiUse,
+              isMultiUse
+            })
+          }
+          console.log(`[${new Date().toISOString()}] [${F}] ✅ Payment successful:`, pay)
+        } catch (error: unknown) {
+          if (error instanceof WERR_REVIEW_ACTIONS) {
+            console.error('Wallet threw WERR_REVIEW_ACTIONS:', {
+              code: error.code,
+              message: error.message,
+              reviewActionResults: error.reviewActionResults,
+              sendWithResults: error.sendWithResults,
+              txid: error.txid,
+              tx: error.tx,
+              noSendChange: error.noSendChange
+            })
+          } else if (error instanceof Error) {
+            console.error('Failed with error status:', {
+              message: error.message,
+              name: error.name,
+              stack: error.stack,
+              error: error
+            })
+          } else {
+            console.error('Failed with unknown error:', error)
+          }
+          throw error
         }
-        console.log(`[${new Date().toISOString()}] [${F}] ✅ Payment successful:`, pay)
-      }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unexpected error'
         console.error(`[${new Date().toISOString()}] [${F}] ❌ Payment flow error:`, {
@@ -811,7 +843,7 @@ useEffect(() => {
       multiUse
     ]
   )
-
+  
   if (!paid) {
     if (variable) {
       const left =

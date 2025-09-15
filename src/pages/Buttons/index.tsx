@@ -52,7 +52,6 @@ const wallet = new WalletClient('json-api', CONFIG.WALLET_ORIGIN)
 
 interface Payment {
   payment_id: string
-  //*transaction_id: string
   amount: number
   txid: string | null
   completed: boolean
@@ -95,7 +94,6 @@ interface ButtonResponse {
     updatedAt: string
     payments?: {
       paymentId: string
-      //*transactionId: string
       amount: number
       txid: string | null
       completed: boolean
@@ -241,7 +239,6 @@ const mappedButtons: Button[] = data.data.map((button, index) => {
   const payments = button.payments
     ? button.payments.map(payment => ({
         payment_id: payment.paymentId,
-        //*transaction_id: payment.transactionId,
         amount: payment.amount,
         txid: payment.txid ?? null,
         completed: !!payment.completed,
@@ -336,7 +333,6 @@ useEffect(() => {
 
   const requestSort = (
     key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'derivation_prefix' | 'derivation_suffix' | 'txid'> | null,
-    //*key: Exclude<keyof Button, 'payments'> | Exclude<keyof Payment, 'transaction_id' | 'txid'> | null,
     isSubTable?: boolean
   ) => {
     const config = isSubTable ? subTableSortConfig : sortConfig
@@ -351,7 +347,6 @@ useEffect(() => {
         setSubTableSortConfig({ key: 'created_at', direction })
       } else {
         setSubTableSortConfig({ key: key as Exclude<keyof Payment,  'derivation_prefix' | 'derivation_suffix' | 'txid'> | null, direction })
-        //*setSubTableSortConfig({ key: key as Exclude<keyof Payment, 'transaction_id' | 'txid'> | null, direction })
       }
     } else {
       setSortConfig({ key: key as Exclude<keyof Button, 'payments'> | null, direction })
