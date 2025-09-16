@@ -137,7 +137,7 @@ const Navbar = ({ isAdmin }: { isAdmin: boolean }): JSX.Element => {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <img src="/gatewaycash.svg" height="50px" style={{ paddingRight: '0.5em' }} alt="Gateway Logo" />
+          <img src="/gateway-logo-dark.svg" height="50px" style={{ paddingRight: '0.5em' }} alt="Gateway Logo" />
           <Typography variant="h5" sx={{ fontWeight: 'bold', cursor: 'pointer' }}>
             Gateway
           </Typography>
