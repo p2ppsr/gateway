@@ -1890,7 +1890,7 @@ w,
         })
       }
 
-const scriptTag = `<script src="${PAY_BASE}/pay.js" defer></script>`
+const scriptTag = `<script src="${CONFIG.PAY_BASE}/pay.js" defer></script>`
 const codeToCopy = `${htmlCode}\n${scriptTag}`
       logWithTimestamp(
         F,
@@ -2398,7 +2398,7 @@ if (res.ok) {
                 <Box>
 <CodeSnippet
   language="html"
-  code={`<script src="${PAY_BASE}/pay.js" defer></script>`}
+  code={`<script src="${CONFIG.PAY_BASE}/pay.js" defer></script>`}
 />
                 </Box>
               </Card>

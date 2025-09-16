@@ -109,7 +109,7 @@ export default {
         modifiedCode = dom.serialize()
         const styleMatch = modifiedCode.match(/<style>[\s\S]*?<\/style>/i)
         const styles = styleMatch ? styleMatch[0] : ''
-        buttonCode = `${styles}${div.outerHTML}<script src="${API_BASE}/pay.js"></script>`
+        buttonCode = `${styles}${div.outerHTML}<script src="${CONFIG.PAY_BASE}/pay.js"></script>`
       } else {
         logWithTimestamp(F, '[buttonCode] [Step 6a] No div match found, using default:', modifiedCode)
         const domDefault = new JSDOM('')
@@ -124,7 +124,7 @@ export default {
         defaultDiv.textContent = `Pay Now ${button.amount} Sats`
         const styleMatchDefault = modifiedCode.match(/<style>[\s\S]*?<\/style>/i)
         const stylesDefault = styleMatchDefault ? styleMatchDefault[0] : ''
-        buttonCode = `${stylesDefault}${defaultDiv.outerHTML}<script src="${API_BASE}/pay.js"></script>`
+        buttonCode = `${stylesDefault}${defaultDiv.outerHTML}<script src="${CONFIG.PAY_BASE}/pay.js"></script>`
       }
       logWithTimestamp(F, '[buttonCode] [Step 6c] Generated button code:', buttonCode)
       if (!isMerchantId(button.merchant_id)) {

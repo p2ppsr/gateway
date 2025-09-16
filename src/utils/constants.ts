@@ -4,8 +4,7 @@
  * Defines schemes, hosts, ports, environment-dependent bases, and shared limits.
  * This is the single source of truth to avoid magic strings in routes or embeds.
  *
- * @version 1.4.0 (Updated 12Sep2025_UTC: Introduced PAY_BASE vs API_BASE split; 
- * DEV_API_BASE always resolves to http://localhost:PORT/api for clarity.)
+ * @version 1.6.0 (Updated 16Sep2025_UTC: Removed gateway.local fallback; prod now requires HOSTING_DOMAIN from .env)
  * @author xAI
  */
 
@@ -20,11 +19,11 @@ export const SCHEMES = {
 } as const
 
 /**
- * Canonical hostnames for Gateway and Wallet.
+ * Canonical hostnames for Wallet only.
+ * Gateway host must come from .env (HOSTING_DOMAIN).
  */
 export const HOSTS = {
-  GATEWAY: 'gateway.local', // Production Gateway hostname
-  WALLET: 'localhost',      // Wallet always runs on the user's machine
+  WALLET: 'localhost', // Wallet always runs on the user's machine
 } as const
 
 /**
@@ -61,11 +60,11 @@ const DEV_API_BASE = `${DEV_BASE}${process.env.API_ROUTING_PREFIX ?? '/api'}`
  * Application-wide configuration object:
  *
  * @property PAY_BASE - Base URL for static/public assets like `pay.js`.
- *   - Prod: https://gateway.local
+ *   - Prod: must come from HOSTING_DOMAIN
  *   - Dev: http://localhost:PORT (no `/api`)
  *
  * @property API_BASE - Base URL for API requests (JSON endpoints).
- *   - Prod: https://gateway.local
+ *   - Prod: HOSTING_DOMAIN + /api
  *   - Dev: http://localhost:PORT/api
  *
  * @property WALLET_ORIGIN - Canonical local wallet URL (primary port).
@@ -73,10 +72,37 @@ const DEV_API_BASE = `${DEV_BASE}${process.env.API_ROUTING_PREFIX ?? '/api'}`
 export const CONFIG = {
   SERVER_IDENTITY_KEY: (process as any)?.env?.SERVER_IDENTITY_KEY ?? '03f7c1fe6aaccabb06b9897a5c1f4bfa45230556a771d5b08aec5f48b94f09b61b',
   PRIVATE_IDENTITY_KEY: (process as any)?.env?.PRIVATE_IDENTITY_KEY ?? '3c164fce7834d831bbc96975f9717ad8af7d94d7df0d36de0b4c13e009540589',
-  PAY_BASE: IS_PROD ? `${SCHEMES.HTTPS}://${HOSTS.GATEWAY}` : DEV_BASE,
-  API_BASE: IS_PROD ? `${SCHEMES.HTTPS}://${HOSTS.GATEWAY}/api` : DEV_API_BASE,
-  WALLET_ORIGIN: `${SCHEMES.HTTP}://${HOSTS.WALLET}:${PORTS.WALLET_PRIMARY}`,
+
+  PAY_BASE: IS_PROD
+    ? (() => {
+        if (!process.env.HOSTING_DOMAIN) {
+          throw new Error('❌ HOSTING_DOMAIN must be set in .env for production builds')
+        }
+        return process.env.HOSTING_DOMAIN
+      })()
+    : DEV_BASE,
+
+  API_BASE: IS_PROD
+    ? (() => {
+        if (!process.env.HOSTING_DOMAIN) {
+          throw new Error('❌ HOSTING_DOMAIN must be set in .env for production builds')
+        }
+        return `${process.env.HOSTING_DOMAIN}/api`
+      })()
+    : DEV_API_BASE,
+
+  // Wallet origin always localhost in browser; server never touches window
+  WALLET_ORIGIN: IN_BROWSER
+    ? `${SCHEMES.HTTP}://localhost:${PORTS.WALLET_PRIMARY}`
+    : '',
 } as const
+
+/**
+ * Secondary wallet origin (optional).
+ */
+export const WALLET_SECONDARY_ORIGIN = IN_BROWSER
+  ? `${SCHEMES.HTTP}://localhost:${PORTS.WALLET_SECONDARY}`
+  : ''
 
 /**
  * Helpful list of localhost wallet URLs (used for CSP and dev tooling).

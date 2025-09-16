@@ -56,8 +56,11 @@ const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? HOSTING_DOMAIN
 let IS_VM = false
 try {
   const h = new URL(HOSTING_DOMAIN).hostname
-  IS_VM = /(^|\.)gateway\.local$/i.test(h)
+  // Treat anything non-localhost as VM/prod
+  IS_VM = h !== 'localhost' && h !== '127.0.0.1'
 } catch {}
+
+// Still allow overrides
 IS_VM = IS_VM || process.env.GATEWAY_ENV === 'vm' || process.env.NODE_ENV === 'production'
 
 // For check script visibility
@@ -197,13 +200,16 @@ app.use('/.well-known', (req: Request, res: Response, next: NextFunction) => {
         useDefaults: true,
         directives: {
           ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-          'connect-src': [
-            "'self'",
-            'http://localhost:3321',
-            'http://127.0.0.1:3321',
-            'ws://localhost:3321',
-            'ws://127.0.0.1:3321'
-          ]
+  'connect-src': [
+    "'self'",
+    'http://localhost:3321',
+    'http://127.0.0.1:3321',
+    'ws://localhost:3321',
+    'ws://127.0.0.1:3321',
+    'https:',
+    'https://*.trycloudflare.com',
+    'https://api.github.com'
+  ]
         }
       })
     )
@@ -421,6 +427,14 @@ if (process.env.NODE_ENV === 'production' || process.env.GATEWAY_ENV === 'vm') {
     }
     app.use(ROUTING_PREFIX, apiRouter)
     
+    // --- Version endpoint (fix blank "Loading..." screen) ---
+app.get(['/api/getVersion', '/getVersion'], (req, res) => {
+  res.json({
+    version: process.env.npm_package_version ?? 'dev',
+    serverIdentityKey: process.env.SERVER_IDENTITY_KEY ?? 'unknown'
+  })
+})
+
     // =====================================================
     // 🚀 Start server
     // =====================================================

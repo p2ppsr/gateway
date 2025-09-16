@@ -25,7 +25,7 @@ let _scriptOrigin: string | null = null
  * - Safe to call multiple times; caches the result.
  *
  * @function getScriptOrigin
- * @returns {string} The origin string (e.g. `https://gateway.local`).
+ * @returns {string} The origin string.
  * @example
  * const base = getScriptOrigin()
  * const url = `${base}/api/getStatus`
@@ -35,7 +35,7 @@ let _scriptOrigin: string | null = null
  * Detects the origin (protocol + host + port) of the loaded `pay.js` script.
  * Falls back to `window.location.origin` if the script tag is not found.
  *
- * @returns {string} The origin string, e.g. `https://gateway.local` or `http://localhost:3001`.
+ * @returns {string} The origin string.
  */
 export function getScriptOrigin(): string {
   if (_scriptOrigin) {

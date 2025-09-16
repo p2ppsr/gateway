@@ -15,7 +15,8 @@ set +a
 # Allow overrides like: VM=my-box ZONE=us-central1-f ./scripts/update-gcp-vm.sh
 export VM=${VM:-gateway-box}
 export ZONE=${ZONE:-us-central1-f}
-export DOMAIN=${DOMAIN:-gateway.local}
+# Prefer .env HOSTING_DOMAIN if available, fallback to gateway.local
+export DOMAIN=${DOMAIN:-${HOSTING_DOMAIN:-gateway.local}}
 export PROTO=${PROTO:-https}
 
 DIR="$(cd "$(dirname "$0")" && pwd)"

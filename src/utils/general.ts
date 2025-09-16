@@ -205,7 +205,7 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
  *
  * **Important**
  * - For mutual-auth to succeed, the signed URL must match the actual request origin.
- *   Prefer `API_BASE = window.location.origin` (e.g., `https://gateway.local`) and
+ *   Prefer `API_BASE = window.location.origin` and
  *   avoid mixing hosts like `http://localhost:3001` from the browser.
  * - Do **not** set `Authorization` yourself; it is added by `AuthFetch`.
  * - Timeout cancels the request and surfaces a clear error.

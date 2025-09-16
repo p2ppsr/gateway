@@ -13,7 +13,7 @@ set -euo pipefail
 
 VM=${VM:-gateway-box}
 ZONE=${ZONE:-us-central1-f}
-DOMAIN=${DOMAIN:-gateway.local}
+DOMAIN=${DOMAIN:-cyber-migration-toddler-australia.trycloudflare.com}
 PROTO=${PROTO:-https}
 EXPECTED_VERSION=${EXPECTED_VERSION:-}
 EXPECTED_VERSION_REGEX=${EXPECTED_VERSION_REGEX:-'^1\.9\.'}
@@ -522,6 +522,52 @@ if [ -n "${SERVER_IDENTITY_KEY:-}" ]; then
 else
   echo "⚠️  SERVER_IDENTITY_KEY not set locally, skipping check"
 fi
+
+  # ------------------ cloudflare edge checks ------------------------------------
+  echo "== Cloudflare edge checks =="
+
+  # Fetch without --resolve (hit Cloudflare edge, not localhost)
+  HDRS_CF="$(curl -sk -D - -o /dev/null "${PROTO}://${DOMAIN}/pay.js" || true)"
+  CODE_CF="$(status_from_headers "$HDRS_CF")"
+
+  if [ "$CODE_CF" = "200" ] || [ "$CODE_CF" = "304" ]; then
+    pass "cloudflare: /pay.js edge HTTP $CODE_CF"
+  else
+    fail "cloudflare: /pay.js edge HTTP ${CODE_CF:-<none>}"
+  fi
+
+  if header_present "$HDRS_CF" "cf-ray"; then
+    pass "cloudflare: cf-ray header present"
+  else
+    fail "cloudflare: cf-ray header missing"
+  fi
+
+  if header_present "$HDRS_CF" "server" && hdr_has_token "$HDRS_CF" "server" "cloudflare"; then
+    pass "cloudflare: server header = cloudflare"
+  else
+    fail "cloudflare: server header not cloudflare"
+  fi
+
+  if header_present "$HDRS_CF" "cf-cache-status"; then
+    CF_CACHE="$(header_value_first "$HDRS_CF" "cf-cache-status")"
+    pass "cloudflare: cf-cache-status=${CF_CACHE}"
+  else
+    fail "cloudflare: cf-cache-status header missing"
+  fi
+
+  # Double-check important headers survive through edge
+  [ -n "$(header_value_first "$HDRS_CF" "strict-transport-security" || true)" ] \
+    && pass "cloudflare: HSTS header preserved" \
+    || fail "cloudflare: HSTS header stripped"
+
+  [ -n "$(header_value_first "$HDRS_CF" "content-security-policy" || true)" ] \
+    && pass "cloudflare: CSP header preserved" \
+    || fail "cloudflare: CSP header stripped"
+
+  # Edge /healthz test (sanity from Cloudflare side)
+  HDRS_CF_HZ="$(curl -sk -D - -o /dev/null "${PROTO}://${DOMAIN}/healthz" || true)"
+  CODE_CF_HZ="$(status_from_headers "$HDRS_CF_HZ")"
+  [ "$CODE_CF_HZ" = "200" ] && pass "cloudflare: /healthz edge 200" || fail "cloudflare: /healthz edge ${CODE_CF_HZ:-<none>}"
 
 # ------------------ summary --------------------------------------------------
 echo "----------------------------------------"

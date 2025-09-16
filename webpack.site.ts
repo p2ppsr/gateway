@@ -1,8 +1,9 @@
 // webpack.site.ts
 import { merge } from 'webpack-merge'
 import type { Configuration } from 'webpack'
+import webpack from 'webpack'
 import common from './webpack.common'
-import 'dotenv/config'   // ✅ ensure SERVER_IDENTITY_KEY is loaded for site build too
+import 'dotenv/config'   // ✅ ensures .env is loaded into process.env during build
 
 const site: Configuration = merge(common, {
   mode: 'production',
@@ -15,7 +16,13 @@ const site: Configuration = merge(common, {
     runtimeChunk: false
   },
   performance: { hints: false },
-  devtool: false
+  devtool: false,
+  plugins: [
+    new webpack.DefinePlugin({
+      'process.env.HOSTING_DOMAIN': JSON.stringify(process.env.HOSTING_DOMAIN || ''),
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
+    }),
+  ],
 })
 
 export default site
