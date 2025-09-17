@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /**
  * @file src/pages/Buttons/index.tsx
  *
