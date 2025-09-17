@@ -203,7 +203,7 @@ const PaymentButtonsList = () => {
       setHoveredValue(fullValue)
       const columnCell = document.querySelector(
         `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Button Id', 'Payment Id', 'HTML Code'].indexOf(columnName) + 2})`
-      )
+      ) as HTMLTableCellElement | null
       if (columnCell != null) {
         columnRefs.current[columnName] = columnCell
       }
@@ -613,7 +613,7 @@ const PaymentButtonsList = () => {
           button.payments.forEach((_, paymentIndex) => {
             const rowEl = document.querySelector(
               `tr[data-payment-row="${button.button_id}-${paymentIndex}"]`
-            )
+            ) as HTMLTableRowElement | null
             subTableRefs.current[paymentIndex] = rowEl
           })
         }
@@ -702,13 +702,13 @@ const PaymentButtonsList = () => {
     paginatedButtons.forEach((button, index) => {
       const buttonIdCell = document.querySelector(
         `tr:nth-child(${index * 2 + 1}) td:nth-child(2)`
-      )
+      ) as HTMLTableCellElement | null
       const paymentIdCell = document.querySelector(
         `tr:nth-child(${index * 2 + 1}) td:nth-child(3)`
-      )
+      ) as HTMLTableCellElement | null
       const htmlCodeCell = document.querySelector(
         `tr:nth-child(${index * 2 + 1}) td:nth-child(10)`
-      )
+      ) as HTMLTableCellElement | null
       if (buttonIdCell != null) columnRefs.current['Button Id'] = buttonIdCell
       if (paymentIdCell != null) columnRefs.current['Payment Id'] = paymentIdCell
       if (htmlCodeCell != null) columnRefs.current['HTML Code'] = htmlCodeCell
