@@ -43,6 +43,7 @@ import { logWithTimestamp } from '../../utils/logging'
 import { CONFIG } from '../../utils/constants'
 import { WalletClient } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
+import SortableHeader from '../../components/SortableHeader'
 const F = 'pages/Payments'
 
 interface Payment {
@@ -482,8 +483,8 @@ const PaymentsList = () => {
       setHoveredValue(fullValue)
       const columnCell = document.querySelector(
         `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Txid', 'Payment Id', 'Button Id', 'Payer Id'].indexOf(columnName) + 2})`
-      )
-      if (columnCell != null) {
+      ) as HTMLTableCellElement | null
+      if (columnCell !== null) {
         columnRefs.current[columnName] = columnCell
       }
     }
@@ -703,116 +704,60 @@ const PaymentsList = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Timestamp'
+                      active={sortConfig.key === 'created_at'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('created_at')}
-                    >
-                      Timestamp
-                      {sortConfig.key === 'created_at' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Txid'
+                      active={sortConfig.key === 'txid'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('txid')}
-                    >
-                      Txid
-                      {sortConfig.key === 'txid' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Payment Id'
+                      active={sortConfig.key === 'payment_id'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('payment_id')}
-                    >
-                      Payment Id
-                      {sortConfig.key === 'payment_id' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Button Id'
+                      active={sortConfig.key === 'button_id'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('button_id')}
-                    >
-                      Button Id
-                      {sortConfig.key === 'button_id' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Payer Id'
+                      active={sortConfig.key === 'payer_id'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('payer_id')}
-                    >
-                      Payer Id
-                      {sortConfig.key === 'payer_id' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Sats'
+                      active={sortConfig.key === 'amount'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('amount')}
-                    >
-                      Sats
-                      {sortConfig.key === 'amount' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
-                    <Typography
-                      sx={{
-                        whiteSpace: 'nowrap',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                    <SortableHeader
+                      label='Description'
+                      active={sortConfig.key === 'description'}
+                      direction={sortConfig.direction}
                       onClick={() => requestSort('description')}
-                    >
-                      Description
-                      {sortConfig.key === 'description' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                    </Typography>
+                    />
                   </TableCell>
                   <TableCell>
                     <Typography sx={{ whiteSpace: 'nowrap' }}>
@@ -1133,5 +1078,4 @@ const PaymentsList = () => {
     </Container>
   )
 }
-
 export default PaymentsList
