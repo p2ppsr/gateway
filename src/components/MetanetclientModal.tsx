@@ -11,9 +11,9 @@
  * layout using MUI and `react-qr-code`.
  */
 
-import React from 'react'
-import { Typography, Link, Box } from '@mui/material'
-import QRCode from 'react-qr-code'
+import React from "react";
+import { Typography, Link, Box } from "@mui/material";
+import QRCode from "react-qr-code";
 
 /**
  * Props for the `MetanetclientModal` component.
@@ -22,8 +22,8 @@ import QRCode from 'react-qr-code'
  * @property {string} platformLabel - Human-readable platform label ("Android", "iOS", "macOS", etc.).
  */
 interface Props {
-  downloadURL: string
-  platformLabel: string
+  downloadURL: string;
+  platformLabel: string;
 }
 
 /**
@@ -41,21 +41,24 @@ interface Props {
  * @param {Props} props - The `downloadURL` and `platformLabel` to display.
  * @returns {JSX.Element} The rendered modal component.
  */
-const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => {
-  const isMobile = platformLabel === 'Android' || platformLabel === 'iOS'
-  const clientType = isMobile ? 'Metanet Mobile' : 'Metanet Desktop'
+const MetanetclientModal: React.FC<Props> = ({
+  downloadURL,
+  platformLabel,
+}) => {
+  const isMobile = platformLabel === "Android" || platformLabel === "iOS";
+  const clientType = isMobile ? "Metanet Mobile" : "Metanet Desktop";
 
   return (
     <Box
       sx={{
-        bgcolor: '#111',
-        border: '1px solid #555',
-        borderRadius: '12px',
+        bgcolor: "#111",
+        border: "1px solid #555",
+        borderRadius: "12px",
         p: 4,
-        textAlign: 'center',
+        textAlign: "center",
         maxWidth: 400,
-        color: '#fff',
-        boxShadow: 5
+        color: "#fff",
+        boxShadow: 5,
       }}
     >
       <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -63,8 +66,14 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
       </Typography>
 
       <Typography gutterBottom>
-        You can download it for your{' '}
-        <Link href={downloadURL} underline="hover" target="_blank" rel="noopener noreferrer" sx={{ color: '#3aa0ff' }}>
+        You can download it for your{" "}
+        <Link
+          href={downloadURL}
+          underline="hover"
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{ color: "#3aa0ff" }}
+        >
           {platformLabel}
         </Link>
         :
@@ -72,11 +81,11 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
 
       <Typography gutterBottom>
         <Link
-          href='https://metanet.bsvb.tech'
-          underline='hover'
-          target='_blank'
-          rel='noopener noreferrer'
-          sx={{ color: '#3aa0ff' }}
+          href="https://metanet.bsvb.tech"
+          underline="hover"
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{ color: "#3aa0ff" }}
         >
           All Metanet clients
         </Link>
@@ -88,7 +97,7 @@ const MetanetclientModal: React.FC<Props> = ({ downloadURL, platformLabel }) => 
         </Box>
       )}
     </Box>
-  )
-}
+  );
+};
 
-export default MetanetclientModal
+export default MetanetclientModal;

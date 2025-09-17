@@ -22,24 +22,24 @@ const mockDb = {
   fn: { now: jest.fn().mockReturnValue(new Date()) },
 } as any;
 
-jest.mock('knex', () => ({
+jest.mock("knex", () => ({
   __esModule: true,
   default: jest.fn(() => mockDb),
 }));
-jest.mock('../../utils/logging', () => ({
+jest.mock("../../utils/logging", () => ({
   logWithTimestamp: jest.fn(),
 }));
-jest.mock('../../utils/general', () => ({
+jest.mock("../../utils/general", () => ({
   isBase58: jest.fn(),
   isMerchantId: jest.fn(),
 }));
-jest.mock('../../utils/idGenerator', () => ({
+jest.mock("../../utils/idGenerator", () => ({
   generateAndValidateUniqueId: jest.fn(),
 }));
-jest.mock('../../utils/merchant', () => ({
+jest.mock("../../utils/merchant", () => ({
   ensureMerchantExists: jest.fn(),
 }));
-jest.mock('express-validator', () => ({
+jest.mock("express-validator", () => ({
   validationResult: jest.fn(),
   body: jest.fn(() => ({
     optional: jest.fn().mockReturnThis(),
@@ -53,15 +53,15 @@ jest.mock('express-validator', () => ({
   })),
 }));
 
-import { Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
-import initializeIds from '../../routes/initializeIds';
-import { logWithTimestamp } from '../../utils/logging';
-import { isBase58, isMerchantId } from '../../utils/general';
-import { generateAndValidateUniqueId } from '../../utils/idGenerator';
-import { ensureMerchantExists } from '../../utils/merchant';
-import { Knex } from 'knex';
-import knex from 'knex';
+import { Request, Response } from "express";
+import { body, validationResult } from "express-validator";
+import initializeIds from "../../routes/initializeIds";
+import { logWithTimestamp } from "../../utils/logging";
+import { isBase58, isMerchantId } from "../../utils/general";
+import { generateAndValidateUniqueId } from "../../utils/idGenerator";
+import { ensureMerchantExists } from "../../utils/merchant";
+import { Knex } from "knex";
+import knex from "knex";
 
 // Extend Request interface to include auth property
 interface CustomRequest extends Request {
@@ -83,8 +83,8 @@ function makeTrxMock() {
   } as any;
 
   const trx: any = jest.fn((table: string) => {
-    if (table === 'ids') return idsBuilder;
-    if (table === 'payments') return paymentsBuilder;
+    if (table === "ids") return idsBuilder;
+    if (table === "payments") return paymentsBuilder;
     throw new Error(`Unknown table: ${table}`);
   });
   trx.raw = jest.fn().mockResolvedValue(undefined);
@@ -93,7 +93,7 @@ function makeTrxMock() {
   return { trx, idsBuilder, paymentsBuilder };
 }
 
-describe('routes/initializeIds.ts', () => {
+describe("routes/initializeIds.ts", () => {
   let mockReq: Partial<CustomRequest>;
   let mockRes: Partial<Response>;
   let statusSpy: jest.Mock;
@@ -115,103 +115,112 @@ describe('routes/initializeIds.ts', () => {
     (mockDb.transaction as jest.Mock).mockReset();
   });
 
-  test('rejects missing sender identity key', async () => {
+  test("rejects missing sender identity key", async () => {
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description' },
+      body: { merchantId: "validMerchantId", description: "Test description" },
       headers: {},
     };
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '[initializeIds] Route hit for /api/initializeIds',
+      "routes/initializeIds",
+      "[initializeIds] Route hit for /api/initializeIds",
       expect.any(Object),
     );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Missing sender identity key from auth context',
+      "routes/initializeIds",
+      "❌ [initializeIds] Missing sender identity key from auth context",
     );
     expect(statusSpy).toHaveBeenCalledWith(401);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: '❌ Unauthorized: Missing sender identity',
+      status: "error",
+      message: "❌ Unauthorized: Missing sender identity",
     });
   });
 
-  test('rejects invalid merchantId format', async () => {
+  test("rejects invalid merchantId format", async () => {
     (isMerchantId as jest.Mock).mockReturnValue(false);
     mockReq = {
-      body: { merchantId: 'invalidMerchantId', description: 'Test description' },
+      body: {
+        merchantId: "invalidMerchantId",
+        description: "Test description",
+      },
       headers: {},
-      auth: { identityKey: 'invalidMerchantId' },
+      auth: { identityKey: "invalidMerchantId" },
     };
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Invalid merchant identity format:',
+      "routes/initializeIds",
+      "❌ [initializeIds] Invalid merchant identity format:",
       expect.any(Object),
     );
     expect(statusSpy).toHaveBeenCalledWith(400);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: '❌ Invalid merchantId format',
+      status: "error",
+      message: "❌ Invalid merchantId format",
       request: expect.any(Object),
     });
   });
 
-  test('rejects sender identity mismatch', async () => {
+  test("rejects sender identity mismatch", async () => {
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description' },
+      body: { merchantId: "validMerchantId", description: "Test description" },
       headers: {},
-      auth: { identityKey: 'differentIdentity' },
+      auth: { identityKey: "differentIdentity" },
     };
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Sender identity does not match merchantId:',
+      "routes/initializeIds",
+      "❌ [initializeIds] Sender identity does not match merchantId:",
       expect.any(Object),
     );
     expect(statusSpy).toHaveBeenCalledWith(403);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: 'Sender identity does not match merchantId',
+      status: "error",
+      message: "Sender identity does not match merchantId",
       request: expect.any(Object),
     });
   });
 
-  test('rejects validation errors', async () => {
+  test("rejects validation errors", async () => {
     (validationResult as unknown as jest.Mock).mockReturnValue({
       isEmpty: jest.fn().mockReturnValue(false),
-      array: jest.fn().mockReturnValue([{ msg: 'Invalid field', type: 'field' }]),
+      array: jest
+        .fn()
+        .mockReturnValue([{ msg: "Invalid field", type: "field" }]),
     });
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description' },
+      body: { merchantId: "validMerchantId", description: "Test description" },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Validation failed:',
+      "routes/initializeIds",
+      "❌ [initializeIds] Validation failed:",
       expect.any(Object),
     );
     expect(statusSpy).toHaveBeenCalledWith(400);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: expect.stringContaining('❌ Validation failed:'),
+      status: "error",
+      message: expect.stringContaining("❌ Validation failed:"),
       errors: expect.any(Array),
       request: expect.any(Object),
     });
   });
 
-  test('successfully inserts new button ID', async () => {
+  test("successfully inserts new button ID", async () => {
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description', buttonId: 'validButtonId' },
+      body: {
+        merchantId: "validMerchantId",
+        description: "Test description",
+        buttonId: "validButtonId",
+      },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
 
     const { trx, idsBuilder } = makeTrxMock();
@@ -224,43 +233,53 @@ describe('routes/initializeIds.ts', () => {
 
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
-    expect(ensureMerchantExists).toHaveBeenCalledWith(mockDb, 'validMerchantId');
+    expect(ensureMerchantExists).toHaveBeenCalledWith(
+      mockDb,
+      "validMerchantId",
+    );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '✅ [initializeIds] MerchantId validated:',
-      { merchantId: 'validMerchantId' },
+      "routes/initializeIds",
+      "✅ [initializeIds] MerchantId validated:",
+      { merchantId: "validMerchantId" },
     );
     expect(mockDb.transaction).toHaveBeenCalled();
     expect(idsBuilder.insert).toHaveBeenCalledWith({
-      id: 'validButtonId',
-      merchant_id: 'validMerchantId',
-      type: 'button',
+      id: "validButtonId",
+      merchant_id: "validMerchantId",
+      type: "button",
       timestamp: expect.anything(),
     });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '✅ [initializeIds] ID inserted:',
-      { id: 'validButtonId', merchantId: 'validMerchantId', type: 'button' },
+      "routes/initializeIds",
+      "✅ [initializeIds] ID inserted:",
+      { id: "validButtonId", merchantId: "validMerchantId", type: "button" },
     );
     expect(statusSpy).toHaveBeenCalledWith(200);
-    expect(jsonSpy).toHaveBeenCalledWith({ status: 'success', id: 'validButtonId' });
+    expect(jsonSpy).toHaveBeenCalledWith({
+      status: "success",
+      id: "validButtonId",
+    });
   });
 
-  test('successfully inserts new payment ID with existing button ID', async () => {
+  test("successfully inserts new payment ID with existing button ID", async () => {
     mockReq = {
       body: {
-        merchantId: 'validMerchantId',
-        description: 'Test description',
-        paymentId: 'validPaymentId',
-        buttonId: 'validButtonId',
+        merchantId: "validMerchantId",
+        description: "Test description",
+        paymentId: "validPaymentId",
+        buttonId: "validButtonId",
       },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
 
     const { trx, idsBuilder, paymentsBuilder } = makeTrxMock();
     idsBuilder.first
-      .mockResolvedValueOnce({ id: 'validButtonId', type: 'button', merchant_id: 'validMerchantId' }) // Button exists
+      .mockResolvedValueOnce({
+        id: "validButtonId",
+        type: "button",
+        merchant_id: "validMerchantId",
+      }) // Button exists
       .mockResolvedValueOnce(null); // No duplicate in ids for paymentId
     paymentsBuilder.first.mockResolvedValueOnce(null); // No duplicate in payments
     idsBuilder.insert.mockResolvedValue(undefined);
@@ -271,38 +290,44 @@ describe('routes/initializeIds.ts', () => {
 
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
-    expect(ensureMerchantExists).toHaveBeenCalledWith(mockDb, 'validMerchantId');
+    expect(ensureMerchantExists).toHaveBeenCalledWith(
+      mockDb,
+      "validMerchantId",
+    );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '✅ [initializeIds] MerchantId validated:',
-      { merchantId: 'validMerchantId' },
+      "routes/initializeIds",
+      "✅ [initializeIds] MerchantId validated:",
+      { merchantId: "validMerchantId" },
     );
     expect(mockDb.transaction).toHaveBeenCalled();
     expect(idsBuilder.insert).toHaveBeenCalledWith({
-      id: 'validPaymentId',
-      merchant_id: 'validMerchantId',
-      type: 'payment',
+      id: "validPaymentId",
+      merchant_id: "validMerchantId",
+      type: "payment",
       timestamp: expect.anything(),
     });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '✅ [initializeIds] ID inserted:',
-      { id: 'validPaymentId', merchantId: 'validMerchantId', type: 'payment' },
+      "routes/initializeIds",
+      "✅ [initializeIds] ID inserted:",
+      { id: "validPaymentId", merchantId: "validMerchantId", type: "payment" },
     );
     expect(statusSpy).toHaveBeenCalledWith(200);
-    expect(jsonSpy).toHaveBeenCalledWith({ status: 'success', id: 'validPaymentId' });
+    expect(jsonSpy).toHaveBeenCalledWith({
+      status: "success",
+      id: "validPaymentId",
+    });
   });
 
-  test('rejects non-existent button ID for payment ID request', async () => {
+  test("rejects non-existent button ID for payment ID request", async () => {
     mockReq = {
       body: {
-        merchantId: 'validMerchantId',
-        description: 'Test description',
-        paymentId: 'validPaymentId',
-        buttonId: 'invalidButtonId',
+        merchantId: "validMerchantId",
+        description: "Test description",
+        paymentId: "validPaymentId",
+        buttonId: "invalidButtonId",
       },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
 
     const { trx, idsBuilder } = makeTrxMock();
@@ -314,38 +339,57 @@ describe('routes/initializeIds.ts', () => {
 
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
-    expect(ensureMerchantExists).toHaveBeenCalledWith(mockDb, 'validMerchantId');
+    expect(ensureMerchantExists).toHaveBeenCalledWith(
+      mockDb,
+      "validMerchantId",
+    );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Button ID does not exist:',
-      { buttonId: 'invalidButtonId', merchantId: 'validMerchantId' },
+      "routes/initializeIds",
+      "❌ [initializeIds] Button ID does not exist:",
+      { buttonId: "invalidButtonId", merchantId: "validMerchantId" },
     );
     expect(statusSpy).toHaveBeenCalledWith(400);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: 'Button ID invalidButtonId does not exist',
+      status: "error",
+      message: "Button ID invalidButtonId does not exist",
       request: expect.any(Object),
-      merchantId: 'validMerchantId',
+      merchantId: "validMerchantId",
     });
   });
 
-  test('retries and fails after 3 duplicate ID attempts', async () => {
+  test("retries and fails after 3 duplicate ID attempts", async () => {
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description', buttonId: 'duplicateId' },
+      body: {
+        merchantId: "validMerchantId",
+        description: "Test description",
+        buttonId: "duplicateId",
+      },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
 
     (generateAndValidateUniqueId as jest.Mock)
-      .mockResolvedValueOnce('duplicateId1')
-      .mockResolvedValueOnce('duplicateId2')
-      .mockResolvedValueOnce('duplicateId3');
+      .mockResolvedValueOnce("duplicateId1")
+      .mockResolvedValueOnce("duplicateId2")
+      .mockResolvedValueOnce("duplicateId3");
 
     const { trx, idsBuilder } = makeTrxMock();
     idsBuilder.first
-      .mockResolvedValueOnce({ id: 'duplicateId', type: 'button', merchant_id: 'validMerchantId' })
-      .mockResolvedValueOnce({ id: 'duplicateId1', type: 'button', merchant_id: 'validMerchantId' })
-      .mockResolvedValueOnce({ id: 'duplicateId2', type: 'button', merchant_id: 'validMerchantId' });
+      .mockResolvedValueOnce({
+        id: "duplicateId",
+        type: "button",
+        merchant_id: "validMerchantId",
+      })
+      .mockResolvedValueOnce({
+        id: "duplicateId1",
+        type: "button",
+        merchant_id: "validMerchantId",
+      })
+      .mockResolvedValueOnce({
+        id: "duplicateId2",
+        type: "button",
+        merchant_id: "validMerchantId",
+      });
 
     (mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx);
@@ -353,47 +397,52 @@ describe('routes/initializeIds.ts', () => {
 
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
-    expect(ensureMerchantExists).toHaveBeenCalledWith(mockDb, 'validMerchantId');
+    expect(ensureMerchantExists).toHaveBeenCalledWith(
+      mockDb,
+      "validMerchantId",
+    );
     expect(generateAndValidateUniqueId).toHaveBeenCalledTimes(3);
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '⚠️ [initializeIds] Duplicate button ID detected, trying new ID:',
+      "routes/initializeIds",
+      "⚠️ [initializeIds] Duplicate button ID detected, trying new ID:",
       expect.any(Object),
     );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Failed to generate unique ID after 3 attempts:',
+      "routes/initializeIds",
+      "❌ [initializeIds] Failed to generate unique ID after 3 attempts:",
       expect.objectContaining({
-        lastAttemptedId: 'duplicateId3',
-        merchantId: 'validMerchantId',
-        type: 'button',
+        lastAttemptedId: "duplicateId3",
+        merchantId: "validMerchantId",
+        type: "button",
       }),
     );
     expect(statusSpy).toHaveBeenCalledWith(409);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: 'Failed to generate unique ID after 3 attempts',
-      newId: 'duplicateId3',
+      status: "error",
+      message: "Failed to generate unique ID after 3 attempts",
+      newId: "duplicateId3",
       request: expect.any(Object),
-      merchantId: 'validMerchantId',
+      merchantId: "validMerchantId",
     });
   });
 
-  test('handles retryable database errors (deadlock/timeout)', async () => {
+  test("handles retryable database errors (deadlock/timeout)", async () => {
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description' },
+      body: { merchantId: "validMerchantId", description: "Test description" },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
 
     (generateAndValidateUniqueId as jest.Mock)
-      .mockResolvedValueOnce('retryId1') // Initial generated ID
-      .mockResolvedValueOnce('validId'); // Retry ID after deadlock
+      .mockResolvedValueOnce("retryId1") // Initial generated ID
+      .mockResolvedValueOnce("validId"); // Retry ID after deadlock
 
     const { trx, idsBuilder } = makeTrxMock();
     idsBuilder.first.mockResolvedValue(null); // No duplicates
     idsBuilder.insert
-      .mockImplementationOnce(() => { throw new Error('ER_LOCK_DEADLOCK'); })
+      .mockImplementationOnce(() => {
+        throw new Error("ER_LOCK_DEADLOCK");
+      })
       .mockResolvedValueOnce(undefined);
 
     (mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
@@ -402,32 +451,39 @@ describe('routes/initializeIds.ts', () => {
 
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
-    expect(ensureMerchantExists).toHaveBeenCalledWith(mockDb, 'validMerchantId');
+    expect(ensureMerchantExists).toHaveBeenCalledWith(
+      mockDb,
+      "validMerchantId",
+    );
     expect(generateAndValidateUniqueId).toHaveBeenCalledTimes(2);
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '⚠️ [initializeIds] Database error (retryable):',
+      "routes/initializeIds",
+      "⚠️ [initializeIds] Database error (retryable):",
       expect.any(Object),
     );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '✅ [initializeIds] ID inserted:',
-      { id: 'validId', merchantId: 'validMerchantId', type: 'button' },
+      "routes/initializeIds",
+      "✅ [initializeIds] ID inserted:",
+      { id: "validId", merchantId: "validMerchantId", type: "button" },
     );
     expect(statusSpy).toHaveBeenCalledWith(200);
-    expect(jsonSpy).toHaveBeenCalledWith({ status: 'success', id: 'validId' });
+    expect(jsonSpy).toHaveBeenCalledWith({ status: "success", id: "validId" });
   });
 
-  test('handles non-retryable database error', async () => {
+  test("handles non-retryable database error", async () => {
     mockReq = {
-      body: { merchantId: 'validMerchantId', description: 'Test description', buttonId: 'validButtonId' },
+      body: {
+        merchantId: "validMerchantId",
+        description: "Test description",
+        buttonId: "validButtonId",
+      },
       headers: {},
-      auth: { identityKey: 'validMerchantId' },
+      auth: { identityKey: "validMerchantId" },
     };
 
     const { trx, idsBuilder } = makeTrxMock();
     idsBuilder.first.mockResolvedValue(null);
-    idsBuilder.insert.mockRejectedValue(new Error('Non-retryable error'));
+    idsBuilder.insert.mockRejectedValue(new Error("Non-retryable error"));
 
     (mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx);
@@ -435,18 +491,21 @@ describe('routes/initializeIds.ts', () => {
 
     await initializeIds.func(mockReq as CustomRequest, mockRes as Response);
 
-    expect(ensureMerchantExists).toHaveBeenCalledWith(mockDb, 'validMerchantId');
+    expect(ensureMerchantExists).toHaveBeenCalledWith(
+      mockDb,
+      "validMerchantId",
+    );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/initializeIds',
-      '❌ [initializeIds] Error pre-populating ID:',
+      "routes/initializeIds",
+      "❌ [initializeIds] Error pre-populating ID:",
       expect.any(Object),
     );
     expect(statusSpy).toHaveBeenCalledWith(500);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: '❌ Non-retryable error',
+      status: "error",
+      message: "❌ Non-retryable error",
       request: expect.any(Object),
-      merchantId: 'validMerchantId',
+      merchantId: "validMerchantId",
     });
   });
 });

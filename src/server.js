@@ -15,5 +15,5 @@
  * - This setup avoids the need to precompile TypeScript during development.
  */
 
-require('ts-node/register')
-require('./server.ts')
+require("ts-node/register");
+require("./server.ts");

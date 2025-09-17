@@ -10,9 +10,9 @@
  * @changelog
  * - 02Sep2025_1529 BST (v1.0.11): Fixed Jest crash by using try/catch in error handling test to catch rejection explicitly.
  */
-import { ensureMerchantExists } from '../../utils/merchant';
-import { logWithTimestamp } from '../../utils/logging';
-import { Knex } from 'knex';
+import { ensureMerchantExists } from "../../utils/merchant";
+import { logWithTimestamp } from "../../utils/logging";
+import { Knex } from "knex";
 
 // Custom QueryBuilder type to include ignore method
 interface CustomQueryBuilder {
@@ -33,14 +33,14 @@ interface CustomKnex extends Knex {
 }
 
 // Mock dependencies
-jest.mock('../../utils/logging', () => ({
+jest.mock("../../utils/logging", () => ({
   logWithTimestamp: jest.fn(),
 }));
-jest.mock('knex', () => ({
+jest.mock("knex", () => ({
   Knex: jest.fn(),
 }));
 
-describe('utils/merchant.ts', () => {
+describe("utils/merchant.ts", () => {
   let mockDb: CustomKnex;
 
   beforeEach(() => {
@@ -52,78 +52,78 @@ describe('utils/merchant.ts', () => {
     };
     mockDb = jest.fn((table: string) => queryBuilder) as unknown as CustomKnex;
     mockDb.fn = {
-      now: jest.fn().mockReturnValue('2025-09-02 15:29:00'),
+      now: jest.fn().mockReturnValue("2025-09-02 15:29:00"),
       uuid: jest.fn(),
       uuidToBin: jest.fn(),
       binToUuid: jest.fn(),
     };
   });
 
-  test('inserts new merchant with valid merchantId', async () => {
-    const merchantId = 'merchant123';
+  test("inserts new merchant with valid merchantId", async () => {
+    const merchantId = "merchant123";
     await ensureMerchantExists(mockDb as Knex, merchantId);
 
-    expect(mockDb).toHaveBeenCalledWith('merchants');
-    expect(mockDb('merchants').insert).toHaveBeenCalledWith({
+    expect(mockDb).toHaveBeenCalledWith("merchants");
+    expect(mockDb("merchants").insert).toHaveBeenCalledWith({
       merchant_id: merchantId,
       custom_fee_rate: 0,
       custom_fee: 0,
       welcomed: 0,
-      created_at: '2025-09-02 15:29:00',
-      updated_at: '2025-09-02 15:29:00',
+      created_at: "2025-09-02 15:29:00",
+      updated_at: "2025-09-02 15:29:00",
     });
-    expect(mockDb('merchants').onConflict).toHaveBeenCalledWith('merchant_id');
-    expect(mockDb('merchants').ignore).toHaveBeenCalled();
+    expect(mockDb("merchants").onConflict).toHaveBeenCalledWith("merchant_id");
+    expect(mockDb("merchants").ignore).toHaveBeenCalled();
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'utils/merchant',
-      '✅ Merchant ensured:',
-      { merchantId }
+      "utils/merchant",
+      "✅ Merchant ensured:",
+      { merchantId },
     );
   });
 
-  test('ignores insertion for existing merchant', async () => {
-    const merchantId = 'merchant123';
-    mockDb('merchants').insert.mockReturnThis();
-    mockDb('merchants').onConflict.mockReturnThis();
-    mockDb('merchants').ignore.mockResolvedValue(undefined);
+  test("ignores insertion for existing merchant", async () => {
+    const merchantId = "merchant123";
+    mockDb("merchants").insert.mockReturnThis();
+    mockDb("merchants").onConflict.mockReturnThis();
+    mockDb("merchants").ignore.mockResolvedValue(undefined);
 
     await ensureMerchantExists(mockDb as Knex, merchantId);
 
-    expect(mockDb).toHaveBeenCalledWith('merchants');
-    expect(mockDb('merchants').insert).toHaveBeenCalled();
-    expect(mockDb('merchants').onConflict).toHaveBeenCalledWith('merchant_id');
-    expect(mockDb('merchants').ignore).toHaveBeenCalled();
+    expect(mockDb).toHaveBeenCalledWith("merchants");
+    expect(mockDb("merchants").insert).toHaveBeenCalled();
+    expect(mockDb("merchants").onConflict).toHaveBeenCalledWith("merchant_id");
+    expect(mockDb("merchants").ignore).toHaveBeenCalled();
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'utils/merchant',
-      '✅ Merchant ensured:',
-      { merchantId }
+      "utils/merchant",
+      "✅ Merchant ensured:",
+      { merchantId },
     );
   });
 
-  test('does nothing for empty merchantId', async () => {
-    await ensureMerchantExists(mockDb as Knex, '');
+  test("does nothing for empty merchantId", async () => {
+    await ensureMerchantExists(mockDb as Knex, "");
 
     expect(mockDb).not.toHaveBeenCalled();
-    expect(mockDb('merchants')?.insert).not.toHaveBeenCalled();
-    expect(mockDb('merchants')?.onConflict).not.toHaveBeenCalled();
-    expect(mockDb('merchants')?.ignore).not.toHaveBeenCalled();
+    expect(mockDb("merchants")?.insert).not.toHaveBeenCalled();
+    expect(mockDb("merchants")?.onConflict).not.toHaveBeenCalled();
+    expect(mockDb("merchants")?.ignore).not.toHaveBeenCalled();
     expect(logWithTimestamp).not.toHaveBeenCalled();
   });
 
-  test('does nothing for undefined merchantId', async () => {
+  test("does nothing for undefined merchantId", async () => {
     await ensureMerchantExists(mockDb as Knex, undefined as any);
 
     expect(mockDb).not.toHaveBeenCalled();
-    expect(mockDb('merchants')?.insert).not.toHaveBeenCalled();
-    expect(mockDb('merchants')?.onConflict).not.toHaveBeenCalled();
-    expect(mockDb('merchants')?.ignore).not.toHaveBeenCalled();
+    expect(mockDb("merchants")?.insert).not.toHaveBeenCalled();
+    expect(mockDb("merchants")?.onConflict).not.toHaveBeenCalled();
+    expect(mockDb("merchants")?.ignore).not.toHaveBeenCalled();
     expect(logWithTimestamp).not.toHaveBeenCalled();
   });
 
-  test('rejects with database error', async () => {
-    const merchantId = 'merchant123';
-    const error = new Error('Database error');
-    mockDb('merchants').insert.mockImplementation(() => Promise.reject(error));
+  test("rejects with database error", async () => {
+    const merchantId = "merchant123";
+    const error = new Error("Database error");
+    mockDb("merchants").insert.mockImplementation(() => Promise.reject(error));
 
     let caughtError: unknown;
     try {
@@ -132,12 +132,12 @@ describe('utils/merchant.ts', () => {
       caughtError = e;
     }
     expect(caughtError).toEqual(error);
-    expect(mockDb).toHaveBeenCalledWith('merchants');
-    expect(mockDb('merchants').insert).toHaveBeenCalled();
+    expect(mockDb).toHaveBeenCalledWith("merchants");
+    expect(mockDb("merchants").insert).toHaveBeenCalled();
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'utils/merchant',
-      '✅ Merchant ensured:',
-      { merchantId }
+      "utils/merchant",
+      "✅ Merchant ensured:",
+      { merchantId },
     );
   });
 });

@@ -16,7 +16,7 @@
     "noEmit": false,
     "declaration": false,
     "emitDeclarationOnly": false,
-    "allowImportingTsExtensions": false,   // 👈 override the base
+    "allowImportingTsExtensions": false, // 👈 override the base
     "composite": false
   },
   "include": [
@@ -25,8 +25,5 @@
     "migrations/**/*.ts",
     "seeds/**/*.ts"
   ],
-  "exclude": [
-    "**/*.test.ts",
-    "src/**/*.tsx"
-  ]
+  "exclude": ["**/*.test.ts", "src/**/*.tsx"]
 }

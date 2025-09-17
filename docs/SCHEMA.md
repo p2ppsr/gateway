@@ -1,4 +1,5 @@
 # Database Schema (Gateway)
+
 **Updated:** 03 Sep 2025 • Source of truth: `migrations/` (see filenames embedded below)
 
 Gateway stores **satoshi-denominated** payments and embeddable “pay button” definitions.  
@@ -29,91 +30,98 @@ Identifiers for buttons and payments are **12-char tokens** reserved in the `ids
 ## Tables
 
 ### 1) `admins`
+
 Created in `initial.ts`, widened in `optimize_schema_types.ts`.
 
-| Column      | Type           | Null | Default           | Notes                                   |
-|-------------|----------------|------|-------------------|-----------------------------------------|
-| `admin_id`  | VARCHAR(66)    | NO   | —                 | **PK**                                  |
-| `created_at`| TIMESTAMP      | YES  | `NOW()`           |                                         |
-| `updated_at`| TIMESTAMP      | YES  | `NOW()`           |                                         |
+| Column       | Type        | Null | Default | Notes  |
+| ------------ | ----------- | ---- | ------- | ------ |
+| `admin_id`   | VARCHAR(66) | NO   | —       | **PK** |
+| `created_at` | TIMESTAMP   | YES  | `NOW()` |        |
+| `updated_at` | TIMESTAMP   | YES  | `NOW()` |        |
 
 ---
 
 ### 2) `merchants`
+
 Created in `initial.ts`, `merchant_id` width & fee type tuned in `optimize_schema_types.ts`.
 
-| Column            | Type            | Null | Default | Notes                     |
-|-------------------|-----------------|------|---------|---------------------------|
-| `merchant_id`     | VARCHAR(66)     | NO   | —       | **PK**                    |
-| `custom_fee_rate` | DECIMAL(10,6)   | YES  | `0.0`   | Percentage (0–100)        |
-| `welcomed`        | BOOLEAN         | NO   | `false` | Onboarding shown          |
-| `custom_fee`      | BOOLEAN         | NO   | `false` | Uses `custom_fee_rate`    |
-| `created_at`      | TIMESTAMP       | YES  | `NOW()` |                           |
-| `updated_at`      | TIMESTAMP       | YES  | `NOW()` |                           |
+| Column            | Type          | Null | Default | Notes                  |
+| ----------------- | ------------- | ---- | ------- | ---------------------- |
+| `merchant_id`     | VARCHAR(66)   | NO   | —       | **PK**                 |
+| `custom_fee_rate` | DECIMAL(10,6) | YES  | `0.0`   | Percentage (0–100)     |
+| `welcomed`        | BOOLEAN       | NO   | `false` | Onboarding shown       |
+| `custom_fee`      | BOOLEAN       | NO   | `false` | Uses `custom_fee_rate` |
+| `created_at`      | TIMESTAMP     | YES  | `NOW()` |                        |
+| `updated_at`      | TIMESTAMP     | YES  | `NOW()` |                        |
 
 ---
 
 ### 3) `ids`
+
 Created in `initial.ts`; width aligned in `optimize_schema_types.ts`.
 
-| Column         | Type                     | Null | Default | Notes                                                                 |
-|----------------|--------------------------|------|---------|-----------------------------------------------------------------------|
-| `id`           | CHAR(12)                 | NO   | —       | **PK** – reserved token (button or payment)                           |
-| `merchant_id`  | VARCHAR(66)              | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)                          |
-| `type`         | ENUM('payment','button') | NO   | —       | Resource kind                                                         |
-| `timestamp`    | TIMESTAMP                | YES  | `NOW()` | Reservation time                                                      |
+| Column        | Type                     | Null | Default | Notes                                        |
+| ------------- | ------------------------ | ---- | ------- | -------------------------------------------- |
+| `id`          | CHAR(12)                 | NO   | —       | **PK** – reserved token (button or payment)  |
+| `merchant_id` | VARCHAR(66)              | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`) |
+| `type`        | ENUM('payment','button') | NO   | —       | Resource kind                                |
+| `timestamp`   | TIMESTAMP                | YES  | `NOW()` | Reservation time                             |
 
 > Usage: Clients first call the ID-reservation API; subsequent records in `payment_buttons` / `payments` must point to these tokens.
 
 ---
 
 ### 4) `payment_buttons`
+
 Created in `initial.ts`; **description removed and `html_code` hardened** in `20250827_schema_updates.ts`.
 `merchant_id` width aligned in `optimize_schema_types.ts`.
 
-| Column            | Type           | Null | Default                | Notes                                                                                     |
-|-------------------|----------------|------|------------------------|-------------------------------------------------------------------------------------------|
-| `button_id`       | CHAR(12)       | NO   | —                      | **PK**, **FK** → `ids.id` (`CASCADE`)                                                     |
-| `merchant_id`     | VARCHAR(66)    | NO   | —                      | **FK** → `merchants.merchant_id` (`CASCADE`)                                              |
-| `payment_id`      | CHAR(12)       | YES  | `NULL`                 | Optional **FK** → `ids.id` (`CASCADE`) – last/seed payment token (single-use workflows)   |
-| `amount`          | BIGINT UNSIGNED| NO   | `0`                    | Default `0` for variable-amount buttons                                                   |
-| `html_code`       | TEXT           | NO   | `'<div>Pay Now</div>'` | **NOT NULL** (hardened in `20250827_schema_updates.ts`)                                   |
-| `variable_amount` | BOOLEAN        | NO   | `false`                | Allows payer to enter amount                                                              |
-| `multi_use`       | BOOLEAN        | NO   | `false`                | Button can be used repeatedly                                                             |
-| `used`            | BOOLEAN        | NO   | `false`                | Server/UI mark for single-use buttons after success                                       |
-| `created_at`      | TIMESTAMP      | YES  | `NOW()`                |                                                                                           |
-| `updated_at`      | TIMESTAMP      | YES  | `NOW()`                |                                                                                           |
+| Column            | Type            | Null | Default                | Notes                                                                                   |
+| ----------------- | --------------- | ---- | ---------------------- | --------------------------------------------------------------------------------------- |
+| `button_id`       | CHAR(12)        | NO   | —                      | **PK**, **FK** → `ids.id` (`CASCADE`)                                                   |
+| `merchant_id`     | VARCHAR(66)     | NO   | —                      | **FK** → `merchants.merchant_id` (`CASCADE`)                                            |
+| `payment_id`      | CHAR(12)        | YES  | `NULL`                 | Optional **FK** → `ids.id` (`CASCADE`) – last/seed payment token (single-use workflows) |
+| `amount`          | BIGINT UNSIGNED | NO   | `0`                    | Default `0` for variable-amount buttons                                                 |
+| `html_code`       | TEXT            | NO   | `'<div>Pay Now</div>'` | **NOT NULL** (hardened in `20250827_schema_updates.ts`)                                 |
+| `variable_amount` | BOOLEAN         | NO   | `false`                | Allows payer to enter amount                                                            |
+| `multi_use`       | BOOLEAN         | NO   | `false`                | Button can be used repeatedly                                                           |
+| `used`            | BOOLEAN         | NO   | `false`                | Server/UI mark for single-use buttons after success                                     |
+| `created_at`      | TIMESTAMP       | YES  | `NOW()`                |                                                                                         |
+| `updated_at`      | TIMESTAMP       | YES  | `NOW()`                |                                                                                         |
 
-> **Removed columns:**  
-> - `description` (made nullable in `202508241218…`, **dropped** in `20250827_schema_updates.ts`)  
+> **Removed columns:**
+>
+> - `description` (made nullable in `202508241218…`, **dropped** in `20250827_schema_updates.ts`)
 > - `total_paid` (**dropped** in `20250827_schema_updates.ts`)  
-> **Never existed (old doc):** `currency`, `accepts`
+>   **Never existed (old doc):** `currency`, `accepts`
 
 ---
 
 ### 5) `payments`
+
 Created in `initial.ts`, extended/fixed by subsequent migrations:
+
 - `description` added (`202508211200…`) and constrained to `VARCHAR(80) NOT NULL DEFAULT ''` (`202508231620…`)
 - `exchange_rate` **dropped** (`202508231620…`)
 - `button_id` FK now points to **`payment_buttons.button_id`** (`202508241018…`)
 - `transaction_id` **renamed** to **`derivation_prefix`**, and **`derivation_suffix`** added (`202508311200…`)
 
-| Column                 | Type            | Null | Default | Notes                                                                                     |
-|------------------------|-----------------|------|---------|-------------------------------------------------------------------------------------------|
-| `payment_id`           | CHAR(12)        | NO   | —       | **PK**, **FK** → `ids.id` (`CASCADE`)                                                     |
-| `merchant_id`          | VARCHAR(66)     | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)                                              |
-| `button_id`            | CHAR(12)        | NO   | —       | **FK** → `payment_buttons.button_id` (`CASCADE`)                                          |
-| `derivation_prefix`    | VARCHAR(64)     | NO   | —       | Replaces `transaction_id`; BRC-29 prefix                                                  |
-| `derivation_suffix`    | VARCHAR(64)     | YES  | `NULL`  | BRC-29 suffix (populated `'1'` in migration)                                              |
-| `amount`               | BIGINT UNSIGNED | NO   | `0`     | Satoshis                                                                                  |
-| `payer_id`             | VARCHAR(255)    | YES  | `NULL`  | Optional payer identifier                                                                 |
-| `txid`                 | VARCHAR(64)     | YES  | `NULL`  | Network transaction id                                                                    |
-| `completed`            | BOOLEAN         | NO   | `false` | Server-side completion marker                                                             |
-| `is_new`               | BOOLEAN         | NO   | `true`  | For inbox/ack flow                                                                        |
-| `blockchain_transaction` | LONGTEXT     | YES  | `NULL`  | Raw/atomic (e.g., BEEF)                                                                   |
-| `description`          | VARCHAR(80)     | NO   | `''`    | Short human label (added/constrained by migrations)                                       |
-| `created_at`           | TIMESTAMP       | YES  | `NOW()` |                                                                                           |
-| `updated_at`           | TIMESTAMP       | YES  | `NOW()` |                                                                                           |
+| Column                   | Type            | Null | Default | Notes                                               |
+| ------------------------ | --------------- | ---- | ------- | --------------------------------------------------- |
+| `payment_id`             | CHAR(12)        | NO   | —       | **PK**, **FK** → `ids.id` (`CASCADE`)               |
+| `merchant_id`            | VARCHAR(66)     | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)        |
+| `button_id`              | CHAR(12)        | NO   | —       | **FK** → `payment_buttons.button_id` (`CASCADE`)    |
+| `derivation_prefix`      | VARCHAR(64)     | NO   | —       | Replaces `transaction_id`; BRC-29 prefix            |
+| `derivation_suffix`      | VARCHAR(64)     | YES  | `NULL`  | BRC-29 suffix (populated `'1'` in migration)        |
+| `amount`                 | BIGINT UNSIGNED | NO   | `0`     | Satoshis                                            |
+| `payer_id`               | VARCHAR(255)    | YES  | `NULL`  | Optional payer identifier                           |
+| `txid`                   | VARCHAR(64)     | YES  | `NULL`  | Network transaction id                              |
+| `completed`              | BOOLEAN         | NO   | `false` | Server-side completion marker                       |
+| `is_new`                 | BOOLEAN         | NO   | `true`  | For inbox/ack flow                                  |
+| `blockchain_transaction` | LONGTEXT        | YES  | `NULL`  | Raw/atomic (e.g., BEEF)                             |
+| `description`            | VARCHAR(80)     | NO   | `''`    | Short human label (added/constrained by migrations) |
+| `created_at`             | TIMESTAMP       | YES  | `NOW()` |                                                     |
+| `updated_at`             | TIMESTAMP       | YES  | `NOW()` |                                                     |
 
 > **Removed columns:** `exchange_rate`  
 > **Renamed:** `transaction_id` → `derivation_prefix`
@@ -121,17 +129,18 @@ Created in `initial.ts`, extended/fixed by subsequent migrations:
 ---
 
 ### 6) `server_settings`
+
 Created in `initial.ts`.
 
-| Column                 | Type             | Null | Default | Notes                                |
-|------------------------|------------------|------|---------|--------------------------------------|
-| `id`                   | INT AUTO_INC     | NO   | —       | **PK**                               |
-| `stripe_api_key`       | VARCHAR(255)     | YES  | `NULL`  | Optional                             |
-| `sendgrid_credentials` | TEXT             | YES  | `NULL`  | Optional                             |
-| `default_fee_rate`     | DECIMAL(24,10)   | YES  | `0`     | Percentage                           |
-| `setup_complete`       | BOOLEAN          | NO   | `false` |                                      |
-| `created_at`           | TIMESTAMP        | YES  | `NOW()` |                                      |
-| `updated_at`           | TIMESTAMP        | YES  | `NOW()` |                                      |
+| Column                 | Type           | Null | Default | Notes      |
+| ---------------------- | -------------- | ---- | ------- | ---------- |
+| `id`                   | INT AUTO_INC   | NO   | —       | **PK**     |
+| `stripe_api_key`       | VARCHAR(255)   | YES  | `NULL`  | Optional   |
+| `sendgrid_credentials` | TEXT           | YES  | `NULL`  | Optional   |
+| `default_fee_rate`     | DECIMAL(24,10) | YES  | `0`     | Percentage |
+| `setup_complete`       | BOOLEAN        | NO   | `false` |            |
+| `created_at`           | TIMESTAMP      | YES  | `NOW()` |            |
+| `updated_at`           | TIMESTAMP      | YES  | `NOW()` |            |
 
 ---
 
@@ -152,26 +161,26 @@ All FKs use **`ON DELETE CASCADE`**.
 
 > Supersedes older table that listed `description`, `total_paid`, `currency`, `accepts` (no longer present).
 
-| Field              | Why it exists / behavior                                                                                                     |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| `button_id`        | Stable 12-char token from `ids`; couples UI embed and ledger.                                                                |
-| `merchant_id`      | Ownership & isolation; cascades on merchant deletion.                                                                        |
-| `payment_id`       | Optional link to a pre-reserved payment token (handy for single-use flows / deep links).                                     |
-| `amount`           | Default amount in sats. `0` when the button is variable and the payer will choose.                                           |
-| `html_code`        | Canonical snippet rendered in the UI; hardened to **NOT NULL** with a safe default so buttons are always embeddable.         |
-| `variable_amount`  | Client UX toggle for variable vs fixed price.                                                                                |
-| `multi_use`        | Governs whether the server/UI should allow repeated successful pays.                                                         |
-| `used`             | Single-use safety latch; prevents replay after success (enforced client & server side).                                      |
-| `created_at/updated_at` | Auditing / ordering.                                                                                                   |
+| Field                   | Why it exists / behavior                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `button_id`             | Stable 12-char token from `ids`; couples UI embed and ledger.                                                        |
+| `merchant_id`           | Ownership & isolation; cascades on merchant deletion.                                                                |
+| `payment_id`            | Optional link to a pre-reserved payment token (handy for single-use flows / deep links).                             |
+| `amount`                | Default amount in sats. `0` when the button is variable and the payer will choose.                                   |
+| `html_code`             | Canonical snippet rendered in the UI; hardened to **NOT NULL** with a safe default so buttons are always embeddable. |
+| `variable_amount`       | Client UX toggle for variable vs fixed price.                                                                        |
+| `multi_use`             | Governs whether the server/UI should allow repeated successful pays.                                                 |
+| `used`                  | Single-use safety latch; prevents replay after success (enforced client & server side).                              |
+| `created_at/updated_at` | Auditing / ordering.                                                                                                 |
 
 ---
 
 ## Notable Differences from the Old Document
 
-- **Removed** from schema: `currency`, `accepts`, `total_paid`, and **button** `description`.  
-- **Payments** now store **BRC-29** derivations: `derivation_prefix` + `derivation_suffix`.  
-- **All monetary values are in sats**; `exchange_rate` was dropped.  
-- `merchant_id` / `admin_id` are **VARCHAR(66)** (compressed keys).  
+- **Removed** from schema: `currency`, `accepts`, `total_paid`, and **button** `description`.
+- **Payments** now store **BRC-29** derivations: `derivation_prefix` + `derivation_suffix`.
+- **All monetary values are in sats**; `exchange_rate` was dropped.
+- `merchant_id` / `admin_id` are **VARCHAR(66)** (compressed keys).
 - `payments.button_id` now **references `payment_buttons.button_id`** (not `ids`).
 
 ---
@@ -259,3 +268,4 @@ CREATE TABLE server_settings (
   created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+```

@@ -25,27 +25,27 @@ const paymentsBuilder = {
 } as any;
 
 const mockDb: any = jest.fn((table: string) => {
-  if (table === 'information_schema.columns') return informationSchemaBuilder;
-  if (table === 'payments') return paymentsBuilder;
+  if (table === "information_schema.columns") return informationSchemaBuilder;
+  if (table === "payments") return paymentsBuilder;
   throw new Error(`Unknown table: ${table}`);
 });
 mockDb.transaction = jest.fn();
 mockDb.raw = jest.fn().mockResolvedValue(undefined);
 mockDb.fn = { now: jest.fn().mockReturnValue(new Date()) };
 
-jest.mock('knex', () => ({
+jest.mock("knex", () => ({
   __esModule: true,
   default: jest.fn(() => mockDb),
 }));
-jest.mock('../../utils/logging', () => ({
+jest.mock("../../utils/logging", () => ({
   logWithTimestamp: jest.fn(),
 }));
 
-import { Request, Response } from 'express';
-import acknowledgePayment from '../../routes/acknowledgePayment';
-import { logWithTimestamp } from '../../utils/logging';
-import { Knex } from 'knex';
-import knex from 'knex';
+import { Request, Response } from "express";
+import acknowledgePayment from "../../routes/acknowledgePayment";
+import { logWithTimestamp } from "../../utils/logging";
+import { Knex } from "knex";
+import knex from "knex";
 
 // Extend Request interface to include body with paymentId
 interface CustomRequest extends Request {
@@ -57,8 +57,8 @@ interface CustomRequest extends Request {
 /** Helper: create a callable trx mock that returns per-table builders */
 function makeTrxMock() {
   const trx: any = jest.fn((table: string) => {
-    if (table === 'information_schema.columns') return informationSchemaBuilder;
-    if (table === 'payments') return paymentsBuilder;
+    if (table === "information_schema.columns") return informationSchemaBuilder;
+    if (table === "payments") return paymentsBuilder;
     throw new Error(`Unknown table: ${table}`);
   });
   trx.raw = jest.fn().mockResolvedValue(undefined);
@@ -67,7 +67,7 @@ function makeTrxMock() {
   return { trx, informationSchemaBuilder, paymentsBuilder };
 }
 
-describe('routes/acknowledgePayment.ts', () => {
+describe("routes/acknowledgePayment.ts", () => {
   let mockReq: Partial<CustomRequest>;
   let mockRes: Partial<Response>;
   let statusSpy: jest.Mock;
@@ -82,173 +82,194 @@ describe('routes/acknowledgePayment.ts', () => {
     (mockDb.transaction as jest.Mock).mockReset();
   });
 
-  test('rejects missing paymentId', async () => {
+  test("rejects missing paymentId", async () => {
     mockReq = {
       body: {},
       headers: {},
     };
 
-    await acknowledgePayment.func(mockReq as CustomRequest, mockRes as Response);
+    await acknowledgePayment.func(
+      mockReq as CustomRequest,
+      mockRes as Response,
+    );
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'Received request body:',
+      "routes/acknowledgePayment",
+      "Received request body:",
       expect.any(Object),
     );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      '❌ Missing paymentId',
+      "routes/acknowledgePayment",
+      "❌ Missing paymentId",
     );
     expect(statusSpy).toHaveBeenCalledWith(400);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: '❌ Missing paymentId',
+      status: "error",
+      message: "❌ Missing paymentId",
     });
   });
 
-  test('successfully acknowledges payment', async () => {
+  test("successfully acknowledges payment", async () => {
     mockReq = {
-      body: { paymentId: 'validPaymentId' },
+      body: { paymentId: "validPaymentId" },
       headers: {},
     };
 
     const { trx } = makeTrxMock();
-    informationSchemaBuilder.first.mockResolvedValue({ column_name: 'is_new', data_type: 'boolean' });
+    informationSchemaBuilder.first.mockResolvedValue({
+      column_name: "is_new",
+      data_type: "boolean",
+    });
     paymentsBuilder.update.mockResolvedValue(1); // One row updated
 
     (mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx);
     });
 
-    await acknowledgePayment.func(mockReq as CustomRequest, mockRes as Response);
+    await acknowledgePayment.func(
+      mockReq as CustomRequest,
+      mockRes as Response,
+    );
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'Received request body:',
-      { paymentId: 'validPaymentId' },
+      "routes/acknowledgePayment",
+      "Received request body:",
+      { paymentId: "validPaymentId" },
     );
     expect(informationSchemaBuilder.where).toHaveBeenCalledWith({
-      table_name: 'payments',
-      column_name: 'is_new',
+      table_name: "payments",
+      column_name: "is_new",
     });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'is_new column info:',
-      { column_name: 'is_new', data_type: 'boolean' },
+      "routes/acknowledgePayment",
+      "is_new column info:",
+      { column_name: "is_new", data_type: "boolean" },
     );
     expect(mockDb.transaction).toHaveBeenCalled();
     expect(paymentsBuilder.update).toHaveBeenCalledWith({ is_new: false });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'Update result:',
+      "routes/acknowledgePayment",
+      "Update result:",
       1,
     );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      '✅ Payment acknowledged successfully:',
-      { paymentId: 'validPaymentId' },
+      "routes/acknowledgePayment",
+      "✅ Payment acknowledged successfully:",
+      { paymentId: "validPaymentId" },
     );
     expect(statusSpy).toHaveBeenCalledWith(200);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'success',
-      message: 'Payment acknowledged successfully',
+      status: "success",
+      message: "Payment acknowledged successfully",
     });
   });
 
-  test('handles no rows updated', async () => {
+  test("handles no rows updated", async () => {
     mockReq = {
-      body: { paymentId: 'validPaymentId' },
+      body: { paymentId: "validPaymentId" },
       headers: {},
     };
 
     const { trx } = makeTrxMock();
-    informationSchemaBuilder.first.mockResolvedValue({ column_name: 'is_new', data_type: 'boolean' });
+    informationSchemaBuilder.first.mockResolvedValue({
+      column_name: "is_new",
+      data_type: "boolean",
+    });
     paymentsBuilder.update.mockResolvedValue(0); // No rows updated
 
     (mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx);
     });
 
-    await acknowledgePayment.func(mockReq as CustomRequest, mockRes as Response);
+    await acknowledgePayment.func(
+      mockReq as CustomRequest,
+      mockRes as Response,
+    );
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'Received request body:',
-      { paymentId: 'validPaymentId' },
+      "routes/acknowledgePayment",
+      "Received request body:",
+      { paymentId: "validPaymentId" },
     );
     expect(informationSchemaBuilder.where).toHaveBeenCalledWith({
-      table_name: 'payments',
-      column_name: 'is_new',
+      table_name: "payments",
+      column_name: "is_new",
     });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'is_new column info:',
-      { column_name: 'is_new', data_type: 'boolean' },
+      "routes/acknowledgePayment",
+      "is_new column info:",
+      { column_name: "is_new", data_type: "boolean" },
     );
     expect(mockDb.transaction).toHaveBeenCalled();
     expect(paymentsBuilder.update).toHaveBeenCalledWith({ is_new: false });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'Update result:',
+      "routes/acknowledgePayment",
+      "Update result:",
       0,
     );
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      '❌ Error in acknowledgePayment:',
+      "routes/acknowledgePayment",
+      "❌ Error in acknowledgePayment:",
       expect.objectContaining({
-        message: 'No rows updated',
+        message: "No rows updated",
       }),
     );
     expect(statusSpy).toHaveBeenCalledWith(500);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: '❌ Internal server error',
+      status: "error",
+      message: "❌ Internal server error",
     });
   });
 
-  test('handles transaction error', async () => {
+  test("handles transaction error", async () => {
     mockReq = {
-      body: { paymentId: 'validPaymentId' },
+      body: { paymentId: "validPaymentId" },
       headers: {},
     };
 
     const { trx } = makeTrxMock();
-    informationSchemaBuilder.first.mockResolvedValue({ column_name: 'is_new', data_type: 'boolean' });
-    paymentsBuilder.update.mockRejectedValue(new Error('Database error'));
+    informationSchemaBuilder.first.mockResolvedValue({
+      column_name: "is_new",
+      data_type: "boolean",
+    });
+    paymentsBuilder.update.mockRejectedValue(new Error("Database error"));
 
     (mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx);
     });
 
-    await acknowledgePayment.func(mockReq as CustomRequest, mockRes as Response);
+    await acknowledgePayment.func(
+      mockReq as CustomRequest,
+      mockRes as Response,
+    );
 
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'Received request body:',
-      { paymentId: 'validPaymentId' },
+      "routes/acknowledgePayment",
+      "Received request body:",
+      { paymentId: "validPaymentId" },
     );
     expect(informationSchemaBuilder.where).toHaveBeenCalledWith({
-      table_name: 'payments',
-      column_name: 'is_new',
+      table_name: "payments",
+      column_name: "is_new",
     });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      'is_new column info:',
-      { column_name: 'is_new', data_type: 'boolean' },
+      "routes/acknowledgePayment",
+      "is_new column info:",
+      { column_name: "is_new", data_type: "boolean" },
     );
     expect(mockDb.transaction).toHaveBeenCalled();
     expect(paymentsBuilder.update).toHaveBeenCalledWith({ is_new: false });
     expect(logWithTimestamp).toHaveBeenCalledWith(
-      'routes/acknowledgePayment',
-      '❌ Error in acknowledgePayment:',
+      "routes/acknowledgePayment",
+      "❌ Error in acknowledgePayment:",
       expect.objectContaining({
-        message: 'Database error',
+        message: "Database error",
       }),
     );
     expect(statusSpy).toHaveBeenCalledWith(500);
     expect(jsonSpy).toHaveBeenCalledWith({
-      status: 'error',
-      message: '❌ Internal server error',
+      status: "error",
+      message: "❌ Internal server error",
     });
   });
 });

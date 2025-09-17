@@ -112,6 +112,16 @@
   },
 
   /* Project Structure */
-  "include": ["src/**/*", "*.ts", "webpack.*.ts", "src/types.d.ts"] /* Only compile files within the src folder */,
-  "exclude": ["public", "migrations", "dist", "node_modules"] /* Exclude build artefacts and migration scripts */
+  "include": [
+    "src/**/*",
+    "*.ts",
+    "webpack.*.ts",
+    "src/types.d.ts"
+  ] /* Only compile files within the src folder */,
+  "exclude": [
+    "public",
+    "migrations",
+    "dist",
+    "node_modules"
+  ] /* Exclude build artefacts and migration scripts */
 }
