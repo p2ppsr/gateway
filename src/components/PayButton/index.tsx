@@ -20,7 +20,8 @@ import React, {
   useCallback,
   ReactElement
 } from 'react'
-import { toast } from 'react-toastify'
+import { toast, ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import {
   WalletClient,
   Transaction,
@@ -303,7 +304,13 @@ const PayButton = ({
               console.log(
                 `[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use and already used`
               )
-              toast.error('This button is single-use and has been used.')
+              toast.warning(
+                '⚠️ This single-use button has already been used and is now disabled.',
+                {
+                  autoClose: 6000,
+                  position: 'top-right'
+                }
+              )
             }
           }
         }
@@ -852,7 +859,13 @@ const PayButton = ({
             )
           ) {
             setDisabled(true)
-            toast.error('This button is single-use and has been used.')
+            toast.warning(
+              '⚠️ This single-use button has already been used and is now disabled.',
+              {
+                autoClose: 6000,
+                position: 'top-right'
+              }
+            )
           }
           throw new Error(`Invoice creation failed: ${invoice.message ?? ''}`)
         }
@@ -876,11 +889,11 @@ const PayButton = ({
             invoice.paymentId
           )
         }
-        const outputsWithSats =
-          ((invoice.outputs?.map((output) => ({
+        const outputsWithSats: CreateActionOutput[] =
+          invoice.outputs?.map((output) => ({
             ...output,
             satoshis: output.satoshis
-          }))) != null) || []
+          })) || []
         if (
           variable &&
           (outputsWithSats.length > 0) &&
@@ -974,6 +987,15 @@ const PayButton = ({
           setPaymentId(initialPaymentId)
           const isMultiUse = multiUse === 'true' || multiUse === true
           if (isMultiUse) setPaid(false)
+          
+          // Show success toast notification
+          toast.success(
+            `✅ Payment successful! ${effectiveAmount} sats sent. TXID: ${pay.txid}`,
+            {
+              autoClose: 8000,
+              position: 'top-right'
+            }
+          )
           console.log(
             `[${new Date().toISOString()}] [${F}] 🔍 Evaluating multiUse before check:`,
             {
@@ -991,7 +1013,11 @@ const PayButton = ({
               }
             )
             toast.info(
-              'This single-use button has been used and is now disabled.'
+              'ℹ️ This single-use button has been used and is now disabled.',
+              {
+                autoClose: 5000,
+                position: 'top-right'
+              }
             )
           } else if (isMultiUse) {
             console.log(
@@ -1063,18 +1089,59 @@ const PayButton = ({
     ]
   )
 
-  if (!paid) {
-    if (variable) {
-      const left =
-        text?.split('{amount}')[0] ||
-        parentDataText?.split('{amount}')[0] ||
-        parentOriginalText?.split('{amount}')[0] ||
-        ''
-      const right =
-        text?.split('{amount}')[1] ||
-        parentDataText?.split('{amount}')[1] ||
-        parentOriginalText?.split('{amount}')[1] ||
-        'Sats'
+  const renderButton = () => {
+    if (!paid) {
+      if (variable) {
+        const left =
+          text?.split('{amount}')[0] ||
+          parentDataText?.split('{amount}')[0] ||
+          parentOriginalText?.split('{amount}')[0] ||
+          ''
+        const right =
+          text?.split('{amount}')[1] ||
+          parentDataText?.split('{amount}')[1] ||
+          parentOriginalText?.split('{amount}')[1] ||
+          'Sats'
+        return (
+          <div
+            ref={containerRef}
+            className={`gateway-paybutton gateway-paybutton-fixed ${disabled ? 'disabled' : ''}`}
+            onClick={handleClick}
+          >
+            <div
+              ref={nodeTextRef}
+              className={`nodeText ${disabled ? 'disabled' : ''}`}
+            >
+              {left}
+              <input
+                type='number'
+                value={variableAmount}
+                onChange={handleVariableAmountChange}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                min='1'
+                max={`${MAX_PAYMENT_SATS}`}
+                style={{
+                  width: '60px',
+                  textAlign: 'center',
+                  margin: '0 6px',
+                  padding: '3px',
+                  border: '2px solid #4a90e2',
+                  borderRadius: '0.5em',
+                  background: '#f9f9f9',
+                  color: '#333',
+                  fontWeight: '500',
+                  verticalAlign: 'middle'
+                }}
+                disabled={loading || disabled}
+                aria-label='Variable payment amount'
+              />
+              {right}
+            </div>
+          </div>
+        )
+      }
       return (
         <div
           ref={containerRef}
@@ -1085,66 +1152,44 @@ const PayButton = ({
             ref={nodeTextRef}
             className={`nodeText ${disabled ? 'disabled' : ''}`}
           >
-            {left}
-            <input
-              type='number'
-              value={variableAmount}
-              onChange={handleVariableAmountChange}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
-              min='1'
-              max={`${MAX_PAYMENT_SATS}`}
-              style={{
-                width: '60px',
-                textAlign: 'center',
-                margin: '0 6px',
-                padding: '3px',
-                border: '2px solid #4a90e2',
-                borderRadius: '0.5em',
-                background: '#f9f9f9',
-                color: '#333',
-                fontWeight: '500',
-                verticalAlign: 'middle'
-              }}
-              disabled={loading || disabled}
-              aria-label='Variable payment amount'
-            />
-            {right}
+            {loading ? loadingtext : buttonLabel}
           </div>
         </div>
       )
     }
     return (
-      <div
-        ref={containerRef}
-        className={`gateway-paybutton gateway-paybutton-fixed ${disabled ? 'disabled' : ''}`}
-        onClick={handleClick}
-      >
-        <div
-          ref={nodeTextRef}
-          className={`nodeText ${disabled ? 'disabled' : ''}`}
-        >
-          {loading ? loadingtext : buttonLabel}
-        </div>
+      <div role='status'>
+        Payment Submitted
+        <br />
+        TXID:{' '}
+        <code>
+          <a
+            href={`https://whatsonchain.com/tx/${txid || ''}`}
+            target='_blank'
+            rel='noopener noreferrer'
+          >
+            {txid || ''}
+          </a>
+        </code>
       </div>
     )
   }
+
   return (
-    <div role='status'>
-      Payment Submitted
-      <br />
-      TXID:{' '}
-      <code>
-        <a
-          href={`https://whatsonchain.com/tx/${txid || ''}`}
-          target='_blank'
-          rel='noopener noreferrer'
-        >
-          {txid || ''}
-        </a>
-      </code>
-    </div>
+    <>
+      {renderButton()}
+      <ToastContainer
+        position='top-right'
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnHover
+        draggable
+        limit={3}
+      />
+    </>
   )
 }
 
