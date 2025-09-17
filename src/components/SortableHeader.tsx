@@ -21,7 +21,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ label, active, directio
 
   return (
     <Typography
-      role="button"
+      role='button'
       tabIndex={0}
       aria-label={`sort by ${label}${active ? `, current ${direction}ending` : ''}`}
       onClick={onClick}
