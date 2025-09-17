@@ -14,7 +14,8 @@ import React, {
   useEffect,
   useCallback,
   useRef,
-  useLayoutEffect
+  useLayoutEffect,
+  useMemo
 } from 'react'
 import {
   Typography,
@@ -29,7 +30,8 @@ import {
   Radio,
   Card,
   Stack,
-  Checkbox
+  Checkbox,
+  Paper
 } from '@mui/material'
 import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient } from '@bsv/sdk'
@@ -37,7 +39,8 @@ import { Root, ContentWrap, CenteredHeader, TextFieldStyled } from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import {
   atomDark,
-  oneLight
+  oneLight,
+  vscDarkPlus
 } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
@@ -49,6 +52,7 @@ import { validateCSS } from '../../utils/general'
 import { initializeIds, InitializeIdsResponse } from '../../utils/initializeIds'
 import { generateBase58 } from '../../utils/general'
 import { fetchJsonWithAuth, fetchWithAuth, setApiDefaultWallet } from '../../utils/api'
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 
 // Vite injects this at build time, declare for TS
 declare const __SERVER_IDENTITY_KEY__: string
@@ -114,24 +118,41 @@ const normalizeCSS = (css: string): string => {
   return output.trim()
 }
 
+function formatHtml(html: string): string {
+  try {
+    return (window as any).prettier
+      ? (window as any).prettier.format(html, { parser: 'html' })
+      : html
+  } catch {
+    return html
+  }
+}
+
 const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   const theme = useTheme()
-  const normalizedCode = code.trim()
-  // // Normalize indentation to 2 spaces for HTML structure, CSS handled by normalizeCSS
-  // const normalizedCode = code
-  //   .split('\n')
-  //   .map(line => line.replace(/^\s{2,}/, '  ')) // Replace 2+ spaces with 2 spaces for HTML
-  //   .join('\n')
-  //   .trim()
+  const normalizedCode = useMemo(() => {
+    // First trim trailing whitespace, then pretty-print HTML if applicable
+    let cleaned = code.replace(/\s+$/, '')
+    if (language === 'html') {
+      cleaned = formatHtml(cleaned)
+    }
+    return cleaned
+  }, [code, language])
+
   return (
-    <SyntaxHighlighter
-      language={language}
-      style={theme.palette.mode === 'dark' ? atomDark : oneLight}
-      showLineNumbers
-      wrapLines
+    <Box
+      component={Paper}
+      variant="outlined"
+      sx={{ p: 2, backgroundColor: theme.palette.background.paper }}
     >
-      {normalizedCode}
-    </SyntaxHighlighter>
+      <SyntaxHighlighter
+        language={language}
+        style={theme.palette.mode === 'dark' ? vscDarkPlus : docco}
+        customStyle={{ margin: 0, padding: 0 }}
+      >
+        {normalizedCode}
+      </SyntaxHighlighter>
+    </Box>
   )
 }
 
@@ -257,8 +278,8 @@ logWithTimestamp(F, 'API_BASE:', API_BASE)
       let previewHtml = ''
       let codeHtml = ''
       if (type === 'fixed') {
-        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-multi-use="${!isSingleUse}">${text}</div>`
-        codeHtml = `<style>
+        previewHtml = formatHtml(`<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-multi-use="${!isSingleUse}">${text}</div>`)
+        codeHtml = formatHtml(`<style>
 ${normalizeCSS(cssToUse)}
 </style>
 <div
@@ -271,13 +292,13 @@ ${normalizeCSS(cssToUse)}
   data-text="${text}"
   data-description="${safeDescription}"
   data-width="fit-content"
-  data-multi-use="${!isSingleUse}">${text}</div>`
+  data-multi-use="${!isSingleUse}">${text}</div>`)
         setPreviewFixedHtml(previewHtml)
         setPreviewCode_fixed(codeHtml)
         logWithTimestamp(F, 'generatePreviewHtml: Fixed preview HTML set:', previewHtml, 'code HTML:', codeHtml)
       } else {
-        previewHtml = `<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-variable="true" data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
-        codeHtml = `<style>
+        previewHtml = formatHtml(`<div class="${previewClassName}" style="width: fit-content; margin: 0 auto; display: block" data-text="${text}" data-description="${safeDescription}" data-buttonId="${ids.buttonId}" data-paymentId="${ids.paymentId}" data-variable="true" data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
+        codeHtml = formatHtml(`<style>
 ${normalizeCSS(cssToUse)}
 </style>
 <div
@@ -290,7 +311,7 @@ ${normalizeCSS(cssToUse)}
   data-description="${safeDescription}"
   data-variable="true"
   data-width="fit-content"
-  data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+  data-multi-use="${!isSingleUse}">${text} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
         setPreviewVariableHtml(previewHtml)
         setPreviewCode_variable(codeHtml)
         logWithTimestamp(F, 'generatePreviewHtml: Variable preview HTML set:', previewHtml, 'code HTML:', codeHtml)
@@ -872,12 +893,12 @@ const data = await fetchJsonWithAuth<ButtonCodeResponse>(
                 newDescription
               )
               const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
-              const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+              const fixedPreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
                 newDescription
-              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
-              const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`)
+              const variablePreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
                 newDescription
-              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
               setPreviewFixedHtml(fixedPreviewHtml)
               setPreviewVariableHtml(variablePreviewHtml)
               generatePreviewHtml(paymentType, newDescription)
@@ -924,12 +945,12 @@ const data = await fetchJsonWithAuth<ButtonCodeResponse>(
               newDescription
             )
             const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
-            const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+            const fixedPreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
               newDescription
-            )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
-            const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+            )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`)
+            const variablePreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
               newDescription
-            )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+            )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
             setPreviewFixedHtml(fixedPreviewHtml)
             setPreviewVariableHtml(variablePreviewHtml)
             generatePreviewHtml(paymentType, newDescription)
@@ -1573,12 +1594,12 @@ w,
         }
         // Regenerate previews to ensure multiUse consistency
         const fixedText = `Pay Now ${fixedSatAmount} Sats`
-        const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+        const fixedPreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
           newFixedDescription
-        )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-multi-use="true">${fixedText}</div>`
-        const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(
+        )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-multi-use="true">${fixedText}</div>`)
+        const variablePreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(
           newVariableDescription
-        )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+        )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
         setPreviewFixedHtml(fixedPreviewHtml)
         setPreviewVariableHtml(variablePreviewHtml)
         setRenderKey(prev => prev + 1)
@@ -1771,13 +1792,13 @@ htmlCode =
 setPreviewCode_fixed(paymentType === 'fixed' ? htmlCode : previewCode_fixed)
 setPreviewCode_variable(paymentType === 'variable' ? htmlCode : previewCode_variable)
 
-const fixedPreviewHtml = `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+const fixedPreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
   updatedDescription
-)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`
+)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-multi-use="${multiUse}">${fixedText}</div>`)
 
-const variablePreviewHtml = `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
+const variablePreviewHtml = formatHtml(`<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
   updatedDescription
-)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+)}" data-buttonId="${serverButtonId}" data-paymentId="${serverPaymentId}" data-variable="true" data-multi-use="${multiUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
 
 setPreviewFixedHtml(fixedPreviewHtml)
 setPreviewVariableHtml(variablePreviewHtml)
@@ -2211,12 +2232,12 @@ if (res.ok) {
                               const variableCodeClass = `gateway-paybutton gateway-paybutton-variable${
                                 value ? ' disabled' : ''
                               }`
-                              const fixedPreviewHtml = `<div class="${fixedPreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
+                              const fixedPreviewHtml = formatHtml(`<div class="${fixedPreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
                                 fixedDescription
-                              )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="${!value}">${fixedText}</div>`
-                              const variablePreviewHtml = `<div class="${variablePreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-text="${variableText}" data-description="${sanitizeInput(
+                              )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="${!value}">${fixedText}</div>`)
+                              const variablePreviewHtml = formatHtml(`<div class="${variablePreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-text="${variableText}" data-description="${sanitizeInput(
                                 variableDescription
-                              )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+                              )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`)
                               const fixedCode = `<style>\n${extractCSS(
                                 value ? fixedCSS : `${fixedBaseCSS}\n</style>`
                               ).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${fixedCodeClass}"\n data-merchant="${

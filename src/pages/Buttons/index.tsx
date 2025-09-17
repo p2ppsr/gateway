@@ -772,6 +772,10 @@ useLayoutEffect(() => {
                     F,
                     `Rendering button ${button.button_id}, multi_use: ${button.multi_use}, used: ${button.used}, render_id: ${button.render_id}, timestamp: ${formatTimeLocal(button.created_at || button.updated_at)}`
                   )
+                  const shouldRenderSubTable =
+                  expandedButton === button.button_id &&
+                  button.multi_use &&
+                  button.payments.length > 1
                   return (
                     <React.Fragment key={button.render_id}>
                       <TableRow data-used={`used-${fullButtonId}-${button.used}`}>
@@ -813,7 +817,7 @@ useLayoutEffect(() => {
                             }}
                           >
                             {formatId(button.payment_id || '')}
-                            {button.multi_use && button.payments.length > 0 && (
+                            {button.multi_use && button.payments.length > 1 && (
                               <IconButton
                                 onClick={e => {
                                   e.stopPropagation()
@@ -913,9 +917,7 @@ useLayoutEffect(() => {
                             : '<div>Pay Now</div>'}
                         </TableCell>
                       </TableRow>
-                      {expandedButton === button.button_id &&
-                        button.multi_use &&
-                        button.payments.length > 0 &&
+                      {shouldRenderSubTable &&
                         sortPayments(button.payments, subTableSortConfig).map((payment, paymentIndex) => {
                           const topBorder =
                             paymentIndex === 0 ? { borderTop: `1px solid ${theme.palette.divider}` } : {}
