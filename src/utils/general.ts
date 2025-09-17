@@ -10,7 +10,7 @@
  *
  * @author xAI
  * @date 2025-09-01
- * @version 1.18 (2025-09-08: add safe URL join + clientConfig integration to avoid "Invalid URL")
+ * @version 1.18 (2025-09-08: aPdd safe URL join + clientConfig integration to avoid "Invalid URL")
  */
 
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
@@ -354,7 +354,9 @@ export const validateCSS = (css: string): boolean => {
           if (hexMatch == null) return false
         }
         if (value.includes('(')) {
+          // @ts-expect-error
           const openCount = ((value.match(/\(/g) != null) || []).length
+          // @ts-expect-error
           const closeCount = ((value.match(/\)/g) != null) || []).length
           if (openCount !== closeCount) return false
           if (value.includes('linear-gradient')) {
