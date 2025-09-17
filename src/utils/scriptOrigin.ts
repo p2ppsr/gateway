@@ -14,7 +14,7 @@
  *   injection and handshake mismatches.
  */
 
-let _scriptOrigin: string | null = null;
+let _scriptOrigin: string | null = null
 
 /**
  * Returns the origin of the currently loaded `pay.js` script.
@@ -37,41 +37,41 @@ let _scriptOrigin: string | null = null;
  *
  * @returns {string} The origin string.
  */
-export function getScriptOrigin(): string {
+export function getScriptOrigin (): string {
   if (_scriptOrigin) {
-    console.log("cached origin returned", { origin: _scriptOrigin });
-    return _scriptOrigin;
+    console.log('cached origin returned', { origin: _scriptOrigin })
+    return _scriptOrigin
   }
 
-  if (typeof window === "undefined") {
-    _scriptOrigin = "";
-    console.log("server-side execution, returning empty string");
-    return _scriptOrigin;
+  if (typeof window === 'undefined') {
+    _scriptOrigin = ''
+    console.log('server-side execution, returning empty string')
+    return _scriptOrigin
   }
 
-  const scripts = window.document.getElementsByTagName("script");
+  const scripts = window.document.getElementsByTagName('script')
   for (const s of Array.from(scripts)) {
-    const src = s.getAttribute("src") || "";
-    if (src.endsWith("/pay.js")) {
+    const src = s.getAttribute('src') || ''
+    if (src.endsWith('/pay.js')) {
       try {
-        const url = new URL(src, window.location.origin);
-        _scriptOrigin = url.origin;
-        console.log("detected pay.js script origin", {
+        const url = new URL(src, window.location.origin)
+        _scriptOrigin = url.origin
+        console.log('detected pay.js script origin', {
           src,
-          origin: _scriptOrigin,
-        });
-        return _scriptOrigin;
+          origin: _scriptOrigin
+        })
+        return _scriptOrigin
       } catch (err) {
-        console.log("URL parse error for pay.js script", {
+        console.log('URL parse error for pay.js script', {
           src,
-          error: String(err),
-        });
+          error: String(err)
+        })
       }
     }
   }
 
   // fallback
-  _scriptOrigin = window.location.origin;
-  console.log("fallback to window.location.origin", { origin: _scriptOrigin });
-  return _scriptOrigin;
+  _scriptOrigin = window.location.origin
+  console.log('fallback to window.location.origin', { origin: _scriptOrigin })
+  return _scriptOrigin
 }

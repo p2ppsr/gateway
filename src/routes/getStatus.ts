@@ -11,16 +11,16 @@
  * Requires authentication middleware to populate `req.auth.identityKey`.
  */
 
-import knex, { Knex } from "knex";
-import knexConfig from "../knexfile";
-import type { Request, Response } from "express";
+import knex, { Knex } from 'knex'
+import knexConfig from '../knexfile'
+import type { Request, Response } from 'express'
 
-const db: Knex = knex(knexConfig);
-const { BSV_NETWORK = "mainnet" } = process.env;
+const db: Knex = knex(knexConfig)
+const { BSV_NETWORK = 'mainnet' } = process.env
 
 export default {
-  type: "get",
-  path: "/getStatus",
+  type: 'get',
+  path: '/getStatus',
 
   /**
    * Express route handler to return current status info.
@@ -34,24 +34,24 @@ export default {
    */
   func: async (req: Request, res: Response): Promise<void> => {
     try {
-      const identityKey = (req as any).auth?.identityKey;
+      const identityKey = (req as any).auth?.identityKey
 
       // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
       const admin = identityKey
-        ? await db("admins").where({ admin_id: identityKey }).first()
-        : null;
+        ? await db('admins').where({ admin_id: identityKey }).first()
+        : null
 
       res.status(200).json({
-        status: "success",
+        status: 'success',
         network: BSV_NETWORK,
-        isAdmin: Boolean(admin),
-      });
+        isAdmin: Boolean(admin)
+      })
     } catch (err) {
-      console.error("❌ Error in /getStatus:", err);
+      console.error('❌ Error in /getStatus:', err)
       res.status(500).json({
-        status: "error",
-        message: "❌ Internal server error",
-      });
+        status: 'error',
+        message: '❌ Internal server error'
+      })
     }
-  },
-};
+  }
+}

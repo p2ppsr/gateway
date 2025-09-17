@@ -13,28 +13,28 @@
  *
  * Version: v1.1 (Updated 20Aug2025_2223 BST)
  */
-const F = "App";
-import React, { useState, useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
-import Theme from "./components/Theme";
-import Navbar from "./components/Navbar";
-import Create from "./pages/Create";
-import Buttons from "./pages/Buttons";
-import Payments from "./pages/Payments";
-import Actions from "./pages/Actions";
-import Money from "./pages/Money";
-import checkForMetanetclient from "./utils/checkForMetanetclient";
-import { CssBaseline } from "@mui/material";
-import { WalletClient } from "@bsv/sdk";
-import useAsyncEffect from "use-async-effect";
-import MetanetclientMissingModal from "./components/MetanetclientMissingModal";
-import { CONFIG } from "./utils/constants";
-import { logWithTimestamp } from "./utils/logging";
-import { fetchWithTimeout } from "./utils/general";
+import React, { useState, useEffect } from 'react'
+import { Routes, Route } from 'react-router-dom'
+import Theme from './components/Theme'
+import Navbar from './components/Navbar'
+import Create from './pages/Create'
+import Buttons from './pages/Buttons'
+import Payments from './pages/Payments'
+import Actions from './pages/Actions'
+import Money from './pages/Money'
+import checkForMetanetclient from './utils/checkForMetanetclient'
+import { CssBaseline } from '@mui/material'
+import { WalletClient } from '@bsv/sdk'
+import useAsyncEffect from 'use-async-effect'
+import MetanetclientMissingModal from './components/MetanetclientMissingModal'
+import { CONFIG } from './utils/constants'
+import { logWithTimestamp } from './utils/logging'
+import { fetchWithTimeout } from './utils/general'
+const F = 'App'
 
-logWithTimestamp(F, `CONFIG:${CONFIG}`);
-const wallet = new WalletClient("auto", CONFIG.WALLET_ORIGIN);
-const API_BASE = CONFIG.API_BASE.replace(/\/+$/, "");
+logWithTimestamp(F, `CONFIG:${CONFIG}`)
+const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
+const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
 /**
  * The main React component for the application.
@@ -49,19 +49,19 @@ const API_BASE = CONFIG.API_BASE.replace(/\/+$/, "");
  * @returns {JSX.Element} The rendered application component.
  */
 const App: React.FC = () => {
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isMncMissing, setIsMncMissing] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isMncMissing, setIsMncMissing] = useState(false)
 
   // Run a periodic check for Metanet client
   useAsyncEffect(() => {
     const intervalId = setInterval(() => {
       void (async () => {
-        const hasMNC = await checkForMetanetclient(CONFIG.WALLET_ORIGIN);
-        setIsMncMissing(hasMNC === 0);
-      })();
-    }, 2000);
-    return () => clearInterval(intervalId);
-  }, []);
+        const hasMNC = await checkForMetanetclient(CONFIG.WALLET_ORIGIN)
+        setIsMncMissing(hasMNC === 0)
+      })()
+    }, 2000)
+    return () => clearInterval(intervalId)
+  }, [])
 
   //   useEffect(() => {
   //     void (async () => {
@@ -86,14 +86,14 @@ const App: React.FC = () => {
       <MetanetclientMissingModal open={isMncMissing} />
       <Navbar isAdmin={isAdmin} />
       <Routes>
-        <Route path="/" element={<Create />} />
-        <Route path="/buttons" element={<Buttons />} />
-        <Route path="/payments" element={<Payments />} />
-        <Route path="/actions" element={<Actions />} />
-        <Route path="/money" element={<Money />} />
+        <Route path='/' element={<Create />} />
+        <Route path='/buttons' element={<Buttons />} />
+        <Route path='/payments' element={<Payments />} />
+        <Route path='/actions' element={<Actions />} />
+        <Route path='/money' element={<Money />} />
       </Routes>
     </Theme>
-  );
-};
+  )
+}
 
-export default App;
+export default App

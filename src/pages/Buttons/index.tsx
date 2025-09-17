@@ -14,8 +14,7 @@
  * - 31Aug2025_2045 BST (v3.110): Used DUP_FIELD_PLACEHOLDER for Button Id, Payment Id, and Description in sub-table when payment_id matches button.payment_id.
  * - 31Aug2025_2030 BST (v3.109): Used DUP_FIELD_PLACEHOLDER from consts.ts for Button Id, Payment Id, and Description in sub-table to avoid duplication.
  */
-const F = "pages/Buttons";
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import {
   CircularProgress,
   Container,
@@ -37,314 +36,314 @@ import {
   Card,
   TextField,
   Tooltip,
-  Collapse,
-} from "@mui/material";
+  Collapse
+} from '@mui/material'
 import {
   FirstPage,
   LastPage,
   ReceiptLong,
   ExpandMore,
-  ExpandLess,
-} from "@mui/icons-material";
-import { WalletClient } from "@bsv/sdk";
-import { useTheme } from "@mui/material/styles";
-import { Link } from "react-router-dom";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+  ExpandLess
+} from '@mui/icons-material'
+import { WalletClient } from '@bsv/sdk'
+import { useTheme } from '@mui/material/styles'
+import { Link } from 'react-router-dom'
+import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import {
   fetchWithTimeout,
   formatId,
-  formatTimeLocal,
-} from "../../utils/general";
-import { logWithTimestamp } from "../../utils/logging";
-import { CONFIG, DUP_FIELD_PLACEHOLDER } from "../../utils/constants";
+  formatTimeLocal
+} from '../../utils/general'
+import { logWithTimestamp } from '../../utils/logging'
+import { CONFIG, DUP_FIELD_PLACEHOLDER } from '../../utils/constants'
+const F = 'pages/Buttons'
 
-const wallet = new WalletClient("json-api", CONFIG.WALLET_ORIGIN);
+const wallet = new WalletClient('json-api', CONFIG.WALLET_ORIGIN)
 
 interface Payment {
-  payment_id: string;
-  amount: number;
-  txid: string | null;
-  completed: boolean;
-  created_at: string;
-  description: string | null;
+  payment_id: string
+  amount: number
+  txid: string | null
+  completed: boolean
+  created_at: string
+  description: string | null
 }
 
 interface Button {
-  button_id: string;
-  amount: number;
-  description: string;
-  html_code: string;
-  variable_amount: boolean;
-  multi_use: boolean;
-  used: boolean;
-  calculated_total: number | null;
-  created_at: string;
-  updated_at: string;
-  payment_id: string | null;
-  payments: Payment[];
-  render_id: string;
+  button_id: string
+  amount: number
+  description: string
+  html_code: string
+  variable_amount: boolean
+  multi_use: boolean
+  used: boolean
+  calculated_total: number | null
+  created_at: string
+  updated_at: string
+  payment_id: string | null
+  payments: Payment[]
+  render_id: string
 }
 
 interface ButtonResponse {
-  status: string;
-  message: string;
-  title?: string;
-  data: {
-    buttonId: string;
-    merchantId: string;
-    paymentId: string | null;
-    amount: number;
-    description: string;
-    htmlCode: string;
-    variableAmount: boolean;
-    multiUse: boolean;
-    used: boolean;
-    calculated_total: number | null;
-    createdAt: string;
-    updatedAt: string;
-    payments?: {
-      paymentId: string;
-      amount: number;
-      txid: string | null;
-      completed: boolean;
-      createdAt: string;
-      description: string | null;
-    }[];
-  }[];
-  total?: number;
+  status: string
+  message: string
+  title?: string
+  data: Array<{
+    buttonId: string
+    merchantId: string
+    paymentId: string | null
+    amount: number
+    description: string
+    htmlCode: string
+    variableAmount: boolean
+    multiUse: boolean
+    used: boolean
+    calculated_total: number | null
+    createdAt: string
+    updatedAt: string
+    payments?: Array<{
+      paymentId: string
+      amount: number
+      txid: string | null
+      completed: boolean
+      createdAt: string
+      description: string | null
+    }>
+  }>
+  total?: number
 }
 
 interface SortConfig {
-  key: Exclude<keyof Button, "payments"> | null;
-  direction: "asc" | "desc";
+  key: Exclude<keyof Button, 'payments'> | null
+  direction: 'asc' | 'desc'
 }
 
 interface SubTableSortConfig {
   key:
-    | "amount"
-    | "description"
-    | "created_at"
-    | "payment_id"
-    | "completed"
-    | null;
-  direction: "asc" | "desc";
+  | 'amount'
+  | 'description'
+  | 'created_at'
+  | 'payment_id'
+  | 'completed'
+  | null
+  direction: 'asc' | 'desc'
 }
 
 const PaymentButtonsList = () => {
-  const [buttons, setButtons] = useState<Button[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [customRowsPerPage, setCustomRowsPerPage] = useState("");
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [usedFilter, setUsedFilter] = useState<"all" | "used" | "unused">(
-    "all",
-  );
+  const [buttons, setButtons] = useState<Button[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string>('')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(5)
+  const [customRowsPerPage, setCustomRowsPerPage] = useState('')
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [usedFilter, setUsedFilter] = useState<'all' | 'used' | 'unused'>(
+    'all'
+  )
   const [sortConfig, setSortConfig] = useState<SortConfig>({
-    key: "created_at",
-    direction: "desc",
-  });
+    key: 'created_at',
+    direction: 'desc'
+  })
   const [subTableSortConfig, setSubTableSortConfig] =
     useState<SubTableSortConfig>({
-      key: "created_at",
-      direction: "desc",
-    });
-  const [customOptions, setCustomOptions] = useState<number[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [title, setTitle] = useState<string>("Payment Buttons");
-  const [expandedButton, setExpandedButton] = useState<string | null>(null);
-  const theme = useTheme();
-  const fetchTimeout = useRef<number | null>(null);
-  const [hoveredValue, setHoveredValue] = useState<string | null>(null);
-  const [clickedValue, setClickedValue] = useState<string | null>(null);
-  const [isClicked, setIsClicked] = useState(false);
-  const [exitDirection, setExitDirection] = useState<string | null>(null);
+      key: 'created_at',
+      direction: 'desc'
+    })
+  const [customOptions, setCustomOptions] = useState<number[]>([])
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [title, setTitle] = useState<string>('Payment Buttons')
+  const [expandedButton, setExpandedButton] = useState<string | null>(null)
+  const theme = useTheme()
+  const fetchTimeout = useRef<number | null>(null)
+  const [hoveredValue, setHoveredValue] = useState<string | null>(null)
+  const [clickedValue, setClickedValue] = useState<string | null>(null)
+  const [isClicked, setIsClicked] = useState(false)
+  const [exitDirection, setExitDirection] = useState<string | null>(null)
   const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(
-    null,
-  );
-  const tableRef = useRef<HTMLDivElement>(null);
-  const hoverTextRef = useRef<HTMLDivElement>(null);
-  const [isHoverMultiline, setIsHoverMultiline] = useState(false);
+    null
+  )
+  const tableRef = useRef<HTMLDivElement>(null)
+  const hoverTextRef = useRef<HTMLDivElement>(null)
+  const [isHoverMultiline, setIsHoverMultiline] = useState(false)
 
-  const subTableRefs = useRef<(HTMLTableRowElement | null)[]>([]);
+  const subTableRefs = useRef<Array<HTMLTableRowElement | null>>([])
   const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
-    "Button Id": null,
-    "Payment Id": null,
-    "HTML Code": null,
-  });
+    'Button Id': null,
+    'Payment Id': null,
+    'HTML Code': null
+  })
 
   const cellStyle = {
     borderRight: `1px solid ${theme.palette.divider}`,
-    borderBottom: `1px solid ${theme.palette.divider}`,
-  };
+    borderBottom: `1px solid ${theme.palette.divider}`
+  }
   const lastCellStyle = {
     ...cellStyle,
-    borderRight: "none",
-  };
-  const expandedRowBg = "#4c4a4aff";
-  const API_BASE = CONFIG.API_BASE.replace(/\/+$/, "");
+    borderRight: 'none'
+  }
+  const expandedRowBg = '#4c4a4aff'
+  const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
   const handleMouseEnter = (
     fullValue: string,
     columnName: string,
-    rowIndex: number,
+    rowIndex: number
   ) => {
     logWithTimestamp(
       F,
-      "Mouse enter, fullValue:",
+      'Mouse enter, fullValue:',
       fullValue,
-      "column:",
+      'column:',
       columnName,
-      "rowIndex:",
-      rowIndex,
-    );
+      'rowIndex:',
+      rowIndex
+    )
     if (!isClicked) {
-      setHoveredValue(fullValue);
+      setHoveredValue(fullValue)
       const columnCell = document.querySelector(
-        `tr:nth-child(${rowIndex + 1}) td:nth-child(${["Button Id", "Payment Id", "HTML Code"].indexOf(columnName) + 2})`,
-      ) as HTMLTableCellElement | null;
-      if (columnCell) {
-        columnRefs.current[columnName] = columnCell;
+        `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Button Id', 'Payment Id', 'HTML Code'].indexOf(columnName) + 2})`
+      )
+      if (columnCell != null) {
+        columnRefs.current[columnName] = columnCell
       }
     }
-  };
+  }
 
   const handleMouseLeave = (e: React.MouseEvent) => {
-    logWithTimestamp(F, "Mouse leave, tableRef defined:", !!tableRef.current);
-    if (tableRef.current && hoveredValue && !isClicked) {
-      const rect = tableRef.current.getBoundingClientRect();
-      const mouseY = e.clientY;
-      const mouseX = e.clientX;
+    logWithTimestamp(F, 'Mouse leave, tableRef defined:', !(tableRef.current == null))
+    if ((tableRef.current != null) && hoveredValue && !isClicked) {
+      const rect = tableRef.current.getBoundingClientRect()
+      const mouseY = e.clientY
+      const mouseX = e.clientX
       const hoveredColumn = Object.keys(columnRefs.current).find((col) =>
-        columnRefs.current[col]?.contains(e.target as Node),
-      );
+        columnRefs.current[col]?.contains(e.target as Node)
+      )
       if (hoveredColumn) {
         const colRect =
-          columnRefs.current[hoveredColumn]!.getBoundingClientRect();
+          columnRefs.current[hoveredColumn]!.getBoundingClientRect()
         const isBottomExit =
           mouseY > colRect.bottom &&
           mouseX >= colRect.left &&
-          mouseX <= colRect.right;
+          mouseX <= colRect.right
         if (
           isBottomExit &&
-          (hoveredColumn === "Button Id" ||
-            hoveredColumn === "Payment Id" ||
-            hoveredColumn === "HTML Code")
+          (hoveredColumn === 'Button Id' ||
+            hoveredColumn === 'Payment Id' ||
+            hoveredColumn === 'HTML Code')
         ) {
-          setExitDirection("bottom");
+          setExitDirection('bottom')
         } else {
-          setHoveredValue(null);
-          setExitDirection(null);
+          setHoveredValue(null)
+          setExitDirection(null)
         }
       } else {
-        setHoveredValue(null);
-        setExitDirection(null);
+        setHoveredValue(null)
+        setExitDirection(null)
       }
     }
-  };
+  }
 
   const handleClick = (fullValue: string, columnName: string) => {
     logWithTimestamp(
       F,
-      "Mouse click, fullValue:",
+      'Mouse click, fullValue:',
       fullValue,
-      "column:",
-      columnName,
-    );
-    setHoveredValue(null);
-    setIsClicked(true);
-    setClickedValue(fullValue);
-    setLastClickedColumn(columnName);
+      'column:',
+      columnName
+    )
+    setHoveredValue(null)
+    setIsClicked(true)
+    setClickedValue(fullValue)
+    setLastClickedColumn(columnName)
     navigator.clipboard
       .writeText(fullValue)
-      .catch((err) => logWithTimestamp(F, "Failed to copy to clipboard:", err));
-  };
+      .catch((err) => logWithTimestamp(F, 'Failed to copy to clipboard:', err))
+  }
 
   const handleReset = () => {
-    logWithTimestamp(F, "Reset click");
-    setClickedValue(null);
-    setIsClicked(false);
-    setHoveredValue(null);
-    setExitDirection(null);
-    setLastClickedColumn(null);
-  };
+    logWithTimestamp(F, 'Reset click')
+    setClickedValue(null)
+    setIsClicked(false)
+    setHoveredValue(null)
+    setExitDirection(null)
+    setLastClickedColumn(null)
+  }
 
   const fetchButtons = async () => {
-    setLoading(true);
-    setButtons([]);
+    setLoading(true)
+    setButtons([])
     try {
-      const url = `${API_BASE}/listButtons?limit=500&t=${Date.now()}`;
-      logWithTimestamp(F, "Fetching buttons with URL:", url);
-      const response = await fetchWithTimeout(url, { method: "GET" }, wallet);
+      const url = `${API_BASE}/listButtons?limit=500&t=${Date.now()}`
+      logWithTimestamp(F, 'Fetching buttons with URL:', url)
+      const response = await fetchWithTimeout(url, { method: 'GET' }, wallet)
       logWithTimestamp(
         F,
-        "Fetch response status:",
+        'Fetch response status:',
         response.status,
-        "Headers:",
-        response.headers,
-      );
-      const data: ButtonResponse = await response.json();
-      logWithTimestamp(F, "API response:", JSON.stringify(data));
-      if (data.status === "error")
-        throw new Error(`❌ ${data.message ?? "Failed to fetch buttons"}`);
+        'Headers:',
+        response.headers
+      )
+      const data: ButtonResponse = await response.json()
+      logWithTimestamp(F, 'API response:', JSON.stringify(data))
+      if (data.status === 'error') { throw new Error(`❌ ${data.message ?? 'Failed to fetch buttons'}`) }
       const mappedButtons: Button[] = data.data.map((button, index) => {
-        const payments = button.payments
+        const payments = (button.payments != null)
           ? button.payments.map((payment) => ({
-              payment_id: payment.paymentId,
-              amount: payment.amount,
-              txid: payment.txid ?? null,
-              completed: !!payment.completed,
-              created_at: payment.createdAt,
-              description:
+            payment_id: payment.paymentId,
+            amount: payment.amount,
+            txid: payment.txid ?? null,
+            completed: !!payment.completed,
+            created_at: payment.createdAt,
+            description:
                 payment.description ||
-                `Payment using paymentId: ${payment.paymentId ? formatId(payment.paymentId) : ""}`,
-            }))
-          : [];
+                `Payment using paymentId: ${payment.paymentId ? formatId(payment.paymentId) : ''}`
+          }))
+          : []
         logWithTimestamp(
           F,
           `Payments for button ${button.buttonId}:`,
-          JSON.stringify(payments),
-        );
+          JSON.stringify(payments)
+        )
         const calculated_total =
           button.calculated_total !== null &&
           button.calculated_total !== undefined
             ? button.calculated_total
-            : null;
+            : null
         logWithTimestamp(
           F,
           `Calculated total for button ${button.buttonId}:`,
-          calculated_total,
-        );
+          calculated_total
+        )
         logWithTimestamp(
           F,
           `Total paid for button ${button.buttonId}:`,
-          calculated_total,
-        );
+          calculated_total
+        )
         logWithTimestamp(
           F,
           `Raw used for button ${button.buttonId}:`,
           button.used,
-          "Mapped used:",
+          'Mapped used:',
           !!button.used,
-          "Type:",
-          typeof button.used,
-        );
+          'Type:',
+          typeof button.used
+        )
         logWithTimestamp(
           F,
           `Description for button ${button.buttonId}:`,
           button.description,
-          "PaymentId:",
+          'PaymentId:',
           button.paymentId,
-          "Formatted PaymentId:",
-          button.paymentId ? formatId(button.paymentId) : "",
-        );
+          'Formatted PaymentId:',
+          button.paymentId ? formatId(button.paymentId) : ''
+        )
         const paymentForButton = payments.find(
-          (p) => p.payment_id === button.paymentId,
-        );
-        const description = paymentForButton
+          (p) => p.payment_id === button.paymentId
+        )
+        const description = (paymentForButton != null)
           ? paymentForButton.description
-          : `Payment using paymentId: ${formatId(button.paymentId || "")}`;
+          : `Payment using paymentId: ${formatId(button.paymentId || '')}`
         return {
           button_id: button.buttonId,
           amount: button.variableAmount ? 0 : (button.amount ?? 0),
@@ -352,8 +351,8 @@ const PaymentButtonsList = () => {
             description ||
             (button.paymentId
               ? `Payment using paymentId: ${formatId(button.paymentId)}`
-              : ""),
-          html_code: button.htmlCode ?? "<div>Pay Now</div>",
+              : ''),
+          html_code: button.htmlCode ?? '<div>Pay Now</div>',
           variable_amount: !!button.variableAmount,
           multi_use: !!button.multiUse,
           used: !!button.used,
@@ -362,249 +361,248 @@ const PaymentButtonsList = () => {
           updated_at: button.updatedAt,
           payment_id: button.paymentId ?? null,
           payments,
-          render_id: `${button.buttonId}-${Date.now()}-${index}`,
-        };
-      });
-      logWithTimestamp(F, "Mapped buttons:", JSON.stringify(mappedButtons));
-      setTotalRecords(data.total || mappedButtons.length);
-      setButtons(mappedButtons);
-      setTitle(data.title || "Payment Buttons");
-      logWithTimestamp(F, "Initial buttons length:", mappedButtons.length);
+          render_id: `${button.buttonId}-${Date.now()}-${index}`
+        }
+      })
+      logWithTimestamp(F, 'Mapped buttons:', JSON.stringify(mappedButtons))
+      setTotalRecords(data.total || mappedButtons.length)
+      setButtons(mappedButtons)
+      setTitle(data.title || 'Payment Buttons')
+      logWithTimestamp(F, 'Initial buttons length:', mappedButtons.length)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "❌ Unknown error";
-      logWithTimestamp(F, "❌ Error fetching buttons:", message);
-      setError(message);
+      const message = err instanceof Error ? err.message : '❌ Unknown error'
+      logWithTimestamp(F, '❌ Error fetching buttons:', message)
+      setError(message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    fetchButtons();
+    fetchButtons()
     return () => {
-      if (fetchTimeout.current) clearTimeout(fetchTimeout.current);
-    };
-  }, []);
+      if (fetchTimeout.current) clearTimeout(fetchTimeout.current)
+    }
+  }, [])
 
   useEffect(() => {
-    setPage(0);
-  }, [usedFilter]);
+    setPage(0)
+  }, [usedFilter])
 
   useEffect(() => {
     if (hoveredValue || clickedValue) {
       const subTableHeight =
         expandedButton && subTableRefs.current.length > 0
           ? subTableRefs.current.reduce(
-              (sum, el) => sum + (el?.offsetHeight || 0),
-              0,
-            )
-          : 0;
-      logWithTimestamp(F, `Rendering tooltip:`, {
+            (sum, el) => sum + (el?.offsetHeight || 0),
+            0
+          )
+          : 0
+      logWithTimestamp(F, 'Rendering tooltip:', {
         hoveredValue,
         clickedValue,
-        topPosition: tableRef.current
+        topPosition: (tableRef.current != null)
           ? `${tableRef.current.getBoundingClientRect().bottom + subTableHeight + 10}px`
-          : "0px",
+          : '0px',
         subTableHeight,
         subTableRows: subTableRefs.current.length,
         subTableRowHeights: subTableRefs.current.map((el, i) => ({
           index: i,
-          height: el?.offsetHeight || 0,
-        })),
-      });
+          height: el?.offsetHeight || 0
+        }))
+      })
     }
-  }, [hoveredValue, clickedValue, expandedButton]);
+  }, [hoveredValue, clickedValue, expandedButton])
 
   const requestSort = (
     key:
-      | Exclude<keyof Button, "payments">
-      | Exclude<
-          keyof Payment,
-          "derivation_prefix" | "derivation_suffix" | "txid"
-        >
-      | null,
-    isSubTable?: boolean,
+    | Exclude<keyof Button, 'payments'>
+    | Exclude<
+    keyof Payment,
+    'derivation_prefix' | 'derivation_suffix' | 'txid'
+    >
+    | null,
+    isSubTable?: boolean
   ) => {
-    const config = isSubTable ? subTableSortConfig : sortConfig;
-    let direction: "asc" | "desc" = "asc";
-    if (config.key === key && config.direction === "asc") {
-      direction = "desc";
+    const config = isSubTable ? subTableSortConfig : sortConfig
+    let direction: 'asc' | 'desc' = 'asc'
+    if (config.key === key && config.direction === 'asc') {
+      direction = 'desc'
     }
     if (isSubTable) {
-      const validSubTableKeys: (keyof Payment)[] = [
-        "amount",
-        "description",
-        "created_at",
-        "payment_id",
-        "completed",
-      ];
+      const validSubTableKeys: Array<keyof Payment> = [
+        'amount',
+        'description',
+        'created_at',
+        'payment_id',
+        'completed'
+      ]
       if (key && !validSubTableKeys.includes(key as keyof Payment)) {
         console.warn(
-          `Invalid sub-table sort key: ${key}, defaulting to 'created_at'`,
-        );
-        setSubTableSortConfig({ key: "created_at", direction });
+          `Invalid sub-table sort key: ${key}, defaulting to 'created_at'`
+        )
+        setSubTableSortConfig({ key: 'created_at', direction })
       } else {
         setSubTableSortConfig({
           key: key as Exclude<
-            keyof Payment,
-            "derivation_prefix" | "derivation_suffix" | "txid"
+          keyof Payment,
+          'derivation_prefix' | 'derivation_suffix' | 'txid'
           > | null,
-          direction,
-        });
+          direction
+        })
       }
     } else {
       setSortConfig({
-        key: key as Exclude<keyof Button, "payments"> | null,
-        direction,
-      });
+        key: key as Exclude<keyof Button, 'payments'> | null,
+        direction
+      })
     }
-  };
+  }
 
   const handleRowsPerPageChange = (
-    event: React.ChangeEvent<{ value: unknown }>,
+    event: React.ChangeEvent<{ value: unknown }>
   ) => {
-    const value = event.target.value;
+    const value = event.target.value
     logWithTimestamp(
       F,
-      "Rows per page change:",
+      'Rows per page change:',
       value,
-      "Current options:",
-      rowsPerPageOptions.map((opt) => opt.value),
-    );
+      'Current options:',
+      rowsPerPageOptions.map((opt) => opt.value)
+    )
     if (
-      typeof value === "object" &&
+      typeof value === 'object' &&
       value !== null &&
-      "value" in value &&
+      'value' in value &&
       value.value === 0
     ) {
-      setShowCustomInput(true);
+      setShowCustomInput(true)
     } else {
       const numValue =
-        typeof value === "number" ? value : (value as any)?.value || 5;
+        typeof value === 'number' ? value : (value as any)?.value || 5
       const isValidOption = rowsPerPageOptions.some(
-        (option) => option.value === numValue,
-      );
+        (option) => option.value === numValue
+      )
       if (isValidOption) {
-        setRowsPerPage(numValue);
-        setCustomRowsPerPage("");
-        setShowCustomInput(false);
-        setPage(0);
+        setRowsPerPage(numValue)
+        setCustomRowsPerPage('')
+        setShowCustomInput(false)
+        setPage(0)
       } else {
-        setRowsPerPage(5);
-        setPage(0);
+        setRowsPerPage(5)
+        setPage(0)
       }
     }
-  };
+  }
 
   const handleCustomRowsPerPageChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const value = event.target.value.replace(/[^0-9]/g, "");
-    setCustomRowsPerPage(value);
-  };
+    const value = event.target.value.replace(/[^0-9]/g, '')
+    setCustomRowsPerPage(value)
+  }
 
   const handleCustomInputComplete = (
     event:
-      | React.KeyboardEvent<HTMLDivElement>
-      | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
+    | React.KeyboardEvent<HTMLDivElement>
+    | React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     if (
-      event.type === "keypress" &&
-      (event as React.KeyboardEvent<HTMLDivElement>).key !== "Enter"
-    )
-      return;
-    const numValue = parseInt(customRowsPerPage, 10);
-    logWithTimestamp(F, "Custom rows on complete:", numValue);
+      event.type === 'keypress' &&
+      (event as React.KeyboardEvent<HTMLDivElement>).key !== 'Enter'
+    ) { return }
+    const numValue = parseInt(customRowsPerPage, 10)
+    logWithTimestamp(F, 'Custom rows on complete:', numValue)
     if (isNaN(numValue) || numValue <= 0 || numValue > 500) {
-      setRowsPerPage(5);
+      setRowsPerPage(5)
     } else {
-      setRowsPerPage(numValue);
+      setRowsPerPage(numValue)
       setCustomOptions((prev) => {
         if (!prev.includes(numValue) && ![5, 10, 25].includes(numValue)) {
-          return [...prev, numValue].sort((a, b) => a - b).slice(-3);
+          return [...prev, numValue].sort((a, b) => a - b).slice(-3)
         }
-        return prev;
-      });
+        return prev
+      })
     }
-    setCustomRowsPerPage("");
-    setShowCustomInput(false);
-    setPage(0);
-  };
+    setCustomRowsPerPage('')
+    setShowCustomInput(false)
+    setPage(0)
+  }
 
   const baseOptions = [
-    { value: 5, label: "5" },
-    { value: 10, label: "10" },
-    { value: 25, label: "25" },
-  ];
+    { value: 5, label: '5' },
+    { value: 10, label: '10' },
+    { value: 25, label: '25' }
+  ]
   const rowsPerPageOptions = [
-    { value: 0, label: "set 1..500" },
+    { value: 0, label: 'set 1..500' },
     ...baseOptions,
-    ...customOptions.map((value) => ({ value, label: value.toString() })),
-  ];
+    ...customOptions.map((value) => ({ value, label: value.toString() }))
+  ]
 
   const filteredButtons =
-    usedFilter === "all"
+    usedFilter === 'all'
       ? buttons
       : buttons.filter(
-          (button) =>
-            (usedFilter === "used" && button.used === true) ||
-            (usedFilter === "unused" && button.used === false),
-        );
+        (button) =>
+          (usedFilter === 'used' && button.used) ||
+            (usedFilter === 'unused' && !button.used)
+      )
 
   const sortedButtons = sortConfig.key
     ? [...filteredButtons].sort((a, b) => {
         let aValue: string | number | Date | boolean | null | undefined =
-          sortConfig.key ? a[sortConfig.key] : undefined;
+          sortConfig.key ? a[sortConfig.key] : undefined
         let bValue: string | number | Date | boolean | null | undefined =
-          sortConfig.key ? b[sortConfig.key] : undefined;
-        if (aValue === null || aValue === undefined) return 1;
-        if (bValue === null || bValue === undefined) return -1;
+          sortConfig.key ? b[sortConfig.key] : undefined
+        if (aValue === null || aValue === undefined) return 1
+        if (bValue === null || bValue === undefined) return -1
         if (
-          sortConfig.key === "amount" ||
-          sortConfig.key === "calculated_total"
+          sortConfig.key === 'amount' ||
+          sortConfig.key === 'calculated_total'
         ) {
-          aValue = (aValue as number) || 0;
-          bValue = (bValue as number) || 0;
-          return sortConfig.direction === "asc"
-            ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
+          aValue = (aValue as number) || 0
+          bValue = (bValue as number) || 0
+          return sortConfig.direction === 'asc'
+            ? (aValue) - (bValue)
+            : (bValue) - (aValue)
         } else if (
-          sortConfig.key === "variable_amount" ||
-          sortConfig.key === "multi_use" ||
-          sortConfig.key === "used"
+          sortConfig.key === 'variable_amount' ||
+          sortConfig.key === 'multi_use' ||
+          sortConfig.key === 'used'
         ) {
-          aValue = (aValue as boolean) ? 1 : 0;
-          bValue = (bValue as boolean) ? 1 : 0;
-          return sortConfig.direction === "asc"
-            ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
+          aValue = (aValue as boolean) ? 1 : 0
+          bValue = (bValue as boolean) ? 1 : 0
+          return sortConfig.direction === 'asc'
+            ? (aValue) - (bValue)
+            : (bValue) - (aValue)
         } else if (
-          sortConfig.key === "created_at" ||
-          sortConfig.key === "updated_at"
+          sortConfig.key === 'created_at' ||
+          sortConfig.key === 'updated_at'
         ) {
-          aValue = new Date((aValue as string) || "");
-          bValue = new Date((bValue as string) || "");
-          return sortConfig.direction === "asc"
-            ? (aValue as Date).getTime() - (bValue as Date).getTime()
-            : (bValue as Date).getTime() - (aValue as Date).getTime();
+          aValue = new Date((aValue as string) || '')
+          bValue = new Date((bValue as string) || '')
+          return sortConfig.direction === 'asc'
+            ? (aValue).getTime() - (bValue).getTime()
+            : (bValue).getTime() - (aValue).getTime()
         } else {
-          aValue = (aValue as string) || "";
-          bValue = (bValue as string) || "";
-          return sortConfig.direction === "asc"
+          aValue = (aValue as string) || ''
+          bValue = (bValue as string) || ''
+          return sortConfig.direction === 'asc'
             ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
+            : bValue.localeCompare(aValue)
         }
       })
-    : filteredButtons;
+    : filteredButtons
 
   const paginatedButtons = sortedButtons.slice(
     page * rowsPerPage,
-    (page + 1) * rowsPerPage,
-  );
+    (page + 1) * rowsPerPage
+  )
 
   useLayoutEffect(() => {
     // Clear subTableRefs to prevent duplicates
-    subTableRefs.current = [];
+    subTableRefs.current = []
     if (expandedButton && paginatedButtons.length > 0) {
       paginatedButtons.forEach((button, index) => {
         if (
@@ -614,165 +612,165 @@ const PaymentButtonsList = () => {
         ) {
           button.payments.forEach((_, paymentIndex) => {
             const rowEl = document.querySelector(
-              `tr[data-payment-row="${button.button_id}-${paymentIndex}"]`,
-            ) as HTMLTableRowElement | null;
-            subTableRefs.current[paymentIndex] = rowEl;
-          });
+              `tr[data-payment-row="${button.button_id}-${paymentIndex}"]`
+            )
+            subTableRefs.current[paymentIndex] = rowEl
+          })
         }
-      });
-      logWithTimestamp(F, `Updated subTableRefs:`, {
+      })
+      logWithTimestamp(F, 'Updated subTableRefs:', {
         expandedButton,
         subTableRows: subTableRefs.current.length,
         subTableRowHeights: subTableRefs.current.map((el, i) => ({
           index: i,
-          height: el?.offsetHeight || 0,
-        })),
-      });
+          height: el?.offsetHeight || 0
+        }))
+      })
     }
-  }, [expandedButton, paginatedButtons]);
+  }, [expandedButton, paginatedButtons])
 
   useLayoutEffect(() => {
-    const el = hoverTextRef.current;
-    if (!el) return;
-    const lh = parseFloat(getComputedStyle(el).lineHeight || "20");
-    setIsHoverMultiline(el.scrollHeight > lh + 2);
-  }, [hoveredValue, clickedValue]);
+    const el = hoverTextRef.current
+    if (el == null) return
+    const lh = parseFloat(getComputedStyle(el).lineHeight || '20')
+    setIsHoverMultiline(el.scrollHeight > lh + 2)
+  }, [hoveredValue, clickedValue])
 
   const sortPayments = (payments: Payment[], config: SubTableSortConfig) => {
-    if (!config.key) return payments;
+    if (!config.key) return payments
     return [...payments].sort((a, b) => {
       let aValue: string | number | Date | boolean | null | undefined =
-        config.key ? a[config.key] : undefined;
+        config.key ? a[config.key] : undefined
       let bValue: string | number | Date | boolean | null | undefined =
-        config.key ? b[config.key] : undefined;
-      if (aValue === null || aValue === undefined) return 1;
-      if (bValue === null || bValue === undefined) return -1;
+        config.key ? b[config.key] : undefined
+      if (aValue === null || aValue === undefined) return 1
+      if (bValue === null || bValue === undefined) return -1
       switch (config.key) {
-        case "amount":
-          aValue = (aValue as number) || 0;
-          bValue = (bValue as number) || 0;
-          return config.direction === "asc"
-            ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
-        case "completed":
-          aValue = (aValue as boolean) ? 1 : 0;
-          bValue = (bValue as boolean) ? 1 : 0;
-          return config.direction === "asc"
-            ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number);
-        case "created_at":
-          aValue = new Date((aValue as string) || "");
-          bValue = new Date((bValue as string) || "");
-          return config.direction === "asc"
-            ? (aValue as Date).getTime() - (bValue as Date).getTime()
-            : (bValue as Date).getTime() - (aValue as Date).getTime();
-        case "payment_id":
-        case "description":
-          aValue = (aValue as string) || "";
-          bValue = (bValue as string) || "";
-          return config.direction === "asc"
+        case 'amount':
+          aValue = (aValue as number) || 0
+          bValue = (bValue as number) || 0
+          return config.direction === 'asc'
+            ? (aValue) - (bValue)
+            : (bValue) - (aValue)
+        case 'completed':
+          aValue = (aValue as boolean) ? 1 : 0
+          bValue = (bValue as boolean) ? 1 : 0
+          return config.direction === 'asc'
+            ? (aValue) - (bValue)
+            : (bValue) - (aValue)
+        case 'created_at':
+          aValue = new Date((aValue as string) || '')
+          bValue = new Date((bValue as string) || '')
+          return config.direction === 'asc'
+            ? (aValue).getTime() - (bValue).getTime()
+            : (bValue).getTime() - (aValue).getTime()
+        case 'payment_id':
+        case 'description':
+          aValue = (aValue as string) || ''
+          bValue = (bValue as string) || ''
+          return config.direction === 'asc'
             ? aValue.localeCompare(bValue)
-            : bValue.localeCompare(aValue);
+            : bValue.localeCompare(aValue)
         default:
-          return 0;
+          return 0
       }
-    });
-  };
+    })
+  }
 
   logWithTimestamp(
     F,
-    "Paginated buttons length:",
+    'Paginated buttons length:',
     paginatedButtons.length,
-    "Total buttons length:",
+    'Total buttons length:',
     buttons.length,
-    "Filtered length:",
+    'Filtered length:',
     filteredButtons.length,
-    "Sorted length:",
+    'Sorted length:',
     sortedButtons.length,
-    "Page:",
+    'Page:',
     page,
-    "Offset:",
-    page * rowsPerPage,
-  );
+    'Offset:',
+    page * rowsPerPage
+  )
 
   useLayoutEffect(() => {
     logWithTimestamp(
       F,
-      "useLayoutEffect triggered, tableRef defined:",
-      !!tableRef.current,
-    );
+      'useLayoutEffect triggered, tableRef defined:',
+      !(tableRef.current == null)
+    )
     paginatedButtons.forEach((button, index) => {
       const buttonIdCell = document.querySelector(
-        `tr:nth-child(${index * 2 + 1}) td:nth-child(2)`,
-      ) as HTMLTableCellElement | null;
+        `tr:nth-child(${index * 2 + 1}) td:nth-child(2)`
+      )
       const paymentIdCell = document.querySelector(
-        `tr:nth-child(${index * 2 + 1}) td:nth-child(3)`,
-      ) as HTMLTableCellElement | null;
+        `tr:nth-child(${index * 2 + 1}) td:nth-child(3)`
+      )
       const htmlCodeCell = document.querySelector(
-        `tr:nth-child(${index * 2 + 1}) td:nth-child(10)`,
-      ) as HTMLTableCellElement | null;
-      if (buttonIdCell) columnRefs.current["Button Id"] = buttonIdCell;
-      if (paymentIdCell) columnRefs.current["Payment Id"] = paymentIdCell;
-      if (htmlCodeCell) columnRefs.current["HTML Code"] = htmlCodeCell;
+        `tr:nth-child(${index * 2 + 1}) td:nth-child(10)`
+      )
+      if (buttonIdCell != null) columnRefs.current['Button Id'] = buttonIdCell
+      if (paymentIdCell != null) columnRefs.current['Payment Id'] = paymentIdCell
+      if (htmlCodeCell != null) columnRefs.current['HTML Code'] = htmlCodeCell
       logWithTimestamp(
         F,
-        `Button Id ref assigned: ${!!buttonIdCell}, Payment Id ref: ${!!paymentIdCell}, HTML Code ref: ${!!htmlCodeCell}`,
-      );
+        `Button Id ref assigned: ${!(buttonIdCell == null)}, Payment Id ref: ${!(paymentIdCell == null)}, HTML Code ref: ${!(htmlCodeCell == null)}`
+      )
       logWithTimestamp(
         F,
         `Formatted timestamp for button ${button.button_id}:`,
-        formatTimeLocal(button.created_at || button.updated_at),
-      );
+        formatTimeLocal(button.created_at || button.updated_at)
+      )
       logWithTimestamp(
         F,
         `Used for button ${button.button_id}:`,
         button.used,
-        "Rendered as:",
-        button.used ? "Yes" : "No",
-      );
-    });
-  }, [paginatedButtons]);
+        'Rendered as:',
+        button.used ? 'Yes' : 'No'
+      )
+    })
+  }, [paginatedButtons])
 
   if (loading) {
     return (
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh'
         }}
       >
         <CircularProgress />
       </Box>
-    );
+    )
   }
-  if (error !== "") {
+  if (error !== '') {
     return (
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "90vh",
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '90vh'
         }}
       >
-        <Typography color="error">❌ Error: {error}</Typography>
+        <Typography color='error'>❌ Error: {error}</Typography>
       </Box>
-    );
+    )
   }
 
   return (
     <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
       <Box
         sx={{
-          textAlign: "center",
+          textAlign: 'center',
           marginBottom: theme.spacing(4),
-          marginTop: theme.spacing(5),
+          marginTop: theme.spacing(5)
         }}
       >
-        <Typography variant="h2">{title}</Typography>
-        <Typography variant="subtitle1">
+        <Typography variant='h2'>{title}</Typography>
+        <Typography variant='subtitle1'>
           View all the payment buttons you have created
         </Typography>
       </Box>
@@ -780,21 +778,21 @@ const PaymentButtonsList = () => {
         <Card
           sx={{
             maxWidth: 600,
-            margin: "auto",
+            margin: 'auto',
             padding: theme.spacing(4),
-            textAlign: "center",
+            textAlign: 'center'
           }}
         >
-          <Stack spacing={3} alignItems="center">
+          <Stack spacing={3} alignItems='center'>
             <ReceiptLong
               sx={{ fontSize: 60, color: theme.palette.text.secondary }}
             />
-            <Typography variant="h2">No Payment Buttons Yet</Typography>
-            <Typography color="text.secondary">
+            <Typography variant='h2'>No Payment Buttons Yet</Typography>
+            <Typography color='text.secondary'>
               It looks like you haven’t created any payment buttons. Get started
               by creating one now!
             </Typography>
-            <Button variant="contained" component={Link} to="/" color="primary">
+            <Button variant='contained' component={Link} to='/' color='primary'>
               Create a Button
             </Button>
           </Stack>
@@ -802,20 +800,19 @@ const PaymentButtonsList = () => {
       ) : (
         <>
           <Stack
-            direction="row"
+            direction='row'
             spacing={2}
-            sx={{ mb: 2, justifyContent: "flex-end" }}
+            sx={{ mb: 2, justifyContent: 'flex-end' }}
           >
             <Select
               value={usedFilter}
               onChange={(e) =>
-                setUsedFilter(e.target.value as "all" | "used" | "unused")
-              }
-              variant="outlined"
+                setUsedFilter(e.target.value as 'all' | 'used' | 'unused')}
+              variant='outlined'
             >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="used">Used</MenuItem>
-              <MenuItem value="unused">Unused</MenuItem>
+              <MenuItem value='all'>All</MenuItem>
+              <MenuItem value='used'>Used</MenuItem>
+              <MenuItem value='unused'>Unused</MenuItem>
             </Select>
           </Stack>
           <TableContainer component={Paper} ref={tableRef}>
@@ -824,219 +821,219 @@ const PaymentButtonsList = () => {
                 <TableRow>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("created_at");
+                        e.preventDefault()
+                        requestSort('created_at')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Timestamp{" "}
-                      {sortConfig.key === "created_at" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Timestamp{' '}
+                      {sortConfig.key === 'created_at' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("button_id");
+                        e.preventDefault()
+                        requestSort('button_id')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Button Id{" "}
-                      {sortConfig.key === "button_id" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Button Id{' '}
+                      {sortConfig.key === 'button_id' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("payment_id");
+                        e.preventDefault()
+                        requestSort('payment_id')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Payment Id{" "}
-                      {sortConfig.key === "payment_id" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Payment Id{' '}
+                      {sortConfig.key === 'payment_id' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("amount");
+                        e.preventDefault()
+                        requestSort('amount')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Sats{" "}
-                      {sortConfig.key === "amount" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Sats{' '}
+                      {sortConfig.key === 'amount' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("variable_amount");
+                        e.preventDefault()
+                        requestSort('variable_amount')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Variable{" "}
-                      {sortConfig.key === "variable_amount" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Variable{' '}
+                      {sortConfig.key === 'variable_amount' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("multi_use");
+                        e.preventDefault()
+                        requestSort('multi_use')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Multi-use{" "}
-                      {sortConfig.key === "multi_use" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Multi-use{' '}
+                      {sortConfig.key === 'multi_use' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("used");
+                        e.preventDefault()
+                        requestSort('used')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Used{" "}
-                      {sortConfig.key === "used" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Used{' '}
+                      {sortConfig.key === 'used' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("calculated_total");
+                        e.preventDefault()
+                        requestSort('calculated_total')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Total Paid{" "}
-                      {sortConfig.key === "calculated_total" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Total Paid{' '}
+                      {sortConfig.key === 'calculated_total' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={cellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("description");
+                        e.preventDefault()
+                        requestSort('description')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      Description{" "}
-                      {sortConfig.key === "description" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      Description{' '}
+                      {sortConfig.key === 'description' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                   <TableCell sx={lastCellStyle}>
                     <Typography
-                      component="a"
-                      href="#"
+                      component='a'
+                      href='#'
                       onClick={(e) => {
-                        e.preventDefault();
-                        requestSort("html_code");
+                        e.preventDefault()
+                        requestSort('html_code')
                       }}
                       sx={{
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        color: "inherit",
-                        whiteSpace: "nowrap",
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        color: 'inherit',
+                        whiteSpace: 'nowrap'
                       }}
                     >
-                      HTML Code{" "}
-                      {sortConfig.key === "html_code" &&
-                        (sortConfig.direction === "asc" ? " ↑" : " ↓")}
+                      HTML Code{' '}
+                      {sortConfig.key === 'html_code' &&
+                        (sortConfig.direction === 'asc' ? ' ↑' : ' ↓')}
                     </Typography>
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {paginatedButtons.map((button, index) => {
-                  const fullButtonId = button.button_id || "";
-                  const fullPaymentId = button.payment_id || "";
-                  const fullHtmlCode = button.html_code || "<div>Pay Now</div>";
+                  const fullButtonId = button.button_id || ''
+                  const fullPaymentId = button.payment_id || ''
+                  const fullHtmlCode = button.html_code || '<div>Pay Now</div>'
                   logWithTimestamp(
                     F,
-                    `Rendering button ${button.button_id}, multi_use: ${button.multi_use}, used: ${button.used}, render_id: ${button.render_id}, timestamp: ${formatTimeLocal(button.created_at || button.updated_at)}`,
-                  );
+                    `Rendering button ${button.button_id}, multi_use: ${button.multi_use}, used: ${button.used}, render_id: ${button.render_id}, timestamp: ${formatTimeLocal(button.created_at || button.updated_at)}`
+                  )
                   const shouldRenderSubTable =
                     expandedButton === button.button_id &&
                     button.multi_use &&
-                    button.payments.length > 1;
+                    button.payments.length > 1
                   return (
                     <React.Fragment key={button.render_id}>
                       <TableRow
@@ -1048,29 +1045,28 @@ const PaymentButtonsList = () => {
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           {formatTimeLocal(
-                            button.created_at || button.updated_at,
+                            button.created_at || button.updated_at
                           )}
                         </TableCell>
                         <TableCell
                           onMouseEnter={() =>
                             handleMouseEnter(
                               fullButtonId,
-                              "Button Id",
-                              index * 2 + 1,
-                            )
-                          }
+                              'Button Id',
+                              index * 2 + 1
+                            )}
                           onMouseLeave={handleMouseLeave}
-                          onClick={() => handleClick(fullButtonId, "Button Id")}
+                          onClick={() => handleClick(fullButtonId, 'Button Id')}
                           sx={{
                             ...cellStyle,
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           {formatId(button.button_id)}
@@ -1079,53 +1075,53 @@ const PaymentButtonsList = () => {
                           onMouseEnter={() =>
                             handleMouseEnter(
                               fullPaymentId,
-                              "Payment Id",
-                              index * 2 + 1,
-                            )
-                          }
+                              'Payment Id',
+                              index * 2 + 1
+                            )}
                           onMouseLeave={handleMouseLeave}
                           onClick={() =>
-                            handleClick(fullPaymentId, "Payment Id")
-                          }
+                            handleClick(fullPaymentId, 'Payment Id')}
                           sx={{
                             ...cellStyle,
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           <Box
                             sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              width: "100%",
-                              pr: 0.5,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              pr: 0.5
                             }}
                           >
-                            {formatId(button.payment_id || "")}
+                            {formatId(button.payment_id || '')}
                             {button.multi_use && button.payments.length > 1 && (
                               <IconButton
                                 onClick={(e) => {
-                                  e.stopPropagation();
+                                  e.stopPropagation()
                                   logWithTimestamp(
                                     F,
-                                    `Toggling collapse for button ${button.button_id}, expanded: ${expandedButton === button.button_id ? "closing" : "opening"}, current expandedButton: ${expandedButton}`,
-                                  );
+                                    `Toggling collapse for button ${button.button_id}, expanded: ${expandedButton === button.button_id ? 'closing' : 'opening'}, current expandedButton: ${expandedButton}`
+                                  )
                                   setExpandedButton(
                                     expandedButton === button.button_id
                                       ? null
-                                      : button.button_id,
-                                  );
+                                      : button.button_id
+                                  )
                                 }}
                                 sx={{ padding: 0 }}
                               >
-                                {expandedButton === button.button_id ? (
-                                  <ExpandLess />
-                                ) : (
-                                  <ExpandMore />
-                                )}
+                                {expandedButton === button.button_id
+                                  ? (
+                                    <ExpandLess />
+                                    )
+                                  : (
+                                    <ExpandMore />
+                                    )}
                               </IconButton>
                             )}
                           </Box>
@@ -1134,27 +1130,25 @@ const PaymentButtonsList = () => {
                           onMouseEnter={() =>
                             button.amount === 0
                               ? handleMouseEnter(
-                                  "For variable buttons, this is the initial value (0). Check payments for actual amounts paid.",
-                                  "Sats",
-                                  index * 2 + 1,
-                                )
-                              : null
-                          }
+                                'For variable buttons, this is the initial value (0). Check payments for actual amounts paid.',
+                                'Sats',
+                                index * 2 + 1
+                              )
+                              : null}
                           onMouseLeave={handleMouseLeave}
                           onClick={() =>
                             button.amount === 0
                               ? handleClick(
-                                  "For variable buttons, this is the initial value (0). Check payments for actual amounts paid.",
-                                  "Sats",
-                                )
-                              : null
-                          }
+                                'For variable buttons, this is the initial value (0). Check payments for actual amounts paid.',
+                                'Sats'
+                              )
+                              : null}
                           sx={{
                             ...cellStyle,
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           {button.amount}
@@ -1165,10 +1159,10 @@ const PaymentButtonsList = () => {
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
-                          {button.variable_amount ? "Yes" : "No"}
+                          {button.variable_amount ? 'Yes' : 'No'}
                         </TableCell>
                         <TableCell
                           sx={{
@@ -1176,22 +1170,22 @@ const PaymentButtonsList = () => {
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
-                          {button.multi_use ? "Yes" : "No"}
+                          {button.multi_use ? 'Yes' : 'No'}
                         </TableCell>
                         <TableCell
-                          data-debug={`used-${fullButtonId}-${button.used ? "Yes" : "No"}`}
+                          data-debug={`used-${fullButtonId}-${button.used ? 'Yes' : 'No'}`}
                           sx={{
                             ...cellStyle,
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
-                          {button.used ? "Yes" : "No"}
+                          {button.used ? 'Yes' : 'No'}
                         </TableCell>
                         <TableCell
                           sx={{
@@ -1199,50 +1193,49 @@ const PaymentButtonsList = () => {
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           {button.calculated_total !== null
                             ? button.calculated_total
-                            : "N/A"}
+                            : 'N/A'}
                         </TableCell>
                         <TableCell
                           sx={{
-                            fontSize: "0.875rem",
+                            fontSize: '0.875rem',
                             color: theme.palette.text.primary,
-                            padding: "6px 16px",
+                            padding: '6px 16px',
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           {button.description ||
                             (button.payment_id
                               ? `Payment using paymentId: ${formatId(button.payment_id)}`
-                              : "")}
+                              : '')}
                         </TableCell>
                         <TableCell
                           onMouseEnter={() =>
                             handleMouseEnter(
                               fullHtmlCode,
-                              "HTML Code",
-                              index * 2 + 1,
-                            )
-                          }
+                              'HTML Code',
+                              index * 2 + 1
+                            )}
                           onMouseLeave={handleMouseLeave}
-                          onClick={() => handleClick(fullHtmlCode, "HTML Code")}
+                          onClick={() => handleClick(fullHtmlCode, 'HTML Code')}
                           sx={{
                             ...lastCellStyle,
                             borderBottom:
                               expandedButton === button.button_id
                                 ? 0
-                                : `1px solid ${theme.palette.divider}`,
+                                : `1px solid ${theme.palette.divider}`
                           }}
                         >
                           {button.html_code
                             ? `${button.html_code.substring(0, 16)}...${button.html_code.slice(-16)}`
-                            : "<div>Pay Now</div>"}
+                            : '<div>Pay Now</div>'}
                         </TableCell>
                       </TableRow>
                       {shouldRenderSubTable &&
@@ -1251,31 +1244,30 @@ const PaymentButtonsList = () => {
                             const topBorder =
                               paymentIndex === 0
                                 ? {
-                                    borderTop: `1px solid ${theme.palette.divider}`,
+                                    borderTop: `1px solid ${theme.palette.divider}`
                                   }
-                                : {};
+                                : {}
                             logWithTimestamp(
                               F,
                               `Rendering payment for button ${button.button_id}:`,
                               {
                                 payment_id: payment.payment_id,
                                 completed: payment.completed,
-                                timestamp: formatTimeLocal(payment.created_at),
-                              },
-                            );
+                                timestamp: formatTimeLocal(payment.created_at)
+                              }
+                            )
                             return (
                               <TableRow
                                 key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}
                                 sx={{ backgroundColor: expandedRowBg }}
                                 ref={(el) =>
-                                  (subTableRefs.current[paymentIndex] = el)
-                                }
+                                  (subTableRefs.current[paymentIndex] = el)}
                               >
                                 <TableCell
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {formatTimeLocal(payment.created_at)}
@@ -1284,7 +1276,7 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {DUP_FIELD_PLACEHOLDER}
@@ -1293,24 +1285,22 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                   onMouseEnter={() =>
                                     payment.payment_id !== button.payment_id &&
                                     handleMouseEnter(
                                       payment.payment_id,
-                                      "Payment Id",
-                                      0,
-                                    )
-                                  }
+                                      'Payment Id',
+                                      0
+                                    )}
                                   onMouseLeave={handleMouseLeave}
                                   onClick={() =>
                                     payment.payment_id !== button.payment_id &&
                                     handleClick(
                                       payment.payment_id,
-                                      "Payment Id",
-                                    )
-                                  }
+                                      'Payment Id'
+                                    )}
                                 >
                                   {payment.payment_id === button.payment_id
                                     ? DUP_FIELD_PLACEHOLDER
@@ -1320,7 +1310,7 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {payment.amount ?? DUP_FIELD_PLACEHOLDER}
@@ -1329,7 +1319,7 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {DUP_FIELD_PLACEHOLDER}
@@ -1338,7 +1328,7 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {DUP_FIELD_PLACEHOLDER}
@@ -1347,16 +1337,16 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
-                                  {payment.completed ? "Yes" : "No"}
+                                  {payment.completed ? 'Yes' : 'No'}
                                 </TableCell>
                                 <TableCell
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {DUP_FIELD_PLACEHOLDER}
@@ -1365,7 +1355,7 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {payment.payment_id === button.payment_id
@@ -1379,17 +1369,17 @@ const PaymentButtonsList = () => {
                                   sx={{
                                     ...cellStyle,
                                     ...topBorder,
-                                    backgroundColor: expandedRowBg,
+                                    backgroundColor: expandedRowBg
                                   }}
                                 >
                                   {DUP_FIELD_PLACEHOLDER}
                                 </TableCell>
                               </TableRow>
-                            );
-                          },
+                            )
+                          }
                         )}
                     </React.Fragment>
-                  );
+                  )
                 })}
               </TableBody>
             </Table>
@@ -1398,29 +1388,29 @@ const PaymentButtonsList = () => {
           <Box sx={{ mt: 1 }}>
             <Box
               sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 gap: 1,
-                flexWrap: "wrap",
-                width: "100%",
+                flexWrap: 'wrap',
+                width: '100%'
               }}
             >
               {/* pagination group (stays on the first row) */}
               <Box
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: 0.25,
-                  ml: "auto",
-                  order: 1,
+                  ml: 'auto',
+                  order: 1
                 }}
               >
                 <IconButton
                   onClick={() => setPage(0)}
                   disabled={page === 0}
-                  color="inherit"
-                  size="small"
+                  color='inherit'
+                  size='small'
                   sx={{ mr: 0.5 }}
                 >
                   <FirstPage />
@@ -1428,27 +1418,27 @@ const PaymentButtonsList = () => {
                 <IconButton
                   onClick={() => setPage(page - 1)}
                   disabled={page === 0}
-                  color="inherit"
-                  size="small"
+                  color='inherit'
+                  size='small'
                 />
                 <TablePagination
-                  component="div"
+                  component='div'
                   count={filteredButtons.length}
                   page={page}
                   onPageChange={(e, newPage) => {
-                    setPage(newPage);
+                    setPage(newPage)
                     logWithTimestamp(
                       F,
-                      "Page changed to:",
+                      'Page changed to:',
                       newPage,
-                      "Rows:",
-                      paginatedButtons.length,
-                    );
-                    setHoveredValue(null);
-                    setClickedValue(null);
-                    setIsClicked(false);
-                    setExitDirection(null);
-                    setLastClickedColumn(null);
+                      'Rows:',
+                      paginatedButtons.length
+                    )
+                    setHoveredValue(null)
+                    setClickedValue(null)
+                    setIsClicked(false)
+                    setExitDirection(null)
+                    setLastClickedColumn(null)
                   }}
                   rowsPerPage={rowsPerPage}
                   onRowsPerPageChange={handleRowsPerPageChange}
@@ -1460,18 +1450,17 @@ const PaymentButtonsList = () => {
                   disabled={
                     page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1
                   }
-                  color="inherit"
-                  size="small"
+                  color='inherit'
+                  size='small'
                 />
                 <IconButton
                   onClick={() =>
-                    setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)
-                  }
+                    setPage(Math.ceil(filteredButtons.length / rowsPerPage) - 1)}
                   disabled={
                     page >= Math.ceil(filteredButtons.length / rowsPerPage) - 1
                   }
-                  color="inherit"
-                  size="small"
+                  color='inherit'
+                  size='small'
                   sx={{ ml: 0.5 }}
                 >
                   <LastPage />
@@ -1482,70 +1471,72 @@ const PaymentButtonsList = () => {
               {(hoveredValue || clickedValue) && (
                 <Box
                   onClick={
-                    (hoveredValue && exitDirection === "bottom") || clickedValue
+                    (hoveredValue && exitDirection === 'bottom') || clickedValue
                       ? handleReset
                       : undefined
                   } // NEW: click anywhere to reset
                   sx={{
-                    display: "flex",
-                    alignItems: "center",
+                    display: 'flex',
+                    alignItems: 'center',
                     px: 1,
                     py: 0.5,
-                    borderRadius: "4px",
+                    borderRadius: '4px',
                     bgcolor: theme.palette.background.paper,
                     minWidth: 0,
-                    flex: isHoverMultiline ? "1 1 100%" : "1 1 auto",
+                    flex: isHoverMultiline ? '1 1 100%' : '1 1 auto',
                     order: isHoverMultiline ? 2 : 0,
                     cursor:
-                      (hoveredValue && exitDirection === "bottom") ||
+                      (hoveredValue && exitDirection === 'bottom') ||
                       clickedValue
-                        ? "pointer"
-                        : "default", // NEW: pointer when resettable
+                        ? 'pointer'
+                        : 'default' // NEW: pointer when resettable
                   }}
                 >
                   <Tooltip
                     title={
-                      hoveredValue && exitDirection === "bottom"
-                        ? "click to reset"
+                      hoveredValue && exitDirection === 'bottom'
+                        ? 'click to reset'
                         : clickedValue
-                          ? "click to reset"
+                          ? 'click to reset'
                           : hoveredValue
-                            ? "click table field"
-                            : ""
+                            ? 'click table field'
+                            : ''
                     }
                   >
                     <Typography
                       ref={hoverTextRef}
                       sx={{
                         mr: 1,
-                        fontFamily: "monospace",
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-all",
+                        fontFamily: 'monospace',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-all'
                       }}
                     >
-                      {clickedValue && lastClickedColumn === "Payment Id" ? ( // NEW: make Payment Id a link after click
+                      {clickedValue && lastClickedColumn === 'Payment Id' ? ( // NEW: make Payment Id a link after click
                         <Link
                           to={`/payments?paymentId=${encodeURIComponent(String(clickedValue))}`}
                           onClick={(e) => e.stopPropagation()} // don't reset when following the link
-                          style={{ textDecoration: "underline" }}
+                          style={{ textDecoration: 'underline' }}
                         >
                           {clickedValue}
                         </Link>
                       ) : clickedValue &&
-                        ["Button Id", "Payment Id", "HTML Code"].includes(
-                          lastClickedColumn || "",
-                        ) ? (
-                        clickedValue
-                      ) : (
-                        hoveredValue || clickedValue
-                      )}
+                        ['Button Id', 'Payment Id', 'HTML Code'].includes(
+                          lastClickedColumn || ''
+                        )
+                        ? (
+                            clickedValue
+                          )
+                        : (
+                            hoveredValue || clickedValue
+                          )}
                     </Typography>
                   </Tooltip>
 
                   {hoveredValue && (
-                    <Tooltip title="click table field to enable copy">
+                    <Tooltip title='click table field to enable copy'>
                       <span>
-                        <IconButton size="small" disabled>
+                        <IconButton size='small' disabled>
                           <ContentCopyIcon />
                         </IconButton>
                       </span>
@@ -1553,22 +1544,22 @@ const PaymentButtonsList = () => {
                   )}
 
                   {clickedValue && (
-                    <Tooltip title="copy field">
+                    <Tooltip title='copy field'>
                       <IconButton
-                        size="small"
+                        size='small'
                         onClick={(e) => {
-                          e.stopPropagation(); // NEW: don't reset before copying
+                          e.stopPropagation() // NEW: don't reset before copying
                           navigator.clipboard
                             .writeText(String(clickedValue))
                             .catch((err) =>
                               logWithTimestamp(
                                 F,
-                                "Failed to copy to clipboard:",
-                                err,
-                              ),
-                            );
-                          setClickedValue(null);
-                          setIsClicked(false);
+                                'Failed to copy to clipboard:',
+                                err
+                              )
+                            )
+                          setClickedValue(null)
+                          setIsClicked(false)
                         }}
                       >
                         <ContentCopyIcon />
@@ -1581,16 +1572,16 @@ const PaymentButtonsList = () => {
           </Box>
 
           {showCustomInput && (
-            <Box sx={{ mb: 2, textAlign: "right" }}>
+            <Box sx={{ mb: 2, textAlign: 'right' }}>
               <TextField
-                type="number"
-                label="Custom Rows"
+                type='number'
+                label='Custom Rows'
                 value={customRowsPerPage}
                 onChange={handleCustomRowsPerPageChange}
                 onKeyPress={handleCustomInputComplete}
                 onBlur={handleCustomInputComplete}
-                variant="outlined"
-                size="small"
+                variant='outlined'
+                size='small'
                 inputProps={{ min: 1, max: 500, step: 1 }}
                 sx={{ width: 100 }}
               />
@@ -1599,7 +1590,7 @@ const PaymentButtonsList = () => {
         </>
       )}
     </Container>
-  );
-};
+  )
+}
 
-export default PaymentButtonsList;
+export default PaymentButtonsList
