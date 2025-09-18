@@ -305,9 +305,9 @@ const PayButton = ({
                 `[${new Date().toISOString()}] [${F}] ✅ Button disabled: single-use and already used`
               )
               toast.warning(
-                '⚠️ This single-use button has already been used and is now disabled.',
+                '⚠️ Button cannot be reused',
                 {
-                  autoClose: 6000,
+                  autoClose: 5000,
                   position: 'top-right'
                 }
               )
@@ -860,9 +860,9 @@ const PayButton = ({
           ) {
             setDisabled(true)
             toast.warning(
-              '⚠️ This single-use button has already been used and is now disabled.',
+              '⚠️ Button cannot be reused',
               {
-                autoClose: 6000,
+                autoClose: 5000,
                 position: 'top-right'
               }
             )
@@ -990,9 +990,9 @@ const PayButton = ({
           
           // Show success toast notification
           toast.success(
-            `✅ Payment successful! ${effectiveAmount} sats sent. TXID: ${pay.txid}`,
+            `✅ Payment sent! ${effectiveAmount} sats`,
             {
-              autoClose: 8000,
+              autoClose: 6000,
               position: 'top-right'
             }
           )
@@ -1013,9 +1013,9 @@ const PayButton = ({
               }
             )
             toast.info(
-              'ℹ️ This single-use button has been used and is now disabled.',
+              'ℹ️ Button used successfully',
               {
-                autoClose: 5000,
+                autoClose: 4000,
                 position: 'top-right'
               }
             )
