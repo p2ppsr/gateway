@@ -56,11 +56,17 @@ const isPortValid = Number.isInteger(port) && port > 0 && port < 65536
 
 // Collect any missing/invalid env configuration up front for a clear error
 const missing: string[] = []
-if (typeof SQL_DATABASE_HOST !== 'string' || !SQL_DATABASE_HOST) { missing.push('SQL_DATABASE_HOST') }
-if (typeof SQL_DATABASE_USER !== 'string' || !SQL_DATABASE_USER) { missing.push('SQL_DATABASE_USER') }
+if (typeof SQL_DATABASE_HOST !== 'string' || SQL_DATABASE_HOST === '') {
+  missing.push('SQL_DATABASE_HOST')
+}
+if (typeof SQL_DATABASE_USER !== 'string' || SQL_DATABASE_USER === '') {
+  missing.push('SQL_DATABASE_USER')
+}
 // Password can be empty string but must be defined
 if (typeof SQL_DATABASE_PASSWORD !== 'string') { missing.push('SQL_DATABASE_PASSWORD') }
-if (typeof SQL_DATABASE_DB_NAME !== 'string' || !SQL_DATABASE_DB_NAME) { missing.push('SQL_DATABASE_DB_NAME') }
+if (typeof SQL_DATABASE_DB_NAME !== 'string' || SQL_DATABASE_DB_NAME === '') {
+  missing.push('SQL_DATABASE_DB_NAME')
+}
 if (!isPortValid) missing.push('SQL_DATABASE_PORT (invalid or not a number)')
 
 if (missing.length > 0) {
@@ -81,11 +87,11 @@ if (missing.length > 0) {
 const config: KnexConfig = {
   client: 'mysql2',
   connection: {
-    host: SQL_DATABASE_HOST!,
+    host: SQL_DATABASE_HOST ?? '',
     port,
-    user: SQL_DATABASE_USER!,
-    password: SQL_DATABASE_PASSWORD!,
-    database: SQL_DATABASE_DB_NAME!
+    user: SQL_DATABASE_USER ?? '',
+    password: SQL_DATABASE_PASSWORD ?? '',
+    database: SQL_DATABASE_DB_NAME ?? ''
   },
   // Small, friendly pool for modest VM sizes; bump if needed.
   pool: { min: 0, max: 10 },

@@ -890,10 +890,10 @@ const PayButton = ({
           )
         }
         const outputsWithSats: CreateActionOutput[] =
-          invoice.outputs?.map((output) => ({
+          ((invoice.outputs?.map((output) => ({
             ...output,
             satoshis: output.satoshis
-          })) || []
+          }))) != null) || []
         if (
           variable &&
           (outputsWithSats.length > 0) &&
@@ -987,7 +987,7 @@ const PayButton = ({
           setPaymentId(initialPaymentId)
           const isMultiUse = multiUse === 'true' || multiUse === true
           if (isMultiUse) setPaid(false)
-          
+
           // Show success toast notification
           toast.success(
             `✅ Payment sent! ${effectiveAmount} sats`,

@@ -57,15 +57,6 @@ function run (cmd, args, opts = {}) {
   }
   return res
 }
-function sh (cmd) {
-  // cross-platform: run through the current shell
-  const res = spawnSync(cmd, { stdio: 'inherit', shell: true })
-  if (res.error) throw res.error
-  if (typeof res.status === 'number' && res.status !== 0) {
-    throw new Error(`Command failed: ${cmd}`)
-  }
-  return res
-}
 
 function dockerExists () {
   const r = spawnSync('docker', ['--version'], { stdio: 'ignore' })

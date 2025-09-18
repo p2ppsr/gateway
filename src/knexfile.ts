@@ -81,12 +81,14 @@ if (missing.length > 0) {
 const config: KnexConfig = {
   client: 'mysql2',
   connection: {
-    host: SQL_DATABASE_HOST!,
+    host: SQL_DATABASE_HOST ?? '',
     port,
-    user: SQL_DATABASE_USER!,
-    password: SQL_DATABASE_PASSWORD!,
-    database: SQL_DATABASE_DB_NAME!
+    user: SQL_DATABASE_USER ?? '',
+    // allow empty password but must still be defined
+    password: SQL_DATABASE_PASSWORD ?? '',
+    database: SQL_DATABASE_DB_NAME ?? ''
   },
+
   // Small, friendly pool for modest VM sizes; bump if needed.
   pool: { min: 0, max: 10 },
 

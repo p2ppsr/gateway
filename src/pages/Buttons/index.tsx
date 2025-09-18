@@ -6,14 +6,7 @@
  * Each row represents a button, showing ID, amount, currency, and other details.
  * For multi-use buttons, includes a collapsible sub-table of associated payments.
  *
- * Version: v3.123 (Updated 01Sep2025_0215 BST)
- * Change Log:
- * - 01Sep2025_0215 BST (v3.123): Updated requestSort to use derivation_prefix and derivation_suffix instead of transaction_id for sub-table sorting.
- * - 01Sep2025_0130 BST (v3.122): Replaced transaction_id with derivation_prefix and derivation_suffix in Payment interface and mapping.
- * - 31Aug2025_2130 BST (v3.113): Fixed tooltip vertical position by clearing subTableRefs and using useLayoutEffect for accurate sub-table height.
- * - 31Aug2025_2115 BST (v3.112): Fixed TypeScript error by moving tooltip logging to useEffect; improved sub-table height calculation for tooltip positioning.
- * - 31Aug2025_2045 BST (v3.110): Used DUP_FIELD_PLACEHOLDER for Button Id, Payment Id, and Description in sub-table when payment_id matches button.payment_id.
- * - 31Aug2025_2030 BST (v3.109): Used DUP_FIELD_PLACEHOLDER from consts.ts for Button Id, Payment Id, and Description in sub-table to avoid duplication.
+ * Version: v3.123 (Updated 18Sep2025_0215 BST)
  */
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import {
@@ -36,8 +29,7 @@ import {
   Box,
   Card,
   TextField,
-  Tooltip,
-  Collapse
+  Tooltip
 } from '@mui/material'
 import { FirstPage, LastPage, ReceiptLong, ExpandMore, ExpandLess } from '@mui/icons-material'
 import { WalletClient } from '@bsv/sdk'
@@ -764,7 +756,8 @@ const PaymentButtonsList = () => {
                             }}
                           >
                             {formatId(button.payment_id || '')}
-                            {button.multi_use && button.payments.length > 0 && (
+                            {/* Only show icon if multi_use AND at least one non-empty payment */}
+                            {button.multi_use && (button.payments?.filter(p => p.payment_id || p.amount).length ?? 0) > 1 && (
                               <IconButton
                                 onClick={e => {
                                   e.stopPropagation()
@@ -864,60 +857,62 @@ const PaymentButtonsList = () => {
                       </TableRow>
                       {expandedButton === button.button_id &&
                         button.multi_use &&
-                        button.payments.length > 0 &&
-                        sortPayments(button.payments, subTableSortConfig).map((payment, paymentIndex) => {
-                          const topBorder =
-                            paymentIndex === 0 ? { borderTop: `1px solid ${theme.palette.divider}` } : {}
-                          logWithTimestamp(F, `Rendering payment for button ${button.button_id}:`, {
-                            payment_id: payment.payment_id,
-                            completed: payment.completed,
-                            timestamp: formatTimeLocal(payment.created_at)
-                          })
-                          return (
-                            <TableRow
-                              key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}
-                              sx={{ backgroundColor: expandedRowBg }}
-                              ref={el => (subTableRefs.current[paymentIndex] = el)}
-                            >
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {formatTimeLocal(payment.created_at)}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {DUP_FIELD_PLACEHOLDER}
-                              </TableCell>
-                              <TableCell
-                                sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}
-                                onMouseEnter={() => payment.payment_id !== button.payment_id && handleMouseEnter(payment.payment_id, 'Payment Id', 0)}
-                                onMouseLeave={handleMouseLeave}
-                                onClick={() => payment.payment_id !== button.payment_id && handleClick(payment.payment_id, 'Payment Id')}
+                        (button.payments?.length ?? 0) > 1 &&
+                        sortPayments(button.payments, subTableSortConfig)
+                          .filter(payment => !!payment.payment_id || !!payment.amount) // ⬅ skip blank rows
+                          .map((payment, paymentIndex) => {
+                            const topBorder =
+                              paymentIndex === 0 ? { borderTop: `1px solid ${theme.palette.divider}` } : {}
+                            logWithTimestamp(F, `Rendering payment for button ${button.button_id}:`, {
+                              payment_id: payment.payment_id,
+                              completed: payment.completed,
+                              timestamp: formatTimeLocal(payment.created_at)
+                            })
+                            return (
+                              <TableRow
+                                key={`payment-${button.button_id}-${payment.payment_id || paymentIndex}`}
+                                sx={{ backgroundColor: expandedRowBg }}
+                                ref={el => (subTableRefs.current[paymentIndex] = el)}
                               >
-                                {payment.payment_id === button.payment_id ? DUP_FIELD_PLACEHOLDER : formatId(payment.payment_id)}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {payment.amount ?? DUP_FIELD_PLACEHOLDER}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {DUP_FIELD_PLACEHOLDER}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {DUP_FIELD_PLACEHOLDER}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {payment.completed ? 'Yes' : 'No'}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {DUP_FIELD_PLACEHOLDER}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {payment.payment_id === button.payment_id ? DUP_FIELD_PLACEHOLDER : (payment.description || (payment.payment_id ? `Payment using paymentId: ${formatId(payment.payment_id)}` : DUP_FIELD_PLACEHOLDER))}
-                              </TableCell>
-                              <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
-                                {DUP_FIELD_PLACEHOLDER}
-                              </TableCell>
-                            </TableRow>
-                          )
-                        }
-                        )}
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {formatTimeLocal(payment.created_at)}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {DUP_FIELD_PLACEHOLDER}
+                                </TableCell>
+                                <TableCell
+                                  sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}
+                                  onMouseEnter={() => payment.payment_id !== button.payment_id && handleMouseEnter(payment.payment_id, 'Payment Id', 0)}
+                                  onMouseLeave={handleMouseLeave}
+                                  onClick={() => payment.payment_id !== button.payment_id && handleClick(payment.payment_id, 'Payment Id')}
+                                >
+                                  {payment.payment_id === button.payment_id ? DUP_FIELD_PLACEHOLDER : formatId(payment.payment_id)}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {payment.amount ?? DUP_FIELD_PLACEHOLDER}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {DUP_FIELD_PLACEHOLDER}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {DUP_FIELD_PLACEHOLDER}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {payment.completed ? 'Yes' : 'No'}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {DUP_FIELD_PLACEHOLDER}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {payment.payment_id === button.payment_id ? DUP_FIELD_PLACEHOLDER : (payment.description || (payment.payment_id ? `Payment using paymentId: ${formatId(payment.payment_id)}` : DUP_FIELD_PLACEHOLDER))}
+                                </TableCell>
+                                <TableCell sx={{ ...cellStyle, ...topBorder, backgroundColor: expandedRowBg }}>
+                                  {DUP_FIELD_PLACEHOLDER}
+                                </TableCell>
+                              </TableRow>
+                            )
+                          }
+                          )}
                     </React.Fragment>
                   )
                 })}

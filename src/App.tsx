@@ -13,7 +13,7 @@
  *
  * Version: v1.1 (Updated 20Aug2025_2223 BST)
  */
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Theme from './components/Theme'
 import Navbar from './components/Navbar'
@@ -29,12 +29,9 @@ import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 import { CONFIG } from './utils/constants'
 import { logWithTimestamp } from './utils/logging'
-import { fetchWithTimeout } from './utils/general'
 const F = 'App'
 
 logWithTimestamp(F, `CONFIG:${CONFIG}`)
-const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
 /**
  * The main React component for the application.
@@ -62,23 +59,6 @@ const App: React.FC = () => {
     }, 2000)
     return () => clearInterval(intervalId)
   }, [])
-
-  //   useEffect(() => {
-  //     void (async () => {
-  //       try {
-  // // const res = await fetchWithTimeout(
-  // //   `${API_BASE}/getStatus`,
-  // //   { method: 'GET' },
-  // //   wallet
-  // // )
-  //       // if (!res.ok) throw new Error(`❌ HTTP ${res.status}`)
-  //       //   const { isAdmin } = await res.json()
-  //       //   setIsAdmin(isAdmin)
-  //       // } catch (err) {
-  //       //   console.error('❌ getStatus failed:', err)
-  //       // }
-  //     })()
-  //   }, [])
 
   return (
     <Theme>

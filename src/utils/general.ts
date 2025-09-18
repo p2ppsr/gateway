@@ -154,7 +154,7 @@ export function formatId (id: string): string {
  * @returns {string} Formatted date string (e.g., "26 Aug 2025 14:30:45") or 'N/A' if invalid.
  */
 export function formatTimeLocal (dateStr: string | null | undefined): string {
-  if (!dateStr) {
+  if (dateStr === null || dateStr === undefined || dateStr === '') {
     return 'N/A'
   }
   try {
@@ -354,15 +354,15 @@ export const validateCSS = (css: string): boolean => {
           if (hexMatch == null) return false
         }
         if (value.includes('(')) {
-          // @ts-expect-error
-          const openCount = ((value.match(/\(/g) != null) || []).length
-          // @ts-expect-error
-          const closeCount = ((value.match(/\)/g) != null) || []).length
+          const openMatches = value.match(/\(/g) ?? []
+          const closeMatches = value.match(/\)/g) ?? []
+          const openCount = openMatches.length
+          const closeCount = closeMatches.length
           if (openCount !== closeCount) return false
           if (value.includes('linear-gradient')) {
-            if (value.match(/linear-gradient\s*\([^)]+\)/) == null) return false
-            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g)
-            if ((colorMatches == null) || colorMatches.length < 2) return false
+            if (!/linear-gradient\s*\([^)]+\)/.test(value)) return false
+            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g) ?? []
+            if (colorMatches.length < 2) return false
           }
         }
       }
@@ -384,11 +384,12 @@ export const extractCSS = (input: string): string => {
     return ''
   }
   const match = input.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i)
-  if (match == null) {
+  const extractedCss = match?.[1]
+  if (typeof extractedCss !== 'string') {
     console.warn(`No style tags found in input: ${input.slice(0, 50)}...`)
     return input.trim()
   }
-  return match[1].trim()
+  return extractedCss.trim()
 }
 
 /**
