@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*",
+    "*.ts",
+    "webpack.*.ts",
+    "src/types.d.ts"
+  ],
+  "exclude": [
+    "migrations",
+    "public",
+    "dist",
+    "node_modules"
+  ]
+}

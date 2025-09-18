@@ -113,7 +113,6 @@
 
   /* Project Structure */
   "include": [
-    "migrations",
     "src/**/*",
     "*.ts",
     "webpack.*.ts",

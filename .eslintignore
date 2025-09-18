@@ -1,0 +1,3 @@
+migrations/**
+dist/**
+node_modules/**

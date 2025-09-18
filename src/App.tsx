@@ -24,14 +24,13 @@ import Actions from './pages/Actions'
 import Money from './pages/Money'
 import checkForMetanetclient from './utils/checkForMetanetclient'
 import { CssBaseline } from '@mui/material'
-import { WalletClient } from '@bsv/sdk'
 import useAsyncEffect from 'use-async-effect'
 import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 import { CONFIG } from './utils/constants'
 import { logWithTimestamp } from './utils/logging'
 const F = 'App'
 
-logWithTimestamp(F, `CONFIG:${CONFIG}`)
+logWithTimestamp(F, `CONFIG: ${JSON.stringify(CONFIG)}`)
 
 /**
  * The main React component for the application.
@@ -46,7 +45,7 @@ logWithTimestamp(F, `CONFIG:${CONFIG}`)
  * @returns {JSX.Element} The rendered application component.
  */
 const App: React.FC = () => {
-  const [isAdmin, setIsAdmin] = useState(false)
+const [isAdmin] = useState(false)
   const [isMncMissing, setIsMncMissing] = useState(false)
 
   // Run a periodic check for Metanet client

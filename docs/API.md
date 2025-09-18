@@ -1,6 +1,6 @@
 # Gateway API
 
-**Updated:** 03Sep2025_1728 BST  
+**Updated:** 18Sep2025_1338 UTC  
 **Base URL (default dev):** `http://localhost:3001/api`  
 All requests/returns are **JSON** unless noted.
 
@@ -42,12 +42,11 @@ Run the bootstrap (`scripts/startup.sh` / `scripts/startup.js`) to create/update
 
 ### `GET /getStatus`
 
-Returns basic server health.
+Returns basic server health/environment.
 
 **Response**
-
 ```json
-{ "status": "success", "server": "ok" }
+{ "status": "success", "network": "mainnet", "isAdmin": false }
 ```
 
 ---
@@ -56,48 +55,61 @@ Returns basic server health.
 
 ### `POST /initializeIds`
 
-Reserve unique IDs with duplicate protection and retries (`src/routes/initializeIds.ts`). Used by the UI to pre-allocate identifiers for **buttons** or **payments** owned by a merchant.
+Reserve unique IDs with duplicate protection and retries (`src/routes/initializeIds.ts`).  
+Use this to pre-allocate a **buttonId** or **paymentId** owned by a merchant.
 
-**Body (examples)**
+**Body shape**
 
-Reserve a **button** id
+```ts
+interface Ids {
+  buttonId?: string
+  paymentId?: string
+  merchantId: string
+  description: string // required, max 80 chars
+}
+```
+
+**Example A — reserve a new `buttonId`** (server generates the id)
 
 ```json
 {
-  "merchantId": "0282f...65963",
-  "resource": "button",
+  "merchantId": "03abc...def",
   "description": "T-shirt"
 }
 ```
 
-Reserve a **payment** id referencing an existing button
+**Example B — reserve a specific `buttonId`** (you provide it)
 
 ```json
 {
-  "merchantId": "0282f...65963",
-  "resource": "payment",
+  "merchantId": "03abc...def",
   "buttonId": "7gAt6eG5a4he",
+  "description": "T-shirt"
+}
+```
+
+**Example C — reserve a `paymentId` for an existing `buttonId`**
+
+```json
+{
+  "merchantId": "03abc...def",
+  "buttonId": "7gAt6eG5a4he",
+  "paymentId": "hjvrfMJ7fNBs",
   "description": "Order #1234"
 }
 ```
 
-**Responses**
+**Response (all cases)**
 
 ```json
 { "status": "success", "id": "hjvrfMJ7fNBs" }
 ```
 
-or (when both are explicitly returned)
-
-```json
-{ "status": "success", "buttonId": "7gAt6eG5a4he", "paymentId": "hjvrfMJ7fNBs" }
-```
-
 **Notes**
-
-- Validates `merchantId` (wallet identity key)
-- Detects duplicates & retries on transient DB errors
-- Enforces referential integrity when creating a `paymentId` for an existing `buttonId`
+- Validates `merchantId` (wallet identity key) and requires it to match the authenticated caller.
+- Detects duplicates & retries on transient DB errors (up to 3 attempts).
+- When reserving a `paymentId` and supplying `buttonId`, the server verifies that `buttonId` already exists in `ids`.
+- The `ids` table is the source of truth. Downstream tables (`payment_buttons`, `payments`) must reference these tokens.
 
 ---
 
@@ -105,130 +117,129 @@ or (when both are explicitly returned)
 
 ### `POST /createButton`
 
-Create a button record and return an embed snippet (`src/routes/createButton.ts`).
+Create a button record and seed its first payment record (`src/routes/createButton.ts`). Requires IDs to be **pre-reserved** via `/initializeIds`.
 
 **Body**
-
 ```json
 {
-  "merchantId": "0282f...65963",
-  "amount": 5,
-  "variable": false,
+  "amount": 5000,
+  "variableAmount": false,
   "multiUse": true,
-  "description": "Pay 5 Sats"
+  "description": "Pay 5k sats",
+  "htmlCode": "<div>Pay Now</div>",
+  "paymentId": "hjvrfMJ7fNBs",
+  "buttonId": "7gAt6eG5a4he"
 }
 ```
 
-- `amount`: integer sats. For variable buttons, pass `0` and set `"variable": true`.
+- `amount`: integer sats. For variable buttons, pass `0` and set `"variableAmount": true`.
 - `multiUse`: `true` for reusable buttons; `false`/omitted for single-use.
-- `description`: optional spending description shown to the payer’s wallet.
+- `description`: optional spending description shown to the payer’s wallet (stored on `payments`).
 
 **Response**
-
 ```json
 {
   "status": "success",
-  "button_id": "7gAt6eG5a4he",
-  "payment_id": "hjvrfMJ7fNBs",
-  "html": "<style>…</style><div class=\"gateway-paybutton\" …>Pay Now 5 Sats</div>",
-  "script": "<script src=\"https://YOUR_DOMAIN/pay.js\"></script>"
+  "message": "Payment button and payment created successfully",
+  "paymentId": "hjvrfMJ7fNBs",
+  "buttonId": "7gAt6eG5a4he"
 }
 ```
 
 **Notes**
-
-- The `script` points to `public/pay.js`.
-- The HTML uses `data-multiUse`, which maps to the `multiUse` prop in `PayButton` (`src/components/PayButton/index.tsx`).
+- The HTML snippet you pass (`htmlCode`) is stored and later returned by `/buttonCode/:paymentId`.
+- The server also creates/merges an initial `payments` row for the given `paymentId` and `buttonId`.
 
 ---
 
 ### `GET /buttonCode/:paymentId`
 
-Look up button metadata for a payment (used client-side to detect single-use buttons already used; `src/routes/buttonCode.ts`).
+Look up the embeddable snippet for a payment and its button (`src/routes/buttonCode.ts`).  
+Used by client sites to render the button and include `pay.js`.
 
 **Response**
-
 ```json
 {
   "status": "success",
-  "button_id": "7gAt6eG5a4he",
   "payment_id": "hjvrfMJ7fNBs",
+  "button_id": "7gAt6eG5a4he",
   "multi_use": true,
-  "used": false
+  "used": false,
+  "code": "<style>…</style><div id=\"7gAt6eG5a4he\" class=\"gateway-paybutton\" data-paymentId=\"hjvrfMJ7fNBs\" data-buttonId=\"7gAt6eG5a4he\" data-amount=\"5000\" data-variable=\"false\">Pay Now 5000 Sats</div><script src=\"https://YOUR_DOMAIN/pay.js\"></script>"
 }
 ```
 
 ---
 
-## Invoicing & Payments (BRC-29)
+## Invoicing & Payments (BRC-29 compatible)
 
 ### `POST /invoice`
 
-Create an invoice for a specific button/payment and amount (`src/routes/invoice.ts`). Returns BRC-29 derivations and an output template for the wallet to sign.
+Create an invoice for a specific button/payment and amount (`src/routes/invoice.ts`).  
+Returns a locking script and **outputs** for the wallet to fulfill.
 
 **Body**
-
 ```json
 {
-  "merchantId": "0282f...65963",
+  "merchantId": "03abc...def",
   "buttonId": "7gAt6eG5a4he",
   "paymentId": "hjvrfMJ7fNBs",
-  "amount": 5,
+  "amount": 5000,
   "description": "Payment using paymentId: hjvrfMJ7fNBs"
 }
 ```
 
-- `description` optional (defaults to `"Default Description"`).
-
 **Response**
-
 ```json
 {
   "status": "success",
-  "paymentId": "7D3bm2d9E8yQ",
-  "derivation_prefix": "brc29:prefix:...",
-  "derivation_suffix": "brc29:suffix:...",
-  "outputs": [{ "lockingScript": "76a914…88ac", "satoshis": 5 }]
+  "message": "Invoice created successfully",
+  "paymentId": "hjvrfMJ7fNBs",
+  "outputs": [
+    {
+      "lockingScript": "76a914...88ac",
+      "customInstructions": "{\"derivationPrefix\":\"<hex>\",\"derivationSuffix\":\"<hex>\",\"payee\":\"03abc...def\"}",
+      "satoshis": 5000,
+      "outputDescription": "Payment using paymentId: hjvrfMJ7fNBs",
+      "merchantId": "03abc...def"
+    }
+  ]
 }
 ```
 
 **Rules**
-
-- `amount` must be a positive integer **≤ 10,000** (server cap).
+- Server enforces `amount` to be a positive integer **≤ 10,000** (cap).
 - For variable buttons, the client sets the desired amount before requesting the invoice.
-- The server may return a **new `paymentId`** to use for the pay step.
+- For **multi-use** buttons, the server may generate a **new `paymentId`** for each invoice.
 
 ---
 
 ### `POST /pay`
 
-Submit a signed transaction for the invoice (`src/routes/pay.ts`). The server validates, records, and returns the final `txid`.
+Submit a signed transaction for the invoice (`src/routes/pay.ts`). The server validates the transaction, verifies the derived locking script, records the result, and returns the final `txid`.
 
 **Body**
-
 ```json
 {
-  "paymentId": "7D3bm2d9E8yQ",
+  "paymentId": "hjvrfMJ7fNBs",
   "buttonId": "7gAt6eG5a4he",
   "transaction": {
     "txid": "36321...03065",
     "atomicBeefTx": "..." // Atomic BEEF hex
   },
-  "lockingScript": "76a914…88ac",
-  "amount": 5
+  "lockingScript": "76a914...88ac",
+  "amount": 5000
 }
 ```
 
 **Response**
-
 ```json
-{ "status": "success", "txid": "36321...03065" }
+{ "status": "success", "message": "Payment completed successfully", "txid": "36321...03065" }
 ```
 
 **Notes**
-
-- Single-use buttons reject further attempts after a successful payment.
-- Amounts over the configured cap are rejected.
+- Single-use buttons are marked `used` after a successful payment.
+- The server rejects if `lockingScript` doesn’t match the server-derived script or output amount doesn’t match the invoice.
 
 ---
 
@@ -236,32 +247,28 @@ Submit a signed transaction for the invoice (`src/routes/pay.ts`). The server va
 
 ### `GET /listPayments`
 
-List payments for the authenticated merchant (or the API key’s merchant), with optional filtering (`src/routes/listPayments.ts`).
+List payments for the authenticated merchant (`src/routes/listPayments.ts`).
 
 **Query params**
-
-- `buttonId` (optional)
-- `isNew` (`true` | `false`, optional)
+- `status` (`all` | `completed` | `new`, default **all**)
 - `limit` (default **10**, max **1000**)
 - `offset` (default **0**)
-- `sort` (`asc` | `desc`, default **desc**)
 
 **Response**
-
 ```json
 {
   "status": "success",
   "data": [
     {
-      "timestamp": "2025-09-03T01:07:19Z",
+      "payment_id": "hjvrfMJ7fNBs",
       "txid": "36321...03065",
-      "payment_id": "7D3bm2d9E8yQ",
+      "payer_id": "03abc...def",
+      "amount": 5000,
+      "completed": true,
+      "is_new": false,
+      "created_at": "2025-09-03T01:07:19Z",
       "button_id": "7gAt6eG5a4he",
-      "payer_id": "0282f...65963",
-      "sats": 5,
-      "description": "Payment using paymentId: 7D3bm2d9E8yQ",
-      "complete": true,
-      "is_new": false
+      "description": "Payment using paymentId: hjvrfMJ7fNBs"
     }
   ],
   "total": 178
@@ -272,33 +279,44 @@ List payments for the authenticated merchant (or the API key’s merchant), with
 
 ### `GET /listButtons`
 
-List buttons for the merchant with usage/status flags (`src/routes/listButtons.ts`). `total_paid` is the sum of sats from all linked payments.
+List buttons for the merchant with usage/status flags (`src/routes/listButtons.ts`).
 
 **Query params**
-
-- `usage` (`used` | `unused` | `all`, default **all**)
+- `usage` (`used` | `unused`, optional; default **all**)
 - `excludeSingleUse` (`true` | `false`, default **false**)
 - `limit` (default **10**, max **1000**)
 - `offset` (default **0**)
 - `sort` (`asc` | `desc`, default **desc**)
 
 **Response**
-
 ```json
 {
   "status": "success",
   "data": [
     {
-      "timestamp": "2025-09-03T01:05:41Z",
-      "button_id": "7gAt6eG5a4he",
-      "payment_id": "hjvrfMJ7fNBs",
-      "sats": 5,
-      "variable": false,
-      "multi_use": true,
+      "buttonId": "7gAt6eG5a4he",
+      "merchantId": "03abc...def",
+      "paymentId": "hjvrfMJ7fNBs",
+      "amount": 5000,
+      "htmlCode": "<div>Pay Now</div>",
+      "variableAmount": false,
+      "multiUse": true,
       "used": true,
-      "total_paid": 10,
-      "description": "Pay Now 5 Sats",
-      "html": "<style>…</style><div class=\"gateway-paybutton\" …>…</div>"
+      "calculated_total": 10000,
+      "createdAt": "2025-09-03T01:05:41Z",
+      "updatedAt": "2025-09-03T01:05:41Z",
+      "payments": [
+        {
+          "paymentId": "hjvrfMJ7fNBs",
+          "derivationPrefix": "…",
+          "derivationSuffix": "…",
+          "amount": 5000,
+          "txid": "36321...03065",
+          "completed": true,
+          "createdAt": "2025-09-03T01:06:00Z",
+          "description": "Payment using paymentId: hjvrfMJ7fNBs"
+        }
+      ]
     }
   ],
   "total": 182
@@ -312,13 +330,11 @@ List buttons for the merchant with usage/status flags (`src/routes/listButtons.t
 Mark a payment as seen (`is_new = false`; `src/routes/acknowledgePayment.ts`).
 
 **Body**
-
 ```json
-{ "paymentId": "7D3bm2d9E8yQ" }
+{ "paymentId": "hjvrfMJ7fNBs" }
 ```
 
 **Response**
-
 ```json
 { "status": "success", "message": "Payment acknowledged successfully" }
 ```
@@ -331,13 +347,14 @@ Mark a payment as seen (`is_new = false`; `src/routes/acknowledgePayment.ts`).
 
 - **200 OK** — success
 - **400 Bad Request** — missing/invalid parameters (e.g., `"Invalid amount: must be a positive integer"`)
+- **401 Unauthorized** — missing/invalid identity
+- **403 Forbidden** — authenticated identity does not own the resource
 - **404 Not Found** — resource doesn’t exist (e.g., `"Button not found"`)
 - **409 Conflict** — duplicate or single-use already used (e.g., `"This single-use button has already been used"`)
 - **429 Too Many Requests** — rate limited
-- **500 Internal Server Error** — unhandled server error (e.g., `"Database connection failed"`, `"Invalid transaction signature"`)
+- **500 Internal Server Error** — unhandled server error
 
 **Error shape**
-
 ```json
 { "status": "error", "message": "Explanation of the error…" }
 ```
@@ -354,18 +371,16 @@ Buttons generated by the UI include a snippet like (`src/components/PayButton/in
 </style>
 <div
   class="gateway-paybutton gateway-paybutton-fixed"
-  data-merchant="0282f...65963"
+  data-merchant="03abc...def"
   data-buttonId="7gAt6eG5a4he"
   data-paymentId="hjvrfMJ7fNBs"
-  data-amount="5"
-  data-text="Pay Now 5 Sats"
+  data-amount="5000"
+  data-text="Pay Now 5000 Sats"
   data-variable="false"
   data-multiUse="true"
   data-server="https://YOUR_DOMAIN"
 >
-  Pay Now 5 Sats
+  Pay Now 5000 Sats
 </div>
 <script src="https://YOUR_DOMAIN/pay.js"></script>
 ```
-
-The client script (`public/pay.js`) verifies server availability, requests an invoice, signs, then calls **`/pay`**. The `PayButton` component maps `data-multiUse` to the `multiUse` prop internally. For **single-use** buttons, the UI disables the button after a successful payment.

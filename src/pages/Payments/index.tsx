@@ -483,7 +483,7 @@ const PaymentsList = () => {
       setHoveredValue(fullValue)
       const columnCell = document.querySelector(
         `tr:nth-child(${rowIndex + 1}) td:nth-child(${['Txid', 'Payment Id', 'Button Id', 'Payer Id'].indexOf(columnName) + 2})`
-      ) as HTMLTableCellElement | null
+      )
       if (columnCell !== null) {
         columnRefs.current[columnName] = columnCell
       }

@@ -1,5 +1,6 @@
 // .eslintrc.js
 module.exports = {
+  ignorePatterns: ['migrations/**/*.ts'],
   root: true,
   parser: '@typescript-eslint/parser',
   parserOptions: {
@@ -8,7 +9,7 @@ module.exports = {
     ecmaFeatures: {
       jsx: true
     },
-    project: './tsconfig.json'
+    project: './tsconfig.eslint.json'
   },
   settings: {
     react: {
