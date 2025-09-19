@@ -363,11 +363,18 @@ const PayButton = ({
    */
   useEffect(() => {
     try {
-      const label =
-        text ||
-        parentDataText ||
-        parentOriginalText ||
-        `Pay Now ${amount || variableAmount} Sats`
+      const chosenText =
+        (text && text.trim() !== '' ? text : undefined) ??
+        (parentDataText && parentDataText.trim() !== '' ? parentDataText : undefined) ??
+        (parentOriginalText && parentOriginalText.trim() !== '' ? parentOriginalText : undefined)
+
+      const satsValue =
+        Number.isFinite(amount) && amount > 0
+          ? amount
+          : Number(variableAmount) > 0
+          ? variableAmount
+          : 0
+      const label = chosenText ?? `Pay Now ${satsValue} Sats`
       setButtonLabel(label)
       console.log(
         `[${new Date().toISOString()}] [${F}] 🔍 Button label computed:`,
