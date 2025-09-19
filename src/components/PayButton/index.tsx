@@ -418,12 +418,37 @@ const PayButton = ({
             initialDisabled: container.className.includes('disabled')
           }
         )
+        const parentDataTextValue = containerRef.current?.parentElement?.dataset.text
+        const containerOriginalTextValue = container.dataset.originalText
+        const containerTextContentValue = container.textContent?.trim()
+
+        const textValue =
+          text !== undefined && text.trim() !== '' ? text : undefined
+        const parentDataValue =
+          parentDataTextValue !== undefined && parentDataTextValue.trim() !== ''
+            ? parentDataTextValue
+            : undefined
+        const containerOriginalValue =
+          containerOriginalTextValue !== undefined && containerOriginalTextValue.trim() !== ''
+            ? containerOriginalTextValue
+            : undefined
+        const containerTextValue =
+          containerTextContentValue !== undefined && containerTextContentValue !== ''
+            ? containerTextContentValue
+            : undefined
+
         const originalText =
-          (text && text.trim() !== '' ? text : undefined) ??
-          (containerRef.current?.parentElement?.dataset.text?.trim() !== '' ? containerRef.current?.parentElement?.dataset.text : undefined) ??
-          (container.dataset.originalText?.trim() !== '' ? container.dataset.originalText : undefined) ??
-          (container.textContent?.trim() !== '' ? container.textContent?.trim() : undefined) ??
-          `Pay Now ${Number.isFinite(amount) && amount > 0 ? amount : Number(variableAmount) > 0 ? variableAmount : 0} Sats`
+          textValue ??
+          parentDataValue ??
+          containerOriginalValue ??
+          containerTextValue ??
+          `Pay Now ${
+            Number.isFinite(amount) && amount > 0
+              ? amount
+              : Number(variableAmount) > 0
+              ? variableAmount
+              : 0
+          } Sats`
         container.dataset.originalText = originalText
         container.style.display = 'flex'
         container.style.justifyContent = 'center'
