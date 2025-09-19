@@ -453,7 +453,7 @@ const PayButton = ({
         container.style.display = 'flex'
         container.style.justifyContent = 'center'
         container.style.alignItems = 'center'
-        container.style.width = width || 'fit-content'
+        container.style.width = width ?? 'fit-content'
         container.setAttribute(
           'data-disabled',
           (loading || disabled).toString()
@@ -498,18 +498,28 @@ const PayButton = ({
           multiUse
         }
       )
-
       if (
-        !initialPaymentId ||
-        !buttonId ||
-        !merchant ||
+        initialPaymentId === undefined ||
+        initialPaymentId.trim() === '' ||
+        buttonId === undefined ||
+        buttonId.trim() === '' ||
+        merchant === undefined ||
+        merchant.trim() === '' ||
         (!variable && amount <= 0)
       ) {
         const errors: string[] = []
-        if (!initialPaymentId) errors.push('Missing data-paymentId attribute.')
-        if (!buttonId) errors.push('Missing data-buttonId attribute.')
-        if (!merchant) errors.push('Missing data-merchant attribute.')
-        if (!variable && amount <= 0) { errors.push('Missing valid data-amount attribute.') }
+        if (initialPaymentId === undefined || initialPaymentId.trim() === '') {
+          errors.push('Missing data-paymentId attribute.')
+        }
+        if (buttonId === undefined || buttonId.trim() === '') {
+          errors.push('Missing data-buttonId attribute.')
+        }
+        if (merchant === undefined || merchant.trim() === '') {
+          errors.push('Missing data-merchant attribute.')
+        }
+        if (!variable && amount <= 0) {
+          errors.push('Missing valid data-amount attribute.')
+        }
         errors.forEach((err) => toast.error(err))
         setDisabled(true)
       }
