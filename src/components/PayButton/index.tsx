@@ -364,16 +364,19 @@ const PayButton = ({
   useEffect(() => {
     try {
       const chosenText =
-        (text && text.trim() !== '' ? text : undefined) ??
-        (parentDataText && parentDataText.trim() !== '' ? parentDataText : undefined) ??
-        (parentOriginalText && parentOriginalText.trim() !== '' ? parentOriginalText : undefined)
+        (typeof text === 'string' && text.trim() !== '' ? text : undefined) ??
+        (typeof parentDataText === 'string' && parentDataText.trim() !== '' ? parentDataText : undefined) ??
+        (typeof parentOriginalText === 'string' && parentOriginalText.trim() !== '' ? parentOriginalText : undefined)
+
+      const amountNumber = Number(amount)
+      const variableNumber = Number(variableAmount)
 
       const satsValue =
-        Number.isFinite(amount) && amount > 0
-          ? amount
-          : Number(variableAmount) > 0
-          ? variableAmount
-          : 0
+        Number.isFinite(amountNumber) && amountNumber > 0
+          ? amountNumber
+          : Number.isFinite(variableNumber) && variableNumber > 0
+            ? variableNumber
+            : 0
       const label = chosenText ?? `Pay Now ${satsValue} Sats`
       setButtonLabel(label)
       console.log(
@@ -383,7 +386,7 @@ const PayButton = ({
           dataText: parentDataText,
           propsText: text,
           datasetText: parentOriginalText,
-          fallback: `Pay Now ${amount || variableAmount} Sats`
+          fallback: `Pay Now ${Number.isFinite(amount) && amount > 0 ? amount : Number(variableAmount) > 0 ? variableAmount : 0} Sats`
         }
       )
     } catch (error) {
@@ -416,11 +419,11 @@ const PayButton = ({
           }
         )
         const originalText =
-          text ||
-          containerRef.current?.parentElement?.dataset.text ||
-          container.dataset.originalText ||
-          container.textContent?.trim() ||
-          `Pay Now ${amount || variableAmount} Sats`
+          (text && text.trim() !== '' ? text : undefined) ??
+          (containerRef.current?.parentElement?.dataset.text?.trim() !== '' ? containerRef.current?.parentElement?.dataset.text : undefined) ??
+          (container.dataset.originalText?.trim() !== '' ? container.dataset.originalText : undefined) ??
+          (container.textContent?.trim() !== '' ? container.textContent?.trim() : undefined) ??
+          `Pay Now ${Number.isFinite(amount) && amount > 0 ? amount : Number(variableAmount) > 0 ? variableAmount : 0} Sats`
         container.dataset.originalText = originalText
         container.style.display = 'flex'
         container.style.justifyContent = 'center'
