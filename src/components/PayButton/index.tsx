@@ -271,7 +271,7 @@ const PayButton = ({
     const run = async (): Promise<void> => {
       try {
         const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
-        if (multiUse) {
+        if ((multiUse === true || multiUse === 'true') && paymentId != null && paymentId !== '') {
           const base = getScriptOrigin()
           const url = `${base}/api/buttonCode/${paymentId}`
           const response = await fetchWithTimeout(
