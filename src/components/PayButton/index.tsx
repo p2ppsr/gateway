@@ -195,14 +195,11 @@ const PayButton = ({
           `[${new Date().toISOString()}] [${F}] 🔍 Corrected container class due to disabled override`
         )
       }
-      if (
-        parentContainer !== null &&
-        parentContainer.className.includes('disabled') &&
-        disabled === false
-      ) {
-        parentContainer.className = parentContainer.className
-          .replace('disabled', '')
-          .trim()
+      const pc = parentContainer
+      if (pc == null || !pc.className.includes('disabled') || disabled) {
+        // nothing to do
+      } else {
+        pc.className = pc.className.replace('disabled', '').trim()
         console.log(
           `[${new Date().toISOString()}] [${F}] 🔍 Corrected parent class due to disabled override`
         )
@@ -237,7 +234,7 @@ const PayButton = ({
         buttonId == null ||
         merchant === '' ||
         merchant == null ||
-        (variable === false && amount <= 0)
+        (!variable && amount <= 0)
       ) {
         const errors: string[] = []
         if (initialPaymentId === '' || initialPaymentId == null) {
@@ -249,7 +246,7 @@ const PayButton = ({
         if (merchant === '' || merchant == null) {
           errors.push('Missing data-merchant attribute.')
         }
-        if (variable === false && amount <= 0) {
+        if (!variable && amount <= 0) {
           errors.push('Missing valid data-amount attribute.')
         }
         errors.forEach((err) => toast.error(err))
@@ -269,7 +266,7 @@ const PayButton = ({
    * @function fetchButtonStatus
    */
   useEffect(() => {
-    if (!paymentId || disabled) return
+    if (paymentId == null || paymentId === '' || disabled) return
     let cancelled = false
     const run = async (): Promise<void> => {
       try {
