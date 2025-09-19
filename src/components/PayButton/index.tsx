@@ -230,18 +230,28 @@ const PayButton = ({
           multiUse
         }
       )
-
       if (
-        !initialPaymentId ||
-        !buttonId ||
-        !merchant ||
-        (!variable && amount <= 0)
+        initialPaymentId === '' ||
+        initialPaymentId == null ||
+        buttonId === '' ||
+        buttonId == null ||
+        merchant === '' ||
+        merchant == null ||
+        (variable === false && amount <= 0)
       ) {
         const errors: string[] = []
-        if (!initialPaymentId) errors.push('Missing data-paymentId attribute.')
-        if (!buttonId) errors.push('Missing data-buttonId attribute.')
-        if (!merchant) errors.push('Missing data-merchant attribute.')
-        if (!variable && amount <= 0) { errors.push('Missing valid data-amount attribute.') }
+        if (initialPaymentId === '' || initialPaymentId == null) {
+          errors.push('Missing data-paymentId attribute.')
+        }
+        if (buttonId === '' || buttonId == null) {
+          errors.push('Missing data-buttonId attribute.')
+        }
+        if (merchant === '' || merchant == null) {
+          errors.push('Missing data-merchant attribute.')
+        }
+        if (variable === false && amount <= 0) {
+          errors.push('Missing valid data-amount attribute.')
+        }
         errors.forEach((err) => toast.error(err))
         setDisabled(true)
       }
