@@ -321,7 +321,7 @@ const PayButton = ({
         )
       }
     }
-    run()
+    void run()
     return () => {
       cancelled = true
     }
