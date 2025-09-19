@@ -525,49 +525,56 @@ const PayButton = ({
       }
       container.className = `gateway-paybutton gateway-paybutton-fixed ${disabled ? 'disabled' : ''}`
       textNode.className = `nodeText ${disabled ? 'disabled' : ''}`
-      if (parentContainer?.className.includes('disabled') && !disabled) {
-        parentContainer.className = parentContainer.className
-          .replace('disabled', '')
-          .trim()
+      if (
+        parentContainer != null &&
+        parentContainer.className.trim() !== '' &&
+        parentContainer.className.includes('disabled') &&
+        !disabled
+      ) {
+        const newClassName = parentContainer.className.replace('disabled', '').trim()
+        parentContainer.className = newClassName
         console.log(
           `[${new Date().toISOString()}] [${F}] 🔍 Corrected parent class:`,
           {
-            newClass: parentContainer.className,
+            newClass: newClassName,
             disabled
           }
         )
       }
-      const forceUpdate = () => {
-        if (textNode.className.includes('disabled') && !disabled) {
+      const forceUpdate = (): void => {
+        if (textNode?.className.includes('disabled') && !disabled) {
           textNode.className = `nodeText ${disabled ? 'disabled' : ''}`
           console.log(
-            `[${new Date().toISOString()}] [${F}] 🔍 Forced DOM update:`,
-            {
-              newClass: textNode.className,
-              disabled
-            }
+      `[${new Date().toISOString()}] [${F}] 🔍 Forced DOM update:`,
+      {
+        newClass: textNode.className,
+        disabled
+      }
           )
         }
-        if (container.className.includes('disabled') && !disabled) {
+
+        if (container?.className.includes('disabled') && !disabled) {
           container.className = `gateway-paybutton gateway-paybutton-fixed ${disabled ? 'disabled' : ''}`
           console.log(
-            `[${new Date().toISOString()}] [${F}] 🔍 Forced container update:`,
-            {
-              newClass: container.className,
-              disabled
-            }
+      `[${new Date().toISOString()}] [${F}] 🔍 Forced container update:`,
+      {
+        newClass: container.className,
+        disabled
+      }
           )
         }
-        if (parentContainer?.className.includes('disabled') && !disabled) {
+        if (
+          parentContainer?.className.includes('disabled') === true && !disabled
+        ) {
           parentContainer.className = parentContainer.className
             .replace('disabled', '')
             .trim()
           console.log(
-            `[${new Date().toISOString()}] [${F}] 🔍 Forced parent update:`,
-            {
-              newClass: parentContainer.className,
-              disabled
-            }
+    `[${new Date().toISOString()}] [${F}] 🔍 Forced parent update:`,
+    {
+      newClass: parentContainer.className,
+      disabled
+    }
           )
         }
       }
