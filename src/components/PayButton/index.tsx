@@ -59,17 +59,6 @@ interface WalletOutput {
 }
 
 /**
- * Interface for list outputs arguments.
- * @interface ListOutputsArgs
- * @property {string} [basket] - Optional basket identifier.
- * @property {number} [limit] - Optional limit on outputs.
- */
-interface ListOutputsArgs {
-  basket?: string
-  limit?: number
-}
-
-/**
  * Props interface for the PayButton component.
  * @interface PayButtonProps
  * @property {string} [text] - Optional button text.
@@ -143,8 +132,8 @@ interface ButtonCodeResponse {
   used?: boolean
 }
 
-declare const __SERVER_IDENTITY_KEY__: string
-const serverIdentityKey = __SERVER_IDENTITY_KEY__
+declare const SERVER_IDENTITY_KEY: string
+const serverIdentityKey = SERVER_IDENTITY_KEY
 
 /**
  * PayButton component for initiating blockchain payments.
@@ -890,10 +879,10 @@ const PayButton = ({
           )
         }
         const outputsWithSats: CreateActionOutput[] =
-          ((invoice.outputs?.map((output) => ({
+          invoice.outputs?.map((output) => ({
             ...output,
             satoshis: output.satoshis
-          }))) != null) || []
+          })) ?? []
         if (
           variable &&
           (outputsWithSats.length > 0) &&

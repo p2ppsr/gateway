@@ -45,7 +45,7 @@ logWithTimestamp(F, `CONFIG: ${JSON.stringify(CONFIG)}`)
  * @returns {JSX.Element} The rendered application component.
  */
 const App: React.FC = () => {
-const [isAdmin] = useState(false)
+  const [isAdmin] = useState(false)
   const [isMncMissing, setIsMncMissing] = useState(false)
 
   // Run a periodic check for Metanet client

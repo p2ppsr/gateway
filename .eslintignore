@@ -1,3 +1,4 @@
 migrations/**
 dist/**
 node_modules/**
+__tests/

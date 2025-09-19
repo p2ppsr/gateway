@@ -61,7 +61,7 @@ import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 const F = 'pages/Create'
 
 // Vite injects this at build time, declare for TS
-declare const __SERVER_IDENTITY_KEY__: string
+declare const SERVER_IDENTITY_KEY: string
 
 const debounce = (func: (...args: any[]) => void, wait: number) => {
   let timeout: number | null = null
@@ -1844,7 +1844,7 @@ ${normalizeCSS(cssToUse)}
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-bsv-server': __SERVER_IDENTITY_KEY__ // ✅ injected constant
+            'x-bsv-server': SERVER_IDENTITY_KEY // ✅ injected constant
           },
           body: JSON.stringify(payload)
         }
@@ -2060,7 +2060,7 @@ ${normalizeCSS(cssToUse)}
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-bsv-server': __SERVER_IDENTITY_KEY__
+            'x-bsv-server': SERVER_IDENTITY_KEY
           },
           body: JSON.stringify({
             buttonId: currentButtonId,

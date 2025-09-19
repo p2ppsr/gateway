@@ -99,4 +99,4 @@ declare module "@bsv/sdk" {
   }
 }
 
-declare const __SERVER_IDENTITY_KEY__: string;
+declare const SERVER_IDENTITY_KEY: string;

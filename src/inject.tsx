@@ -29,8 +29,8 @@ import { getScriptOrigin } from './utils/scriptOrigin'
 
 const F = 'inject'
 logWithTimestamp(F, '🔍 INJECT')
-declare const __SERVER_IDENTITY_KEY__: string
-const serverIdentityKey = __SERVER_IDENTITY_KEY__
+declare const SERVER_IDENTITY_KEY: string
+const serverIdentityKey = SERVER_IDENTITY_KEY
 
 // -------------------------------------------------------------------------------------------------
 // Utilities

@@ -31,7 +31,7 @@ const common: Configuration = {
       ]
     }),
     new webpack.DefinePlugin({
-      __SERVER_IDENTITY_KEY__: JSON.stringify(
+      SERVER_IDENTITY_KEY: JSON.stringify(
         process.env.SERVER_IDENTITY_KEY || ''
       )
     })

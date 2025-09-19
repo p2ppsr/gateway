@@ -17,7 +17,6 @@
 import { Request, Response } from 'express'
 import acknowledgePayment from '../../routes/acknowledgePayment'
 import { logWithTimestamp } from '../../utils/logging'
-import knex, { Knex } from 'knex'
 
 const informationSchemaBuilder = {
   where: jest.fn().mockReturnThis(),
