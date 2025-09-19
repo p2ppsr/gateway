@@ -166,7 +166,7 @@ const PayButton = ({
   string | undefined
   >(undefined)
   const [buttonLabel, setButtonLabel] = useState<string>(
-    text || 'Pay Now 0 Sats'
+    text ?? 'Pay Now 0 Sats'
   )
   const containerRef = useRef<HTMLDivElement>(null)
   const nodeTextRef = useRef<HTMLDivElement>(null)
@@ -195,7 +195,11 @@ const PayButton = ({
           `[${new Date().toISOString()}] [${F}] 🔍 Corrected container class due to disabled override`
         )
       }
-      if (parentContainer?.className.includes('disabled') && !disabled) {
+      if (
+        parentContainer !== null &&
+        parentContainer.className.includes('disabled') &&
+        disabled === false
+      ) {
         parentContainer.className = parentContainer.className
           .replace('disabled', '')
           .trim()
