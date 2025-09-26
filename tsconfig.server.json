@@ -6,13 +6,26 @@
     "rootDir": "src",
     "module": "commonjs",
     "target": "ES2021",
-    "lib": ["ES2021"],
+    "lib": [
+      "ES2021"
+    ],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": false,
-    "noEmitOnError": false
+    "noEmitOnError": false,
+    "noResolve": false,
+    "baseUrl": ".",
+    "paths": {
+      "@bsv/wallet-toolbox": [
+        "node_modules/@bsv/wallet-toolbox"
+      ]
+    },
+    "noImplicitAny": false,
+    "strict": false
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "dist",

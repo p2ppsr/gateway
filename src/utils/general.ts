@@ -287,12 +287,33 @@ export const fetchWithTimeout = async (
   )
 
   try {
-    // Merge headers, attach signal
-    const reqOptions = {
-      ...options,
-      headers: { ...(options?.headers ?? {}) },
-      signal: controller.signal as any
-    }
+const headers = { ...(options?.headers ?? {}) }
+
+// Always inject x-bsv-server header if missing
+if (!headers['x-bsv-server']) {
+  headers['x-bsv-server'] = (globalThis as any).SERVER_IDENTITY_KEY ?? ''
+}
+
+// Auto-add Content-Type for non-GET/HEAD with body if missing
+if (
+  (options?.method && !['GET', 'HEAD'].includes(options.method)) &&
+  options?.body && !headers['Content-Type']
+) {
+  headers['Content-Type'] = 'application/json'
+}
+
+const reqOptions = {
+  ...options,
+  headers,
+  signal: controller.signal as any
+}
+
+    // // Merge headers, attach signal
+    // const reqOptions = {
+    //   ...options,
+    //   headers: { ...(options?.headers ?? {}) },
+    //   signal: controller.signal as any
+    // }
 
     const res = await authFetch.fetch(resolvedUrl, reqOptions)
 

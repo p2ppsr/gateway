@@ -41,9 +41,10 @@ import {
 } from '../../utils/general'
 import { logWithTimestamp } from '../../utils/logging'
 import { CONFIG } from '../../utils/constants'
-import { WalletClient } from '@bsv/sdk'
+import { Beef, CachedKeyDeriver, InternalizeActionArgs, PrivateKey, Transaction, Utils, WalletClient } from '@bsv/sdk'
 import { useTheme } from '@mui/material/styles'
 import SortableHeader from '../../components/SortableHeader'
+import { ScriptTemplateBRC29, Setup } from '@bsv/wallet-toolbox'
 const F = 'pages/Payments'
 
 interface Payment {
@@ -74,33 +75,6 @@ interface PaymentResponse {
   }>
   total?: number
 }
-// interface Payment {
-//   payment_id: string | null;
-//   button_id: string | null;
-//   payer_id: string | null;
-//   txid: string | null;
-//   amount: number | null;
-//   completed: boolean | null;
-//   is_new: boolean | null;
-//   created_at: string | null;
-// }
-
-// interface PaymentResponse {
-//   status: string;
-//   message: string;
-//   title?: string;
-//   data: {
-//     payment_id: string | null;
-//     txid: string | null;
-//     payer_id: string | null;
-//     button_id: string | null;
-//     amount: string | number | null;
-//     completed: number | null;
-//     is_new: number | null;
-//     created_at: string | null;
-//   }[];
-//   total?: number;
-// }
 
 interface SortConfig {
   key: keyof Payment | null
@@ -116,6 +90,8 @@ const formatPayerId = (payerId: string | null) => {
   if (!payerId || payerId.length < 10) return payerId || 'N/A'
   return `${payerId.slice(0, 5)}...${payerId.slice(-5)}`
 }
+
+declare const SERVER_IDENTITY_KEY: string
 
 const wallet = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
 
@@ -147,12 +123,15 @@ const PaymentsList = () => {
   const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(
     null
   )
-  const columnRefs = useRef<{ [key: string]: HTMLTableCellElement | null }>({
+  const columnRefs = useRef<Record<string, Element | null>>({
     Txid: null,
     'Payment Id': null,
     'Button Id': null,
     'Payer Id': null
   })
+// Add right after your other useState declarations
+const [walletOutputs, setWalletOutputs] = useState<any[]>([])
+
   const API_BASE = CONFIG.API_BASE.replace(/\/+$/, '')
 
   const fetchPayments = async (retries = 2): Promise<void> => {
@@ -173,7 +152,11 @@ const PaymentsList = () => {
       }
       const url = `${API_BASE}/listPayments?limit=500&status=${statusFilter}&t=${Date.now()}`
       logWithTimestamp(F, 'Fetching payments with URL:', url)
-      const response = await fetchWithTimeout(url, { method: 'GET' }, wallet)
+      const response = await fetchWithTimeout(
+        url, 
+        { method: 'GET' },
+        wallet
+      )
       logWithTimestamp(
         F,
         'Fetch response status:',
@@ -292,6 +275,13 @@ const PaymentsList = () => {
       JSON.stringify(targetPayments, null, 2)
     )
   }, [payments])
+
+  // fetch wallet outputs immediately on mount so balance shows even before acknowledge
+useEffect(() => {
+  // after your payment logic succeeds in acknowledgePayment:
+setTimeout(() => fetchWalletOutputs(), 5000); // 3-second delay before fetching
+
+}, [])
 
   const sortedPayments = useMemo(() => {
     if (!sortConfig.key) return payments
@@ -431,7 +421,32 @@ const PaymentsList = () => {
     }
   }
 
-  const handleCustomRowsPerPageChange = (
+const fetchWalletOutputs = async () => {
+  try {
+    let allOutputs: any[] = []
+    let offset = 0
+    const limit = 25
+    for (;;) {
+      // triggers MND popup in browser
+      const result = await wallet.listOutputs({
+        basket: 'default',
+        limit,
+        offset
+      })
+      if (!result?.outputs || result.outputs.length === 0) break
+      allOutputs = allOutputs.concat(result.outputs)
+      offset += result.outputs.length
+      if (offset >= (result.totalOutputs ?? offset)) break
+    }
+    console.log('Wallet outputs (paged)', allOutputs.length)
+    setWalletOutputs(allOutputs)
+  } catch (err) {
+    console.error('❌ Error fetching wallet outputs:', err)
+    setWalletOutputs([])
+  }
+}
+
+const handleCustomRowsPerPageChange = (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const value = event.target.value.replace(/[^0-9]/g, '')
@@ -551,53 +566,131 @@ const PaymentsList = () => {
     setLastClickedColumn(null)
   }
 
-  const acknowledgePayment = async (paymentId: string | null) => {
-    if (!paymentId) {
-      logWithTimestamp(
-        F,
-        '❌ Attempted to acknowledge payment with null paymentId'
-      )
-      return
-    }
-    try {
-      logWithTimestamp(F, 'URL:', `${API_BASE}/acknowledgePayment`)
-      const response = await fetchWithTimeout(
-        `${API_BASE}/acknowledgePayment?t=${Date.now()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ paymentId })
-        },
-        wallet
-      )
-      if (!response.ok) {
-        const errorText = await response.text()
-        logWithTimestamp(
-          F,
-          '❌ Acknowledgment failed with response:',
-          errorText
-        )
-        throw new Error(
-          `❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`
-        )
-      }
-      const data: PaymentResponse = await response.json()
-      logWithTimestamp(F, 'Acknowledgment response:', JSON.stringify(data))
-      if (data.status === 'error') {
-        throw new Error(
-          `❌ ${data.message ?? 'Failed to acknowledge payment'}`
-        )
-      }
-      logWithTimestamp(F, 'Successfully acknowledged payment:', paymentId)
-      setPayments([])
-      setRenderKey(Date.now()) // Force re-render after acknowledgment
-      await fetchPayments()
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '❌ Unknown error'
-      logWithTimestamp(F, '❌ Error acknowledging payment:', message)
-      setError(message)
-    }
+
+const acknowledgePayment = async (paymentId: string | null) => {
+  if (!paymentId) {
+    logWithTimestamp(F, '❌ Attempted to acknowledge payment with null paymentId')
+    return
   }
+logWithTimestamp(F,  '🔍acknowledgePayment enter')
+
+  try {
+    // Step 1: fetch required fields from backend
+    const response = await fetchWithTimeout(
+      `${API_BASE}/acknowledgePayment?t=${Date.now()}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ paymentId })
+      },
+      wallet
+    )
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(
+        `❌ HTTP error! status: ${response.status}, body: ${errorText}`
+      )
+    }
+    const data = await response.json()
+    logWithTimestamp(F, '🔍 Backend acknowledgePayment response:', data)
+
+    if (data.status === 'error') {
+      throw new Error(`❌ ${data.message ?? 'Missing payment data'}`)
+    }
+
+// --- Step 1: extract fields from backend ---
+const {
+  atomicBeefTx,
+  txid,
+  derivationPrefix,
+  derivationSuffix,
+  merchant_id: merchantId,
+  expectedLockingScriptHex
+} = data
+
+logWithTimestamp(F, '🔍 Step 1 extracted fields', {
+  atomicBeefTx,
+  txid,
+  derivationPrefix,
+  derivationSuffix,
+  merchantId
+})
+
+// --- Step 2: decode BEEF TX and find correct output ---
+const txBytes: number[] = Utils.toArray(atomicBeefTx, 'hex')
+logWithTimestamp(F, '🔍 txBytes length', txBytes.length)
+
+const tx = Transaction.fromAtomicBEEF(txBytes)
+logWithTimestamp(F, '🔍 Decoded Transaction', {
+  version: tx.version,
+  inputsCount: tx.inputs.length,
+  outputsCount: tx.outputs.length
+})
+
+const fixedPriv = PrivateKey.fromHex('1'.padStart(64, '0')) 
+const fixedPubKey = fixedPriv.toPublicKey()
+
+// --- Step 4: find the matching output ---
+const realIndex = tx.outputs.findIndex((o, idx) => {
+  const lockingScript = o.lockingScript.toHex() // always has toHex()
+  const lockingScriptHex = String(o.lockingScript.toHex()).toLowerCase().trim();
+  logWithTimestamp(F, `🔍 Output[${idx}] lockingScript`, lockingScript, ',expectedLockingScriptHex=', expectedLockingScriptHex)
+  return lockingScriptHex === expectedLockingScriptHex
+})
+
+logWithTimestamp(F, '🔍 realIndex found', realIndex)
+
+if (realIndex === -1) {
+  throw new Error(`❌ No output matches expected BRC29 lockingScript for ${paymentId}`)
+}
+        const beefUrl = `https://api.whatsonchain.com/v1/bsv/main/tx/${txid}/beef`
+        console.log('Fetching AtomicBEEF from WOC:', beefUrl)
+        const beefRes = await fetch(beefUrl)
+        if (!beefRes.ok) {
+          throw new Error(`WOC /beef responded ${beefRes.status}`)
+        }
+if (atomicBeefTx !== beefRes) {
+  console.error(`WOC mismatch with DB: atomicBeefTx=${atomicBeefTx}, beefRes=${beefRes}`)
+}
+logWithTimestamp(F, '🔍 fixedPubKey', {
+  fixedPrivHex: fixedPriv.toHex(),
+  fixedPubKey
+})
+
+// --- Step 5: build args for internalizeAction ---
+const args: InternalizeActionArgs = {
+  tx:  Utils.toArray(atomicBeefTx, 'hex'),
+  outputs: [
+    {
+      outputIndex: realIndex,
+      protocol: 'wallet payment',
+      paymentRemittance: {
+        derivationPrefix,
+        derivationSuffix,
+        senderIdentityKey: fixedPubKey.toString()
+      }
+    }
+  ],
+  description: `Internalize Gateway Payment ${paymentId}`
+}
+logWithTimestamp(F, '🔍 Prepared internalizeAction args', args)
+
+// --- Step 6: call internalizeAction on merchant’s wallet ---
+const internalizeResult = await wallet.internalizeAction(args)
+logWithTimestamp(F, '✅ internalizeAction completed', internalizeResult)
+
+// --- Step 7: refresh state ---
+logWithTimestamp(F, 'Successfully acknowledged payment', paymentId)
+setPayments([])
+setRenderKey(Date.now())
+await fetchPayments()
+await fetchWalletOutputs()
+
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : '❌ Unknown error'
+    logWithTimestamp(F, '❌ Error acknowledging payment:', message)
+    setError(message)
+  }
+}
 
   const baseOptions = [
     { value: 5, label: '5' },
@@ -861,23 +954,23 @@ const PaymentsList = () => {
                           : 'N/A'}
                       </TableCell>
                       <TableCell>
-                        {payment.is_new
+                        {payment.is_new && payment.amount! > 0
                           ? (
-                            <Button
+                          <Button
                               variant='contained'
                               color='primary'
-                              onClick={async () =>
-                                await acknowledgePayment(payment.payment_id).catch(
-                                  () => {}
-                                )}
+                              onClick={async () => {
+                                await acknowledgePayment(payment.payment_id).catch(() => {})
+                              }}
                             >
-                              Acknowledge
+                              Deposit
                             </Button>
-                            )
-                          : (
-                              'confirmed'
-                            )}
-                      </TableCell>
+                          ) : !payment.is_new ? (
+                            'deposited'
+                          ) : (
+                            '—'
+                          )}
+                        </TableCell>
                     </TableRow>
                   )
                 })}

@@ -24,7 +24,7 @@ import express, { Request, Response, NextFunction, Router } from 'express'
 import bodyParser from 'body-parser'
 import path from 'path'
 import knex from 'knex'
-import { Setup } from '@bsv/wallet-toolbox'
+import { SetupClient } from '@bsv/wallet-toolbox'
 import {
   AuthRequest,
   createAuthMiddleware
@@ -34,12 +34,13 @@ import routes from './routes'
 import knexConfig from './knexfile'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
-import { CONFIG, MAX_PAYMENT_SATS } from './utils/constants'
+import { MAX_PAYMENT_SATS } from './utils/constants'
 import { logWithTimestamp } from './utils/logging'
-import util from 'util'
 
 const F = 'server'
-dotenv.config()
+const envPath = process.env.DOTENV_CONFIG_PATH || '.env'
+logWithTimestamp(F, `🔧 Loading environment file: ${envPath}`)
+dotenv.config({ path: envPath })
 
 interface Route {
   type: string
@@ -57,6 +58,20 @@ const ROUTING_PREFIX = process.env.ROUTING_PREFIX ?? '/api'
 const WALLET_STORAGE_URL = process.env.WALLET_STORAGE_URL ?? ''
 const HOSTING_DOMAIN = process.env.HOSTING_DOMAIN ?? 'http://localhost:3000'
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? HOSTING_DOMAIN
+const serverKey = process.env.SERVER_PRIVATE_KEY ?? ''
+if (serverKey.length !== 64) {
+  throw new Error(
+    '❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex characters)'
+  )
+}
+// we export a Promise<WalletClient>
+export const walletPromise = (async () => {
+    return await SetupClient.createWalletClientNoEnv({
+    rootKeyHex: serverKey,
+    storageUrl: WALLET_STORAGE_URL,
+    chain: 'main'
+  })
+})()
 
 // Heuristic VM/prod detector
 let IS_VM = false
@@ -132,24 +147,6 @@ async function initializeServer (): Promise<void> {
     await db.migrate.latest()
     logWithTimestamp(F, '✅ Migrations applied successfully')
 
-    const serverKey = process.env.SERVER_PRIVATE_KEY ?? ''
-    if (serverKey.length !== 64) {
-      throw new Error(
-        '❌ SERVER_PRIVATE_KEY is missing or invalid (must be 64 hex characters)'
-      )
-    }
-
-    const wallet = await Setup.createWalletClientNoEnv({
-      rootKeyHex: serverKey,
-      storageUrl: WALLET_STORAGE_URL,
-      chain: 'main'
-    })
-    logWithTimestamp(
-      F,
-      '🔍 Wallet initialized:',
-      util.inspect(wallet, { depth: 2, colors: true } as any)
-    )
-
     // In dev (localhost) → keep strict
     // In prod/VM → trust all proxies so Host/X-Forwarded headers validate correctly
     if (
@@ -207,6 +204,7 @@ async function initializeServer (): Promise<void> {
     // =====================================================
     // 🔑 AUTH MIDDLEWARE — create BEFORE mounting
     // =====================================================
+    const wallet = await walletPromise
     const authRouter = createAuthMiddleware({
       wallet,
       allowUnauthenticated: true,

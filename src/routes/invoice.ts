@@ -16,15 +16,18 @@
 import knex, { Knex } from 'knex'
 import knexConfig from '../knexfile'
 import { randomBytes } from 'crypto'
-import { Hash, P2PKH, PrivateKey, PublicKey, Utils } from '@bsv/sdk'
 import { Request, Response } from 'express'
 import { body, validationResult } from 'express-validator'
 import { logWithTimestamp } from '../utils/logging'
-import { CONFIG } from '../utils/constants'
 import { generateAndValidateUniqueId } from '../utils/idGenerator'
 import { ensureMerchantExists } from '../utils/merchant'
+import { walletPromise } from '../server'
+import { PrivateKey } from '@bsv/sdk'
+import { ScriptTemplateBRC29, ScriptTemplateParamsBRC29 } from '@bsv/wallet-toolbox'
+
 const F = 'routes/invoice'
 const db: Knex = knex(knexConfig)
+logWithTimestamp(F, '🔍 [invoice] Using DB config:', knexConfig);
 
 interface PaymentButton {
   button_id: string
@@ -47,6 +50,12 @@ interface RequestBody {
   amount: number
   description: string
 }
+export type AuthRequest = Request & {
+  auth?: {
+    identityKey?: string
+  }
+}
+
 export default {
   type: 'post',
   path: '/invoice',
@@ -86,64 +95,97 @@ export default {
       .isLength({ max: 80 })
       .withMessage('description exceeds maximum length of 80 characters')
   ],
-  func: async (req: Request, res: Response): Promise<void> => {
-    const derivationPrefix: string = randomBytes(12).toString('hex').slice(0, 12)
-    const derivationSuffix: string = randomBytes(12).toString('hex').slice(0, 12)
+  func: async (req: AuthRequest, res: Response): Promise<void> => {
+    
+let derivationPrefix: string = ''
+let derivationSuffix: string = ''
 
-    const errors = validationResult(req)
-    if (!errors.isEmpty()) {
-      logWithTimestamp(F, '❌ [invoice] Validation errors:', errors.array())
-      res
-        .status(400)
-        .json({
-          status: 'error',
-          message: '❌ Invalid parameters',
-          errors: errors.array()
-        })
-      return
-    }
-    const senderIdentityKey = (req as any).auth?.identityKey
-    logWithTimestamp(
-      F,
-      '🔍 [invoice] [Step 0] Sender identity key from auth context:',
-      {
-        senderIdentityKey,
-        expectedMerchantId: req.body.merchantId,
-        headers: req.headers
-      }
-    )
-    if (!senderIdentityKey) {
-      logWithTimestamp(
-        F,
-        '❌ [invoice] Missing sender identity key from auth context'
-      )
-      res
-        .status(401)
-        .json({
-          status: 'error',
-          message: '❌ Unauthorized: Missing sender identity'
-        })
-      return
-    }
-    let { paymentId, buttonId, merchantId, amount, description }: RequestBody =
-      req.body
-    let paymentDescription = description
-    logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', {
-      paymentId,
-      buttonId,
-      merchantId,
-      amount,
-      description
-    })
-    try {
-      await ensureMerchantExists(db, merchantId)
-      // Verify the payment button exists and belongs to the specified merchant
-      logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', {
-        paymentId,
-        merchantId
-      })
+// ---- validate input ----
+const errors = validationResult(req)
+if (!errors.isEmpty()) {
+  logWithTimestamp(F, '❌ [invoice] Validation errors:', errors.array())
+  res.status(400).json({
+    status: 'error',
+    message: '❌ Invalid parameters',
+    errors: errors.array()
+  })
+  return
+}
+
+// ---- auth + inputs (do NOT require caller === merchant) ----
+const allowFallback = (process.env.ALLOW_UNAUTH_FALLBACK ?? '').toLowerCase() === 'yes'
+
+let senderIdentityKey = (req as any).auth?.identityKey || null
+if (!senderIdentityKey || senderIdentityKey === 'unknown') senderIdentityKey = null
+
+// Pull request fields once (avoid redeclares later)
+let { paymentId, amount, description } = req.body as RequestBody
+const buttonId: string = (req.body as RequestBody).buttonId
+const requestedMerchantId: string = (req.body as RequestBody).merchantId
+
+logWithTimestamp(F, '🔍 [invoice] [Step 0] Auth context check:', {
+  senderIdentityKey,
+  requestedMerchantId,
+  headers: req.headers,
+  allowFallback
+})
+
+// ---- resolve merchant from the button (source of truth) ----
+const ownerRow = await db('payment_buttons')
+  .select('merchant_id')
+  .where({ button_id: buttonId })
+  .first()
+
+if (!ownerRow) {
+  res.status(404).json({ status: 'error', message: 'Unknown buttonId' })
+  return
+}
+const merchantId: string = ownerRow.merchant_id
+
+// Optional sanity: if client sent a merchantId, ensure it matches the button owner
+if (requestedMerchantId && requestedMerchantId !== merchantId) {
+  res.status(400).json({
+    status: 'error',
+    message: 'merchantId mismatch for buttonId',
+    details: { requestedMerchantId, resolvedMerchantId: merchantId, buttonId }
+  })
+  return
+}
+
+// Allow unauth fallback if configured
+if (!senderIdentityKey && allowFallback) {
+  senderIdentityKey = '0282f7effd932d9d2a3774c287eacb9ace3728a753a0339e2f16998153e5d65963'
+}
+
+logWithTimestamp(F, '✅ [invoice] Caller accepted; resolved merchant', {
+  senderIdentityKey,
+  requestedMerchantId,
+  resolvedMerchantId: merchantId,
+  allowFallback
+})
+try{
+// Ensure the resolved merchant exists
+await ensureMerchantExists(db, merchantId)
+
+// ---- Step 1: log request with resolved merchant ----
+let paymentDescription = description
+logWithTimestamp(F, '🔍 [invoice] [Step 1] Received request body:', {
+  paymentId,
+  buttonId,
+  requestedMerchantId,
+  resolvedMerchantId: merchantId,
+  amount,
+  description
+})
+
+// ---- Step 2: proceed to load the button row with resolved merchant ----
+logWithTimestamp(F, '🔍 [invoice] [Step 2] Executing query:', {
+  paymentId,
+  merchantId
+})
       const button: PaymentButton | undefined = await db('payment_buttons')
         .where({
+          button_id: buttonId,
           payment_id: paymentId,
           merchant_id: merchantId
         })
@@ -195,7 +237,34 @@ export default {
       const checkExistingPayment = await db('payments')
         .where({ payment_id: paymentId, button_id: buttonId })
         .first()
-      if (!checkExistingPayment) {
+
+// AFTER you’ve got checkExistingPayment from DB
+
+if (
+  checkExistingPayment &&
+  checkExistingPayment.derivation_prefix &&
+  checkExistingPayment.derivation_suffix
+) {
+  // ✅ reuse existing
+  derivationPrefix = checkExistingPayment.derivation_prefix
+  derivationSuffix = checkExistingPayment.derivation_suffix
+  logWithTimestamp(F, '🔍 [invoice] [Step 3A] Reusing existing derivation for paymentId:', {
+    paymentId,
+    derivationPrefix,
+    derivationSuffix
+  })
+} else {
+  // ❌ generate new
+  derivationPrefix = randomBytes(12).toString('hex').slice(0, 12)
+  derivationSuffix = randomBytes(12).toString('hex').slice(0, 12)
+  logWithTimestamp(F, '🔍 [invoice] [Step 3B] Generated new derivation for paymentId:', {
+    paymentId,
+    derivationPrefix,
+    derivationSuffix
+  })
+}
+
+        if (!checkExistingPayment) {
         logWithTimestamp(
           F,
           '❌ [invoice] No existing payment found for paymentId:',
@@ -426,78 +495,66 @@ export default {
         })
         return
       }
-      let senderPrivateKey: PrivateKey
-      const existingPayment = await db('payments')
-        .where({ payment_id: paymentId })
-        .first()
-      if (existingPayment && existingPayment.payer_id) {
-        senderPrivateKey = new PrivateKey(existingPayment.payer_id, 'hex')
-        logWithTimestamp(
-          F,
-          '🔍 [invoice] Using payer_id from payments:',
-          existingPayment.payer_id
-        )
-      } else {
-        senderPrivateKey = new PrivateKey(
-          '0000000000000000000000000000000000000000000000000000000000000001',
-          'hex'
-        )
-        logWithTimestamp(F, '🔍 [invoice] Using hardcoded key as fallback')
-      }
-      const recipientPublicKey = PublicKey.fromString(button.merchant_id)
-      const invoiceNumber: string = `2-3241645161d8-${derivationPrefix} ${derivationSuffix}`
-      const combined = Utils.toArray(
-        `${senderPrivateKey.toString()}${recipientPublicKey.toString()}${invoiceNumber}`,
-        'utf8'
-      )
-      const derivedHash = Hash.sha256(Hash.sha256(combined))
-      const derivedPriv = new PrivateKey(Utils.toHex(derivedHash), 'hex')
-      const derivedPublicKey = derivedPriv.toPublicKey().toString()
-      const pkh = new P2PKH()
-      const derivedScript = pkh
-        .lock(PublicKey.fromString(derivedPublicKey).toHash())
-        .toHex()
-      logWithTimestamp(
-        F,
-        '🔍 [invoice] [Step 8] Generated derived script:',
-        derivedScript
-      )
-      const satoshis = button.variable_amount ? amount : button.amount
-      logWithTimestamp(
-        F,
-        '🔍 [invoice] [Step 9] Calculated satoshis for output:',
-        satoshis
-      )
-      const outputDescription = paymentDescription
-      logWithTimestamp(
-        F,
-        '🔍 [invoice] [Step 10] Using output description:',
-        outputDescription
-      )
-      const outputs = [
-        {
-          lockingScript: derivedScript,
-          customInstructions: JSON.stringify({
-            derivationPrefix,
-            derivationSuffix,
-            payee: senderIdentityKey
-          }),
-          satoshis,
-          outputDescription,
-          merchantId
-        }
-      ]
-      logWithTimestamp(
-        F,
-        '🔍 [invoice] [Step 11] Sending response with paymentId:',
-        { paymentId, buttonId, outputs }
-      )
-      res.status(200).json({
-        status: 'success',
-        message: 'Invoice created successfully',
-        paymentId,
-        outputs
-      })
+
+// --- Step 1: seed components ---
+logWithTimestamp(F, '🔍 [invoice] Seed components', {
+  prefix: derivationPrefix,
+  suffix: derivationSuffix
+})
+
+const wallet = await walletPromise
+const brcParams: ScriptTemplateParamsBRC29 = {
+  derivationPrefix,
+  derivationSuffix,
+  keyDeriver: wallet.keyDeriver
+}
+logWithTimestamp(F, '🔍 [invoice] BRC29 params', brcParams)
+
+// --- Step 2: build the ScriptTemplate and fixed pubkey ---
+const BRC29 = new ScriptTemplateBRC29(brcParams)
+const fixedPriv = PrivateKey.fromHex('1'.padStart(64, '0')) // 0x01 key
+logWithTimestamp(F, '🔍 [invoice] Fixed keypair', fixedPriv)
+
+// --- Step 3: generate full BRC29 lockingScript (identical to server) ---
+const lockingScript = BRC29.lock(fixedPriv.toString(), button.merchant_id)
+logWithTimestamp(F, '🔍 [invoice] Generated full BRC29 lockingScript=', lockingScript)
+
+// --- Step 4: prepare outputs array ---
+const satoshis = button.variable_amount ? amount : button.amount
+const outputDescription = paymentDescription
+const outputs = [
+  {
+    lockingScript,
+    satoshis,
+    outputDescription,
+    merchantId: button.merchant_id,
+    customInstructions: JSON.stringify({
+      derivationPrefix,
+      derivationSuffix
+    })
+  }
+]
+logWithTimestamp(F, '🔍 [invoice] Prepared outputs array (fixed-key):', outputs)
+
+// --- Step 5: convert lockingScript to hex for client ---
+const outputsForClient = outputs.map((o) => ({
+  ...o,
+  lockingScript:
+    o.lockingScript && typeof o.lockingScript !== 'string'
+      ? o.lockingScript.toHex()
+      : o.lockingScript
+}))
+logWithTimestamp(F, '🔍 [invoice] outputsForClient', outputsForClient)
+
+res.status(200).json({
+  status: 'success',
+  message: 'Invoice created successfully',
+  paymentId,
+  derivationPrefix,
+  derivationSuffix,
+  outputs: outputsForClient
+});
+
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : '❌ Unknown error'

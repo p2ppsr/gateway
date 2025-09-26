@@ -33,6 +33,7 @@ import {
 import { CONFIG, MAX_PAYMENT_SATS } from '../../utils/constants'
 import { fetchWithTimeout } from '../../utils/general'
 import { getScriptOrigin } from '../../utils/scriptOrigin'
+
 // Component logging prefix
 const F = 'components/PayButton'
 
@@ -871,10 +872,6 @@ const PayButton = ({
           url,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-bsv-server': serverIdentityKey
-            },
             body: JSON.stringify({
               merchantId: merchant,
               buttonId,
@@ -941,18 +938,44 @@ const PayButton = ({
             invoice.paymentId
           )
         }
-        const outputsWithSats: CreateActionOutput[] =
-          invoice.outputs?.map((output) => ({
-            ...output,
-            satoshis: output.satoshis
-          })) ?? []
-        if (
-          variable &&
-          (outputsWithSats.length > 0) &&
-          outputsWithSats[0].satoshis === 0
-        ) {
-          outputsWithSats[0].satoshis = effectiveAmount
-        }
+
+// 🔍 Build outputs exactly as server expects (lockingScript + satoshis + outputDescription)
+// replace your outputsWithSats definition with this:
+const outputsWithSats = (invoice.outputs ?? []).map(output => {
+  const lockingScriptHex =
+    typeof output.lockingScript === 'string'
+      ? output.lockingScript
+      : Utils.toHex(output.lockingScript)
+  return {
+    lockingScript: lockingScriptHex,
+    satoshis: variable && output.satoshis === 0 ? effectiveAmount : output.satoshis,
+    outputDescription: output.outputDescription ?? 'Payment Output'
+  }
+})
+
+if (outputsWithSats.length === 0) {
+  throw new Error('Invoice returned no outputs')
+}
+
+// Debug log
+console.log(
+  `[${new Date().toISOString()}] [${F}] 🔍 [Step 4] Client prepared outputsWithSats:`,
+  outputsWithSats
+)
+
+        //* const outputsWithSats: CreateActionOutput[] =
+        //   invoice.outputs?.map((output) => ({
+        //     ...output,
+        //     satoshis: output.satoshis
+        //   })) ?? []
+
+        // if (
+        //   variable &&
+        //   (outputsWithSats.length > 0) &&
+        //   outputsWithSats[0].satoshis === 0
+        // ) {
+        //   outputsWithSats[0].satoshis = effectiveAmount
+        // }
         if (
           (outputsWithSats.length > 0) &&
           outputsWithSats[0].satoshis !== effectiveAmount
@@ -970,12 +993,36 @@ const PayButton = ({
         )
 
         try {
-          const createActionResult: CreateActionResult =
-            await wallet.createAction({
-              description: invoice.paymentId,
-              outputs: outputsWithSats
-            })
-          console.log('result=', createActionResult)
+
+// Extract the server-provided escrow lockingScript from the first output
+const escrowLockingScript = outputsWithSats[0]?.lockingScript
+if (!escrowLockingScript) {
+  throw new Error('Missing escrow lockingScript from server invoice outputs')
+}
+
+// --- Apply the server’s full output exactly as returned (no overwrite) ---
+if (outputsWithSats.length === 0) {
+  throw new Error('Invoice returned no outputs')
+}
+
+// Make sure outputDescription is preserved for every output
+outputsWithSats.forEach((o, idx) => {
+  if (!o.outputDescription) {
+    o.outputDescription = `Payment Output #${idx + 1}`
+  }
+})
+
+// Diagnostic log before sending
+console.log(
+  `[${new Date().toISOString()}] [${F}] 🔍 [Step 5] Final outputs to wallet.createAction:`,
+  outputsWithSats
+)
+
+// Now create the action with outputs exactly matching invoice
+const createActionResult: CreateActionResult = await wallet.createAction({
+  description: invoice.paymentId,
+  outputs: outputsWithSats
+})
 
           if (createActionResult.tx == null) {
             throw new Error('Transaction is undefined. Action may be delayed.')
@@ -988,9 +1035,10 @@ const PayButton = ({
             `[${new Date().toISOString()}] [${F}] ✅ [Step 6] Action created:`,
             createActionResult
           )
-          let transaction, atomicBeefTx, txid
+          let txid: string | null = null
+          let atomicBeefTx: string = ''
           try {
-            transaction = Transaction.fromAtomicBEEF(createActionResult.tx)
+            const transaction = Transaction.fromAtomicBEEF(createActionResult.tx)
             txid = transaction.id('hex')
             atomicBeefTx = Utils.toHex(createActionResult.tx)
             console.log(
@@ -1019,10 +1067,6 @@ const PayButton = ({
             payUrl,
             {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-bsv-server': serverIdentityKey
-              },
               body: JSON.stringify(payPayload)
             },
             wallet
@@ -1036,7 +1080,7 @@ const PayButton = ({
           )
           setPaid(true)
           setTxid(pay.txid)
-          setPaymentId(initialPaymentId)
+          //*setPaymentId(initialPaymentId)
           const isMultiUse = multiUse === 'true' || multiUse === true
           if (isMultiUse) setPaid(false)
 

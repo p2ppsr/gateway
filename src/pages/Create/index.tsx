@@ -60,8 +60,8 @@ import {
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs'
 const F = 'pages/Create'
 
-// Vite injects this at build time, declare for TS
 declare const SERVER_IDENTITY_KEY: string
+const serverIdentityKey = SERVER_IDENTITY_KEY
 
 const debounce = (func: (...args: any[]) => void, wait: number) => {
   let timeout: number | null = null
@@ -767,7 +767,10 @@ ${normalizeCSS(cssToUse)}
       const navType = performance.navigation.type
       let serverStatus = { isRestarted: false }
       try {
-        const res = await fetchWithAuth('/getStatus', { method: 'GET' })
+        const res = await fetchWithAuth(
+          '/getStatus', 
+        { method: 'GET' },
+        )
         serverStatus = await res.json()
         logWithTimestamp(F, 'useEffect: Server status:', serverStatus)
       } catch (err: any) {
@@ -901,7 +904,7 @@ ${normalizeCSS(cssToUse)}
           try {
             const data = await fetchJsonWithAuth<ButtonCodeResponse>(
               `/buttonCode/${encodeURIComponent(validButtonID)}`,
-              { method: 'GET' }
+              { method: 'GET' },           
             )
             logWithTimestamp(F, 'useEffect: Button code response', {
               status: data.status,
@@ -1842,10 +1845,6 @@ ${normalizeCSS(cssToUse)}
         '/createButton',
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-bsv-server': SERVER_IDENTITY_KEY // ✅ injected constant
-          },
           body: JSON.stringify(payload)
         }
       )
@@ -2046,7 +2045,6 @@ ${normalizeCSS(cssToUse)}
         )
         await fetch(`${API_BASE}/cleanupIds`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             buttonId: currentButtonId,
             paymentId: currentPaymentId,
@@ -2058,10 +2056,6 @@ ${normalizeCSS(cssToUse)}
       try {
         const res = await fetchWithAuth('/cleanupIds', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-bsv-server': SERVER_IDENTITY_KEY
-          },
           body: JSON.stringify({
             buttonId: currentButtonId,
             paymentId: currentPaymentId,

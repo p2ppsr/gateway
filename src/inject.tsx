@@ -22,7 +22,7 @@ import { createRoot } from 'react-dom/client'
 import PayButton, { PayButtonProps } from './components/PayButton'
 import { logWithTimestamp } from './utils/logging'
 import { initializeIds } from './utils/initializeIds'
-import { fetchWithTimeout } from './utils/general'
+import { fetchWithTimeout, isBase58 } from './utils/general'
 import { WalletClient } from '@bsv/sdk'
 import { CONFIG } from './utils/constants'
 import { getScriptOrigin } from './utils/scriptOrigin'
@@ -311,41 +311,55 @@ const bootstrapPayButtons = async (): Promise<void> => {
       logWithTimestamp(F, '🔍 props after data-* mapping:', { ...props })
     }
 
-    // Decide whether we need to initialize IDs (skip validation for simplicity/reliability)
-    const needsInit = !props.paymentId
+// Always initialize IDs – but skip first usage if server already gave a paymentId
+try {
+  let resp;
 
-    if (needsInit) {
-      try {
-        // initializeIds signature can vary across builds; cast to any to avoid type mismatch errors.
-        const resp = await (initializeIds as any)(
-          'payment',
-          wallet,
-          props.paymentId || '',
-          undefined, // merchantId (optional)
-          undefined, // setId callback
-          undefined, // fixed description cb
-          undefined, // variable description cb
-          undefined // auth token
-        )
+  // If props.paymentId is a valid Base58 (first use), skip initializeIds
+  const isPreassignedPaymentId =
+    props.paymentId && isBase58(props.paymentId, 12);
 
-        if (resp?.status === 'success' && resp?.paymentId) {
-          props.paymentId = String(resp.paymentId)
-          logWithTimestamp(F, '✅ initialized paymentId:', props.paymentId)
-        } else {
-          throw new Error(
-            `initializeIds failed: ${String(resp?.message || 'unknown error')}`
-          )
-        }
-      } catch (err) {
-        const e = toError(err)
-        logWithTimestamp(F, '❌ initialization failed, skipping element:', {
-          message: e.message
-        })
-        console.error('❌ [inject] Initialization failed:', e)
-        // Skip rendering this element if we cannot guarantee a usable paymentId
-        continue
-      }
-    }
+  if (isPreassignedPaymentId) {
+    // First use: just accept server-provided paymentId
+    logWithTimestamp(
+      F,
+      'ℹ️ skipping initializeIds — using preassigned paymentId:',
+      props.paymentId
+    );
+    resp = { status: 'success', id: props.paymentId };
+  } else {
+    // Second+ use or no paymentId provided: request a new one from server
+    resp = await (initializeIds as any)(
+      'payment',
+      wallet,
+      props.paymentId ? String(props.paymentId) : null,
+      String(props.merchant || ''),
+      undefined, // setId callback
+      undefined, // fixed description cb
+      undefined, // variable description cb
+      undefined, // buttonId
+      false,     // force = false
+      props.description
+    );
+  }
+
+  if (resp?.status === 'success' && (resp?.id || props.paymentId)) {
+    props.paymentId = String(resp.id || props.paymentId);
+    logWithTimestamp(F, '✅ initialized paymentId:', props.paymentId);
+  } else {
+    throw new Error(
+      `initializeIds failed: ${String(resp?.message || 'unknown error')}`
+    );
+  }
+} catch (err) {
+  const e = toError(err);
+  logWithTimestamp(F, '❌ initialization failed, skipping element:', {
+    message: e.message
+  });
+  console.error('❌ [inject] Initialization failed:', e);
+  // Skip rendering this element if we cannot guarantee a usable paymentId
+  continue;
+}
 
     // Create/ ensure the button exists
     await createButton(props, wallet)

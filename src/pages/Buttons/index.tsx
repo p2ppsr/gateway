@@ -42,6 +42,9 @@ import { CONFIG, DUP_FIELD_PLACEHOLDER } from '../../utils/constants'
 import SortableHeader from '../../components/SortableHeader'
 const F = 'pages/Buttons'
 
+declare const SERVER_IDENTITY_KEY: string
+const serverIdentityKey = SERVER_IDENTITY_KEY
+
 const wallet = new WalletClient('json-api', CONFIG.WALLET_ORIGIN)
 
 interface Payment {

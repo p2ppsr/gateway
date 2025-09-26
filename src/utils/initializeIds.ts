@@ -100,7 +100,8 @@ export const initializeIds = async (
   setSpendingDescription_fixed?: Dispatch<SetStateAction<string>>,
   setSpendingDescription_variable?: Dispatch<SetStateAction<string>>,
   buttonId?: string,
-  force: boolean = true
+  force: boolean = true,
+  description?: string
 ): Promise<InitializeIdsResponse> => {
   // Validate type + inputs
   if (type !== 'payment' && type !== 'button') {
@@ -189,15 +190,43 @@ export const initializeIds = async (
 
   // 3) Auth POST to initializeIds
   const currentKey = type === 'payment' ? 'paymentId' : 'buttonId'
-  const body = {
-    [currentKey]: currentId,
-    merchantId: effectiveMerchantId,
-    ...(type === 'payment' && buttonId ? { buttonId } : {}),
-    description:
-      type === 'payment'
-        ? `Payment using paymentId: ${currentId}`
-        : `Payment using buttonId: ${currentId}`
-  }
+
+// Build effectiveDescription with your new rule (simplified)
+let effectiveDescription = description
+
+if (type === 'payment' && description) {
+  // Replace any paymentId in description with the new one (case sensitive, global)
+  const paymentPlaceholder = /paymentId:\s*[A-HJ-NP-Za-km-z1-9]+/g
+  effectiveDescription = description.replace(
+    paymentPlaceholder,
+    `paymentId: ${currentId}`
+  )
+}
+
+// Fallback if no description supplied
+if (!effectiveDescription) {
+  effectiveDescription =
+    type === 'payment'
+      ? `Payment using paymentId: ${currentId}`
+      : `Payment using buttonId: ${currentId}`
+}
+
+const body = {
+  [currentKey]: currentId,
+  merchantId: effectiveMerchantId,
+  ...(type === 'payment' && buttonId ? { buttonId } : {}),
+  description: effectiveDescription
+}
+
+  // const body = {
+  //   [currentKey]: currentId,
+  //   merchantId: effectiveMerchantId,
+  //   ...(type === 'payment' && buttonId ? { buttonId } : {}),
+  //   description:
+  //     type === 'payment'
+  //       ? `Payment using paymentId: ${currentId}`
+  //       : `Payment using buttonId: ${currentId}`
+  // }
   const bodyPreview = JSON.stringify(body).slice(0, 200)
   logWithTimestamp(F, `POST (auth) → ${INIT_URL}`)
   logWithTimestamp(F, `POST (auth) body (first 200): ${bodyPreview}`)
