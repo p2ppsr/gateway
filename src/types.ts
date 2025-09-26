@@ -5,8 +5,8 @@
  * @property {number} outputIndex - The index of the output within the transaction.
  */
 export interface UTXOReference {
-  txid: string
-  outputIndex: number
+  txid: string;
+  outputIndex: number;
 }
 
 /**
@@ -26,18 +26,18 @@ export interface UTXOReference {
  * @property {string} searchableAttributes - Serialized string for overlay indexing.
  */
 export interface GatewayRecord {
-  txid: string
-  outputIndex: number
-  payerIdentityKey: string
-  merchantId: string
-  amount: number
-  currency: string
-  buttonId: string
-  derivationPrefix: string
-  derivationSuffix: string
-  status: string
-  createdAt: Date
-  searchableAttributes: string
+  txid: string;
+  outputIndex: number;
+  payerIdentityKey: string;
+  merchantId: string;
+  amount: number;
+  currency: string;
+  buttonId: string;
+  derivationPrefix: string;
+  derivationSuffix: string;
+  status: string;
+  createdAt: Date;
+  searchableAttributes: string;
 }
 
 /**
@@ -53,14 +53,14 @@ export interface GatewayRecord {
  * @property {string} [status] - Filter by payment status.
  */
 export interface GatewayAttributes {
-  payerIdentityKey?: string
-  merchantId?: string
-  amount?: number
-  currency?: string
-  buttonId?: string
-  derivationPrefix?: string
-  derivationSuffix?: string
-  status?: string
+  payerIdentityKey?: string;
+  merchantId?: string;
+  amount?: number;
+  currency?: string;
+  buttonId?: string;
+  derivationPrefix?: string;
+  derivationSuffix?: string;
+  status?: string;
 }
 
 /**
@@ -69,7 +69,7 @@ export interface GatewayAttributes {
  * @property {Array<Object>} $and - List of conditions to match.
  */
 export interface GatewayQuery {
-  $and: Array<{ [key: string]: any }>
+  $and: Array<{ [key: string]: any }>;
 }
 
 // Overlay-compatible structured lookup query types
@@ -81,8 +81,8 @@ export interface GatewayQuery {
  * @property {{ merchantId: string }} value - Merchant ID to match.
  */
 export interface FindByMerchantIdQuery {
-  type: 'findByMerchantId'
-  value: { merchantId: string }
+  type: "findByMerchantId";
+  value: { merchantId: string };
 }
 
 /**
@@ -92,8 +92,8 @@ export interface FindByMerchantIdQuery {
  * @property {{ paymentId: string }} value - Payment ID to match.
  */
 export interface FindByPaymentIdQuery {
-  type: 'findByPaymentId'
-  value: { paymentId: string }
+  type: "findByPaymentId";
+  value: { paymentId: string };
 }
 
 /**
@@ -103,8 +103,8 @@ export interface FindByPaymentIdQuery {
  * @property {{ buttonId: string }} value - Button ID to match.
  */
 export interface FindByButtonIdQuery {
-  type: 'findByButtonId'
-  value: { buttonId: string }
+  type: "findByButtonId";
+  value: { buttonId: string };
 }
 
 /**
@@ -114,8 +114,8 @@ export interface FindByButtonIdQuery {
  * @property {{ derivationPrefix: string }} value - derivation prefix to match.
  */
 export interface FindByDerivationPrefixQuery {
-  type: 'findByDerivationPrefix'
-  value: { derivationPrefix: string }
+  type: "findByDerivationPrefix";
+  value: { derivationPrefix: string };
 }
 
 /**
@@ -125,8 +125,8 @@ export interface FindByDerivationPrefixQuery {
  * @property {{ derivationSuffix: string }} value - derivation suffix to match.
  */
 export interface FindByDerivationSuffixQuery {
-  type: 'findByDerivationSuffix'
-  value: { derivationSuffix: string }
+  type: "findByDerivationSuffix";
+  value: { derivationSuffix: string };
 }
 
 // /**
@@ -147,8 +147,8 @@ export interface FindByDerivationSuffixQuery {
  * @property {{ amount: number }} value - Amount to match.
  */
 export interface FindByAmountQuery {
-  type: 'findByAmount'
-  value: { amount: number }
+  type: "findByAmount";
+  value: { amount: number };
 }
 
 /**
@@ -161,12 +161,12 @@ export interface FindByAmountQuery {
  * @property {string} [value.merchantId] - Filter by merchant ID.
  */
 export interface FindAllQuery {
-  type: 'findAll'
+  type: "findAll";
   value?: {
-    derivationPrefix?: string
-    derivationSuffix?: string
-    merchantId?: string
-  }
+    derivationPrefix?: string;
+    derivationSuffix?: string;
+    merchantId?: string;
+  };
 }
 
 /**
@@ -179,4 +179,4 @@ export type GatewayLookupQuery =
   | FindByDerivationPrefixQuery
   | FindByDerivationSuffixQuery
   | FindByAmountQuery
-  | FindAllQuery
+  | FindAllQuery;

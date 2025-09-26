@@ -45,6 +45,7 @@ Run the bootstrap (`scripts/startup.sh` / `scripts/startup.js`) to create/update
 Returns basic server health/environment.
 
 **Response**
+
 ```json
 { "status": "success", "network": "mainnet", "isAdmin": false }
 ```
@@ -62,10 +63,10 @@ Use this to pre-allocate a **buttonId** or **paymentId** owned by a merchant.
 
 ```ts
 interface Ids {
-  buttonId?: string
-  paymentId?: string
-  merchantId: string
-  description: string // required, max 80 chars
+  buttonId?: string;
+  paymentId?: string;
+  merchantId: string;
+  description: string; // required, max 80 chars
 }
 ```
 
@@ -106,6 +107,7 @@ interface Ids {
 ```
 
 **Notes**
+
 - Validates `merchantId` (wallet identity key) and requires it to match the authenticated caller.
 - Detects duplicates & retries on transient DB errors (up to 3 attempts).
 - When reserving a `paymentId` and supplying `buttonId`, the server verifies that `buttonId` already exists in `ids`.
@@ -120,6 +122,7 @@ interface Ids {
 Create a button record and seed its first payment record (`src/routes/createButton.ts`). Requires IDs to be **pre-reserved** via `/initializeIds`.
 
 **Body**
+
 ```json
 {
   "amount": 5000,
@@ -137,6 +140,7 @@ Create a button record and seed its first payment record (`src/routes/createButt
 - `description`: optional spending description shown to the payer’s wallet (stored on `payments`).
 
 **Response**
+
 ```json
 {
   "status": "success",
@@ -147,6 +151,7 @@ Create a button record and seed its first payment record (`src/routes/createButt
 ```
 
 **Notes**
+
 - The HTML snippet you pass (`htmlCode`) is stored and later returned by `/buttonCode/:paymentId`.
 - The server also creates/merges an initial `payments` row for the given `paymentId` and `buttonId`.
 
@@ -158,6 +163,7 @@ Look up the embeddable snippet for a payment and its button (`src/routes/buttonC
 Used by client sites to render the button and include `pay.js`.
 
 **Response**
+
 ```json
 {
   "status": "success",
@@ -179,6 +185,7 @@ Create an invoice for a specific button/payment and amount (`src/routes/invoice.
 Returns a locking script and **outputs** for the wallet to fulfill.
 
 **Body**
+
 ```json
 {
   "merchantId": "03abc...def",
@@ -190,6 +197,7 @@ Returns a locking script and **outputs** for the wallet to fulfill.
 ```
 
 **Response**
+
 ```json
 {
   "status": "success",
@@ -208,6 +216,7 @@ Returns a locking script and **outputs** for the wallet to fulfill.
 ```
 
 **Rules**
+
 - Server enforces `amount` to be a positive integer **≤ 10,000** (cap).
 - For variable buttons, the client sets the desired amount before requesting the invoice.
 - For **multi-use** buttons, the server may generate a **new `paymentId`** for each invoice.
@@ -219,6 +228,7 @@ Returns a locking script and **outputs** for the wallet to fulfill.
 Submit a signed transaction for the invoice (`src/routes/pay.ts`). The server validates the transaction, verifies the derived locking script, records the result, and returns the final `txid`.
 
 **Body**
+
 ```json
 {
   "paymentId": "hjvrfMJ7fNBs",
@@ -233,11 +243,17 @@ Submit a signed transaction for the invoice (`src/routes/pay.ts`). The server va
 ```
 
 **Response**
+
 ```json
-{ "status": "success", "message": "Payment completed successfully", "txid": "36321...03065" }
+{
+  "status": "success",
+  "message": "Payment completed successfully",
+  "txid": "36321...03065"
+}
 ```
 
 **Notes**
+
 - Single-use buttons are marked `used` after a successful payment.
 - The server rejects if `lockingScript` doesn’t match the server-derived script or output amount doesn’t match the invoice.
 
@@ -250,11 +266,13 @@ Submit a signed transaction for the invoice (`src/routes/pay.ts`). The server va
 List payments for the authenticated merchant (`src/routes/listPayments.ts`).
 
 **Query params**
+
 - `status` (`all` | `completed` | `new`, default **all**)
 - `limit` (default **10**, max **1000**)
 - `offset` (default **0**)
 
 **Response**
+
 ```json
 {
   "status": "success",
@@ -282,6 +300,7 @@ List payments for the authenticated merchant (`src/routes/listPayments.ts`).
 List buttons for the merchant with usage/status flags (`src/routes/listButtons.ts`).
 
 **Query params**
+
 - `usage` (`used` | `unused`, optional; default **all**)
 - `excludeSingleUse` (`true` | `false`, default **false**)
 - `limit` (default **10**, max **1000**)
@@ -289,6 +308,7 @@ List buttons for the merchant with usage/status flags (`src/routes/listButtons.t
 - `sort` (`asc` | `desc`, default **desc**)
 
 **Response**
+
 ```json
 {
   "status": "success",
@@ -330,11 +350,13 @@ List buttons for the merchant with usage/status flags (`src/routes/listButtons.t
 Mark a payment as seen (`is_new = false`; `src/routes/acknowledgePayment.ts`).
 
 **Body**
+
 ```json
 { "paymentId": "hjvrfMJ7fNBs" }
 ```
 
 **Response**
+
 ```json
 { "status": "success", "message": "Payment acknowledged successfully" }
 ```
@@ -355,6 +377,7 @@ Mark a payment as seen (`is_new = false`; `src/routes/acknowledgePayment.ts`).
 - **500 Internal Server Error** — unhandled server error
 
 **Error shape**
+
 ```json
 { "status": "error", "message": "Explanation of the error…" }
 ```

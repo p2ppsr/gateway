@@ -87,22 +87,22 @@ Created in `202508210900_initial.ts`.
 
 Created in `202508210900_initial.ts`.
 
-| Column                   | Type            | Null | Default | Notes                                               |
-| ------------------------ | --------------- | ---- | ------- | --------------------------------------------------- |
-| `payment_id`             | CHAR(12)        | NO   | —       | **PK**, **FK** → `ids.id` (`CASCADE`)               |
-| `merchant_id`            | VARCHAR(66)     | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)        |
-| `button_id`              | CHAR(12)        | NO   | —       | **FK** → `payment_buttons.button_id` (`CASCADE`)    |
-| `derivation_prefix`      | VARCHAR(64)     | NO   | —       | BRC-29 prefix                                       |
-| `derivation_suffix`      | VARCHAR(64)     | YES  | `NULL`  | BRC-29 suffix                                       |
-| `amount`                 | BIGINT UNSIGNED | NO   | `0`     | Satoshis                                            |
-| `payer_id`               | VARCHAR(255)    | YES  | `NULL`  | Optional payer identifier                           |
-| `txid`                   | VARCHAR(64)     | YES  | `NULL`  | Network transaction id                              |
-| `completed`              | BOOLEAN         | NO   | `false` | Server-side completion marker                       |
-| `is_new`                 | BOOLEAN         | NO   | `true`  | For inbox/ack flow                                  |
-| `blockchain_transaction` | LONGTEXT        | YES  | `NULL`  | Raw/atomic (e.g., BEEF)                             |
-| `description`            | VARCHAR(80)     | NO   | `''`    | Short human label                                   |
-| `created_at`             | TIMESTAMP       | YES  | `NOW()` |                                                     |
-| `updated_at`             | TIMESTAMP       | YES  | `NOW()` |                                                     |
+| Column                   | Type            | Null | Default | Notes                                            |
+| ------------------------ | --------------- | ---- | ------- | ------------------------------------------------ |
+| `payment_id`             | CHAR(12)        | NO   | —       | **PK**, **FK** → `ids.id` (`CASCADE`)            |
+| `merchant_id`            | VARCHAR(66)     | NO   | —       | **FK** → `merchants.merchant_id` (`CASCADE`)     |
+| `button_id`              | CHAR(12)        | NO   | —       | **FK** → `payment_buttons.button_id` (`CASCADE`) |
+| `derivation_prefix`      | VARCHAR(64)     | NO   | —       | BRC-29 prefix                                    |
+| `derivation_suffix`      | VARCHAR(64)     | YES  | `NULL`  | BRC-29 suffix                                    |
+| `amount`                 | BIGINT UNSIGNED | NO   | `0`     | Satoshis                                         |
+| `payer_id`               | VARCHAR(255)    | YES  | `NULL`  | Optional payer identifier                        |
+| `txid`                   | VARCHAR(64)     | YES  | `NULL`  | Network transaction id                           |
+| `completed`              | BOOLEAN         | NO   | `false` | Server-side completion marker                    |
+| `is_new`                 | BOOLEAN         | NO   | `true`  | For inbox/ack flow                               |
+| `blockchain_transaction` | LONGTEXT        | YES  | `NULL`  | Raw/atomic (e.g., BEEF)                          |
+| `description`            | VARCHAR(80)     | NO   | `''`    | Short human label                                |
+| `created_at`             | TIMESTAMP       | YES  | `NOW()` |                                                  |
+| `updated_at`             | TIMESTAMP       | YES  | `NOW()` |                                                  |
 
 ---
 

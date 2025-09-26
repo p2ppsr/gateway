@@ -1,3 +1,3 @@
-declare module 'console-browserify' {
-  export = console
+declare module "console-browserify" {
+  export = console;
 }

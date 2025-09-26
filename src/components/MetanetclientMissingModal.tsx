@@ -8,9 +8,9 @@
  * with a centered modal if `open` is true and valid download info is available.
  */
 
-import React from 'react'
-import usePlatformDownloadInfo from '../utils/usePlatformDownloadInfo'
-import MetanetclientModal from './MetanetclientModal'
+import React from "react";
+import usePlatformDownloadInfo from "../utils/usePlatformDownloadInfo";
+import MetanetclientModal from "./MetanetclientModal";
 
 /**
  * Props for the `MetanetclientMissingModal` component.
@@ -18,7 +18,7 @@ import MetanetclientModal from './MetanetclientModal'
  * @property {boolean} open - Whether the modal is currently visible.
  */
 interface Props {
-  open: boolean
+  open: boolean;
 }
 
 /**
@@ -36,23 +36,23 @@ interface Props {
  * @returns {JSX.Element | null} The modal element or null if not active.
  */
 const MetanetclientMissingModal: React.FC<Props> = ({ open }) => {
-  const info = usePlatformDownloadInfo()
+  const info = usePlatformDownloadInfo();
 
-  if (!open || info == null) return null
+  if (!open || info == null) return null;
 
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         top: 0,
         left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 9999
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "rgba(0, 0, 0, 0.85)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
       }}
     >
       <MetanetclientModal
@@ -60,7 +60,7 @@ const MetanetclientMissingModal: React.FC<Props> = ({ open }) => {
         platformLabel={info.platformLabel}
       />
     </div>
-  )
-}
+  );
+};
 
-export default MetanetclientMissingModal
+export default MetanetclientMissingModal;
