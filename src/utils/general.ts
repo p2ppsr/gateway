@@ -151,32 +151,31 @@ export function formatId(id: string): string {
 /**
  * Formats a timestamp string into a human-readable format in the user's local timezone.
  * @param {string | null | undefined} dateStr The timestamp string (e.g., ISO string or Unix timestamp) or null/undefined.
- * @returns {string} Formatted date string (e.g., "26 Aug 2025 14:30:45") or 'N/A' if invalid.
+ * @returns {string} Formatted date string (e.g., "Aug 26, 2025, 2:30:45 PM" for US, "26 Aug 2025 14:30:45" for UK) or 'N/A' if invalid.
  */
 export function formatTimeLocal(dateStr: string | null | undefined): string {
   if (dateStr === null || dateStr === undefined || dateStr === '') {
-    return 'N/A'
+    return 'N/A';
   }
   try {
-    const date = new Date(dateStr)
+    const date = new Date(dateStr);
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date string: ${dateStr}`)
-      return 'N/A'
+      console.warn(`Invalid date string: ${dateStr}`);
+      return 'N/A';
     }
     return date
-      .toLocaleString('en-GB', {
+      .toLocaleString(undefined, {
         year: 'numeric',
         month: 'short',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false
       })
-      .replace(',', '')
+      .replace(/,(\s)?/, ', '); // Ensure consistent comma spacing
   } catch (error) {
-    console.warn(`Error formatting date string: ${dateStr}`, error)
-    return 'N/A'
+    console.warn(`Error formatting date string: ${dateStr}`, error);
+    return 'N/A';
   }
 }
 
