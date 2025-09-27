@@ -21,6 +21,7 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": [
+    "src/__tests/**",
     "node_modules",
     "dist",
     "public",

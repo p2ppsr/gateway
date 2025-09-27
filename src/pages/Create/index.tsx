@@ -2,11 +2,9 @@
  * @file src/pages/Create/index.tsx
  * @description Component for creating and managing payment buttons in the Gateway UI.
  * Allows users to configure button settings, generate button code, and copy it to the clipboard.
- * @version 1.0.1 (Updated 24Aug2025_2341 BST to fix ID reuse in handleCopyCode)
+ * @version 1.0.1
  * @author xAI (Grok 3)
  * @changelog
- * - 24Aug2025_1800 BST (v1.0.0): Initial creation with button creation and copy functionality.
- * - 24Aug2025_2341 BST (v1.0.1): Fixed handleCopyCode to generate new buttonId and paymentId for each copy action, removing showCode condition to prevent ID reuse.
  */
 import React, {
   useState,
@@ -37,8 +35,6 @@ import { WalletClient } from '@bsv/sdk'
 import { Root, ContentWrap, CenteredHeader, TextFieldStyled } from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import {
-  atomDark,
-  oneLight,
   vscDarkPlus
 } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
@@ -94,7 +90,6 @@ interface ButtonResponse {
   buttonId: string
 }
 
-// Add just below `interface ButtonResponse`:
 interface ButtonCodeResponse {
   status: 'success' | 'error'
   button_id: string
@@ -134,6 +129,7 @@ function formatHtml(html: string): string {
 const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   const theme = useTheme()
   const normalizedCode = useMemo(() => {
+
     // First trim trailing whitespace, then pretty-print HTML if applicable
     let cleaned = code.replace(/\s+$/, '')
     if (language === 'html') {
@@ -174,7 +170,6 @@ const Create: React.FC = () => {
   const [paymentType, setPaymentType] = useState<'fixed' | 'variable'>('fixed')
   const [fixedSatAmount, setFixedSatAmount] = useState('5')
   const [isSingleUse, setIsSingleUse] = useState(false) // Checkbox state: true = single-use, false = multi-use
-  const multiUse = !isSingleUse // Map checkbox to multiUse
   const [merchant, setMerchant] = useState('')
   const [buttonID, setButtonID] = useState('')
   const [paymentID, setPaymentID] = useState('')
@@ -571,10 +566,6 @@ ${normalizeCSS(cssToUse)}
   }, [merchant])
 
   useEffect(() => {
-    logWithTimestamp(
-      F,
-      '@version v4.9.91 (Updated 18Aug2025_1117 BST to fix invalid ID resets, ensure persistence, maintain description consistency, support multi-use button)'
-    )
     logWithTimestamp(F, 'useEffect: Starting initialization process')
     const initializeIfNeeded = async () => {
       let merchantId: string | undefined
@@ -868,10 +859,12 @@ ${normalizeCSS(cssToUse)}
           validPaymentID = paymentResponse.id || generateBase58(12)
           localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
           localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
-          // CPR enable-copy: ensure state even on fallback init
+
+          // enable-copy: ensure state even on fallback init
           setButtonID(validButtonID)
           setPaymentID(validPaymentID)
-          // CPR enable-copy: final guarantee UI reflects chosen IDs
+
+          // enable-copy: final guarantee UI reflects chosen IDs
           setButtonID(validButtonID)
           setPaymentID(validPaymentID)
           setIds({ buttonId: validButtonID, paymentId: validPaymentID })
@@ -1054,7 +1047,7 @@ ${normalizeCSS(cssToUse)}
       logWithTimestamp(F, '❌ useEffect: Error in initialization:', err)
       toast.error(`❌ Initialization failed: ${err.message}`)
     })
-  }, []) // Reverted to empty dependency array
+  }, [])
 
   useEffect(() => {
     if (merchant) {
@@ -1531,6 +1524,7 @@ ${normalizeCSS(cssToUse)}
   }
 
   const resetAll = async () => {
+    // The button id and payment id are not reset as this is not necessary, all other fields are reset to default values
     logWithTimestamp(F, 'resetAll: Starting full reset of page fields')
     try {
       const keysToClear = [
@@ -1545,45 +1539,18 @@ ${normalizeCSS(cssToUse)}
         `isSingleUse_${merchant}`,
         `customCSS_fixed_${merchant}`,
         `customCSS_variable_${merchant}`,
-        `idsInitializedbutton_${merchant}`,
-        `idsInitializedpayment_${merchant}`
       ]
       keysToClear.forEach(k => localStorage.removeItem(k))
       logWithTimestamp(F, 'resetAll: Cleared merchant-scoped localStorage keys')
-      // localStorage.clear()
-      // logWithTimestamp(F, 'resetAll: Cleared all localStorage keys')
-      const newButtonId = generateBase58(12)
-      const newPaymentId = generateBase58(12)
       const w = walletRef.current
       if (w == null) {
         toast.error('❌ Wallet not ready')
         return
       }
-
-      await initializeIds(
-        'button',
-        w,
-        newButtonId,
-        merchant,
-        setButtonID,
-        setSpendingDescription_fixed,
-        setSpendingDescription_variable
-      )
-      await initializeIds(
-        'payment',
-        w,
-        newPaymentId,
-        merchant,
-        setPaymentID,
-        setSpendingDescription_fixed,
-        setSpendingDescription_variable
-      )
       setIds(prev => {
-        const newState = { buttonId: newButtonId, paymentId: newPaymentId }
-        const newFixedDescription = `Payment using paymentId: ${newPaymentId}`
-        const newVariableDescription = `Payment using paymentId: ${newPaymentId}`
-        setButtonID(newButtonId)
-        setPaymentID(newPaymentId)
+        const newState = { buttonId: buttonID, paymentId: paymentID }
+        const newFixedDescription = `Payment using paymentId: ${paymentID}`
+        const newVariableDescription = `Payment using paymentId: ${paymentID}`
         setButtonText_fixed('Pay Now')
         setButtonText_variable('Pay Now')
         setSpendingDescription_fixed(newFixedDescription)
@@ -1642,8 +1609,8 @@ ${normalizeCSS(cssToUse)}
         setShowCode(false)
         setCopySuccess('')
         if (merchant) {
-          localStorage.setItem(`buttonID_${merchant}`, newButtonId)
-          localStorage.setItem(`paymentID_${merchant}`, newPaymentId)
+          localStorage.setItem(`buttonID_${merchant}`, buttonID)
+          localStorage.setItem(`paymentID_${merchant}`, paymentID)
           localStorage.setItem(
             `spendingDescription_fixed_${merchant}`,
             newFixedDescription
@@ -1660,17 +1627,18 @@ ${normalizeCSS(cssToUse)}
           localStorage.setItem(`customCSS_fixed_${merchant}`, fixedCSS)
           localStorage.setItem(`customCSS_variable_${merchant}`, variableCSS)
         }
+
         // Regenerate previews to ensure multiUse consistency
         const fixedText = `Pay Now ${fixedSatAmount} Sats`
         const fixedPreviewHtml = formatHtml(
           `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
             newFixedDescription
-          )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-multi-use="true">${fixedText}</div>`
+          )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="true">${fixedText}</div>`
         )
         const variablePreviewHtml = formatHtml(
           `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(
             newVariableDescription
-          )}" data-buttonId="${newButtonId}" data-paymentId="${newPaymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+          )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
         )
         setPreviewFixedHtml(fixedPreviewHtml)
         setPreviewVariableHtml(variablePreviewHtml)
@@ -1680,8 +1648,8 @@ ${normalizeCSS(cssToUse)}
           F,
           'resetAll: Successfully reset all fields and updated localStorage',
           {
-            newButtonId,
-            newPaymentId,
+            buttonID,
+            paymentID,
             fixedSatAmount: '5',
             paymentType: 'fixed',
             isSingleUse: false,
@@ -1734,6 +1702,7 @@ ${normalizeCSS(cssToUse)}
       )
       return
     }
+
     // Wait for DOM to update and target the correct preview div by class
     await new Promise(resolve => setTimeout(resolve, 0)) // Microtask delay
     const previewDiv =
@@ -1758,6 +1727,7 @@ ${normalizeCSS(cssToUse)}
       )
       return
     }
+
     // Use current IDs from state
     const currentButtonId = buttonID
     const currentPaymentId = paymentID
@@ -1769,6 +1739,7 @@ ${normalizeCSS(cssToUse)}
       currentPaymentId,
       updatedDescription
     })
+
     // Use CSS from state
     const cssToUse =
       paymentType === 'fixed'
@@ -2025,6 +1996,7 @@ ${normalizeCSS(cssToUse)}
       )
     } catch (err: any) {
       setCopySuccess('failed')
+
       // ✅ Safe fallback: if no wallet auth available, call cleanupIds via plain fetch
       if (!merchant) {
         logWithTimestamp(
@@ -2096,7 +2068,7 @@ ${normalizeCSS(cssToUse)}
             <Typography variant="h2">Create Your Payment Button</Typography>
             <Typography variant="subtitle1">
               Edit code live in the left panel to update the preview buttons for
-              your site.
+              your site. Use copy button and paste HTML into your site.
             </Typography>
           </CenteredHeader>
           <Grid container spacing={4}>
