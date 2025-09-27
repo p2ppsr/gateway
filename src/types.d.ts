@@ -6,7 +6,7 @@
  * signAction, acquireCertificate, and proveCertificate.
  */
 
-declare module "@bsv/sdk" {
+declare module '@bsv/sdk' {
   /**
    * Extension of the WalletInterface to include custom methods for signing actions
    * and working with certificates.
@@ -16,9 +16,9 @@ declare module "@bsv/sdk" {
    * @property {Function} proveCertificate - Generates a proof of certificate with selected fields revealed.
    */
   interface WalletInterface {
-    signAction: (...args: any[]) => Promise<any>;
-    acquireCertificate: (...args: any[]) => Promise<any>;
-    proveCertificate: (...args: any[]) => Promise<any>;
+    signAction: (...args: any[]) => Promise<any>
+    acquireCertificate: (...args: any[]) => Promise<any>
+    proveCertificate: (...args: any[]) => Promise<any>
   }
 
   /**
@@ -29,12 +29,9 @@ declare module "@bsv/sdk" {
    * @property {any} [options] - Optional configuration for the signing process.
    */
   interface SignActionArgs {
-    spends: Record<
-      number,
-      { unlockingScript: string; sequenceNumber?: number }
-    >;
-    reference: string;
-    options?: any;
+    spends: Record<number, { unlockingScript: string; sequenceNumber?: number }>
+    reference: string
+    options?: any
   }
 
   /**
@@ -53,17 +50,17 @@ declare module "@bsv/sdk" {
    * @property {string} [certifierUrl] - Optional URL to the certifier's API or service.
    */
   interface AcquireCertificateArgs {
-    type: string;
-    subject?: any;
-    serialNumber: string;
-    revocationOutpoint: string;
-    signature: string;
-    fields: Record<string, string>;
-    certifier: string;
-    keyringRevealer: string;
-    keyringForSubject: Record<string, string>;
-    acquisitionProtocol: "direct" | "issuance";
-    certifierUrl?: string;
+    type: string
+    subject?: any
+    serialNumber: string
+    revocationOutpoint: string
+    signature: string
+    fields: Record<string, string>
+    certifier: string
+    keyringRevealer: string
+    keyringForSubject: Record<string, string>
+    acquisitionProtocol: 'direct' | 'issuance'
+    certifierUrl?: string
   }
 
   /**
@@ -84,19 +81,19 @@ declare module "@bsv/sdk" {
    */
   interface ProveCertificateArgs {
     certificate: {
-      type?: any;
-      subject: string;
-      serialNumber: string;
-      certifier: string;
-      revocationOutpoint: string;
-      signature: string;
-      fields: Record<string, string>;
-    };
-    fieldsToReveal: string[];
-    verifier: string;
-    privileged?: boolean;
-    privilegedReason?: string;
+      type?: any
+      subject: string
+      serialNumber: string
+      certifier: string
+      revocationOutpoint: string
+      signature: string
+      fields: Record<string, string>
+    }
+    fieldsToReveal: string[]
+    verifier: string
+    privileged?: boolean
+    privilegedReason?: string
   }
 }
 
-declare const SERVER_IDENTITY_KEY: string;
+declare const SERVER_IDENTITY_KEY: string

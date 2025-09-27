@@ -13,24 +13,24 @@
  *
  * Version: v1.1 (Updated 20Aug2025_2223 BST)
  */
-import React, { useState } from "react";
-import { Routes, Route } from "react-router-dom";
-import Theme from "./components/Theme";
-import Navbar from "./components/Navbar";
-import Create from "./pages/Create";
-import Buttons from "./pages/Buttons";
-import Payments from "./pages/Payments";
-import Actions from "./pages/Actions";
-import Money from "./pages/Money";
-import checkForMetanetclient from "./utils/checkForMetanetclient";
-import { CssBaseline } from "@mui/material";
-import useAsyncEffect from "use-async-effect";
-import MetanetclientMissingModal from "./components/MetanetclientMissingModal";
-import { CONFIG } from "./utils/constants";
-import { logWithTimestamp } from "./utils/logging";
-const F = "App";
+import React, { useState } from 'react'
+import { Routes, Route } from 'react-router-dom'
+import Theme from './components/Theme'
+import Navbar from './components/Navbar'
+import Create from './pages/Create'
+import Buttons from './pages/Buttons'
+import Payments from './pages/Payments'
+import Actions from './pages/Actions'
+import Money from './pages/Money'
+import checkForMetanetclient from './utils/checkForMetanetclient'
+import { CssBaseline } from '@mui/material'
+import useAsyncEffect from 'use-async-effect'
+import MetanetclientMissingModal from './components/MetanetclientMissingModal'
+import { CONFIG } from './utils/constants'
+import { logWithTimestamp } from './utils/logging'
+const F = 'App'
 
-logWithTimestamp(F, `CONFIG: ${JSON.stringify(CONFIG)}`);
+logWithTimestamp(F, `CONFIG: ${JSON.stringify(CONFIG)}`)
 
 /**
  * The main React component for the application.
@@ -45,19 +45,19 @@ logWithTimestamp(F, `CONFIG: ${JSON.stringify(CONFIG)}`);
  * @returns {JSX.Element} The rendered application component.
  */
 const App: React.FC = () => {
-  const [isAdmin] = useState(false);
-  const [isMncMissing, setIsMncMissing] = useState(false);
+  const [isAdmin] = useState(false)
+  const [isMncMissing, setIsMncMissing] = useState(false)
 
   // Run a periodic check for Metanet client
   useAsyncEffect(() => {
     const intervalId = setInterval(() => {
       void (async () => {
-        const hasMNC = await checkForMetanetclient(CONFIG.WALLET_ORIGIN);
-        setIsMncMissing(hasMNC === 0);
-      })();
-    }, 2000);
-    return () => clearInterval(intervalId);
-  }, []);
+        const hasMNC = await checkForMetanetclient(CONFIG.WALLET_ORIGIN)
+        setIsMncMissing(hasMNC === 0)
+      })()
+    }, 2000)
+    return () => clearInterval(intervalId)
+  }, [])
 
   return (
     <Theme>
@@ -72,7 +72,7 @@ const App: React.FC = () => {
         <Route path="/money" element={<Money />} />
       </Routes>
     </Theme>
-  );
-};
+  )
+}
 
-export default App;
+export default App

@@ -12,13 +12,13 @@
  * @changelog
  * - 02Sep2025_1227 BST (v1.0.0): Added header and improved JSDoc for clarity and consistency.
  */
-import { useEffect, useState } from "react";
-import { Platform } from "react-native";
+import { useEffect, useState } from 'react'
+import { Platform } from 'react-native'
 import getLatestMetanetclientLinks, {
-  MetanetclientLinks,
-} from "./getLatestMetanetclientLinks";
-import { logWithTimestamp } from "./logging";
-const F = "utils/usePlatformDownloadInfo";
+  MetanetclientLinks
+} from './getLatestMetanetclientLinks'
+import { logWithTimestamp } from './logging'
+const F = 'utils/usePlatformDownloadInfo'
 
 /**
  * Represents platform-specific download information for the Metanet client.
@@ -28,8 +28,8 @@ const F = "utils/usePlatformDownloadInfo";
  * @property {string} downloadURL - A direct URL to download the Metanet client for the detected platform, or empty string if unavailable.
  */
 export interface DownloadInfo {
-  platformLabel: string;
-  downloadURL: string;
+  platformLabel: string
+  downloadURL: string
 }
 
 /**
@@ -42,7 +42,7 @@ export interface DownloadInfo {
  * @returns {DownloadInfo | null} An object with `platformLabel` and `downloadURL`, or `null` while loading or if an error occurs.
  */
 const usePlatformDownloadInfo = (): DownloadInfo | null => {
-  const [info, setInfo] = useState<DownloadInfo | null>(null);
+  const [info, setInfo] = useState<DownloadInfo | null>(null)
 
   useEffect(() => {
     /**
@@ -51,14 +51,14 @@ const usePlatformDownloadInfo = (): DownloadInfo | null => {
      * @returns {'macos' | 'windows' | 'linux'} The inferred desktop OS key, defaults to 'macos' if unknown.
      */
     const detectWebPlatform = (): keyof MetanetclientLinks => {
-      const ua = navigator.userAgent || navigator.platform || "unknown";
-      if (typeof ua === "string" && ua !== "") {
-        if (/Mac/i.test(ua)) return "macos";
-        if (/Win/i.test(ua)) return "windows";
-        if (/Linux/i.test(ua)) return "linux";
+      const ua = navigator.userAgent || navigator.platform || 'unknown'
+      if (typeof ua === 'string' && ua !== '') {
+        if (/Mac/i.test(ua)) return 'macos'
+        if (/Win/i.test(ua)) return 'windows'
+        if (/Linux/i.test(ua)) return 'linux'
       }
-      return "macos"; // Fallback to macOS if platform cannot be determined
-    };
+      return 'macos' // Fallback to macOS if platform cannot be determined
+    }
 
     /**
      * Fetches the latest Metanet client links and sets the appropriate platform info.
@@ -67,50 +67,49 @@ const usePlatformDownloadInfo = (): DownloadInfo | null => {
      */
     const fetchDownloadURL = async (): Promise<void> => {
       try {
-        const links: MetanetclientLinks = await getLatestMetanetclientLinks();
-        logWithTimestamp(F, "🔍 Metanet client links:", links);
-        logWithTimestamp(F, "🔍 Platform:", Platform.OS);
+        const links: MetanetclientLinks = await getLatestMetanetclientLinks()
+        logWithTimestamp(F, '🔍 Metanet client links:', links)
+        logWithTimestamp(F, '🔍 Platform:', Platform.OS)
 
-        if (Platform.OS === "ios") {
+        if (Platform.OS === 'ios') {
           setInfo({
-            platformLabel: "iOS",
-            downloadURL: links.ios ?? "",
-          });
-        } else if (Platform.OS === "android") {
+            platformLabel: 'iOS',
+            downloadURL: links.ios ?? ''
+          })
+        } else if (Platform.OS === 'android') {
           setInfo({
-            platformLabel: "Android",
-            downloadURL: links.android ?? "",
-          });
-        } else if (Platform.OS === "web") {
-          const desktopOS = detectWebPlatform();
+            platformLabel: 'Android',
+            downloadURL: links.android ?? ''
+          })
+        } else if (Platform.OS === 'web') {
+          const desktopOS = detectWebPlatform()
           const labelMap: Record<string, string> = {
-            macos: "macOS",
-            windows: "Windows",
-            linux: "Linux",
-          };
+            macos: 'macOS',
+            windows: 'Windows',
+            linux: 'Linux'
+          }
           setInfo({
-            platformLabel: labelMap[desktopOS] || "Desktop",
-            downloadURL: links[desktopOS] ?? "",
-          });
+            platformLabel: labelMap[desktopOS] || 'Desktop',
+            downloadURL: links[desktopOS] ?? ''
+          })
         } else {
           setInfo({
-            platformLabel: "Unknown",
-            downloadURL: links.macos ?? "",
-          });
+            platformLabel: 'Unknown',
+            downloadURL: links.macos ?? ''
+          })
         }
-        logWithTimestamp(F, "✅ Set platform info:", info);
+        logWithTimestamp(F, '✅ Set platform info:', info)
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : "Unknown error";
-        logWithTimestamp(F, "❌ Error fetching download URL:", message);
-        setInfo(null);
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        logWithTimestamp(F, '❌ Error fetching download URL:', message)
+        setInfo(null)
       }
-    };
+    }
 
-    void fetchDownloadURL();
-  }, []);
+    void fetchDownloadURL()
+  }, [])
 
-  return info;
-};
+  return info
+}
 
-export default usePlatformDownloadInfo;
+export default usePlatformDownloadInfo

@@ -14,203 +14,203 @@
  * @changelog
  * - 02Sep2025_1933 BST (v1.0.0): Updated header comment to follow standardized template.
  */
-import knex, { Knex } from "knex";
-import knexConfig from "../knexfile";
-import type { Request, Response } from "express";
-import { body, validationResult } from "express-validator";
-import { logWithTimestamp } from "../utils/logging";
-import { isBase58, isMerchantId } from "../utils/general";
-import { generateAndValidateUniqueId } from "../utils/idGenerator";
-import { ensureMerchantExists } from "../utils/merchant";
-const F = "routes/initializeIds";
-const db: Knex = knex(knexConfig);
+import knex, { Knex } from 'knex'
+import knexConfig from '../knexfile'
+import type { Request, Response } from 'express'
+import { body, validationResult } from 'express-validator'
+import { logWithTimestamp } from '../utils/logging'
+import { isBase58, isMerchantId } from '../utils/general'
+import { generateAndValidateUniqueId } from '../utils/idGenerator'
+import { ensureMerchantExists } from '../utils/merchant'
+const F = 'routes/initializeIds'
+const db: Knex = knex(knexConfig)
 interface Ids {
-  buttonId?: string;
-  paymentId?: string;
-  merchantId: string;
-  description: string; // Changed to required
+  buttonId?: string
+  paymentId?: string
+  merchantId: string
+  description: string // Changed to required
 }
 export type AuthRequest = Request & {
   auth?: {
-    identityKey?: string;
-  };
-};
+    identityKey?: string
+  }
+}
 
 export default {
-  type: "post",
-  path: "/initializeIds",
+  type: 'post',
+  path: '/initializeIds',
   middlewares: [
-    body("buttonId")
+    body('buttonId')
       .optional()
       .trim()
       .escape()
       .isString()
       .notEmpty()
-      .withMessage("buttonId must be a non-empty string")
+      .withMessage('buttonId must be a non-empty string')
       .isLength({ min: 12, max: 12 })
-      .withMessage("buttonId must be exactly 12 characters")
-      .custom((value) => isBase58(value))
-      .withMessage("buttonId must be a 12-character Base58 string"),
-    body("paymentId")
+      .withMessage('buttonId must be exactly 12 characters')
+      .custom(value => isBase58(value))
+      .withMessage('buttonId must be a 12-character Base58 string'),
+    body('paymentId')
       .optional()
       .trim()
       .escape()
       .isString()
       .notEmpty()
-      .withMessage("paymentId must be a non-empty string")
+      .withMessage('paymentId must be a non-empty string')
       .isLength({ min: 12, max: 12 })
-      .withMessage("paymentId must be a 12-character Base58 string")
-      .custom((value) => isBase58(value))
-      .withMessage("paymentId must be a 12-character Base58 string"),
-    body("merchantId")
+      .withMessage('paymentId must be a 12-character Base58 string')
+      .custom(value => isBase58(value))
+      .withMessage('paymentId must be a 12-character Base58 string'),
+    body('merchantId')
       .trim()
       .escape()
       .isString()
       .notEmpty()
-      .withMessage("merchantId must be a non-empty string")
-      .custom((value) => isMerchantId(value))
-      .withMessage("merchantId must be a 64- or 66-character hex string"),
-    body("description")
+      .withMessage('merchantId must be a non-empty string')
+      .custom(value => isMerchantId(value))
+      .withMessage('merchantId must be a 64- or 66-character hex string'),
+    body('description')
       .trim()
       .escape()
       .isString()
       .notEmpty()
-      .withMessage("description is required")
+      .withMessage('description is required')
       .isLength({ max: 80 })
-      .withMessage("description exceeds maximum length of 80 characters"),
+      .withMessage('description exceeds maximum length of 80 characters')
   ],
   func: async (req: AuthRequest, res: Response): Promise<void> => {
-    logWithTimestamp(F, "[initializeIds] Route hit for /initializeIds", {
+    logWithTimestamp(F, '[initializeIds] Route hit for /initializeIds', {
       method: req.method,
       url: req.url,
       body: req.body,
-      headers: req.headers,
-    });
-    const errors = validationResult(req);
+      headers: req.headers
+    })
+    const errors = validationResult(req)
     if (!errors.isEmpty()) {
       const errorDetails = errors
         .array()
-        .map((err) => `${err.msg} (type: ${err.type})`)
-        .join("; ");
-      logWithTimestamp(F, "❌ [initializeIds] Validation failed:", {
+        .map(err => `${err.msg} (type: ${err.type})`)
+        .join('; ')
+      logWithTimestamp(F, '❌ [initializeIds] Validation failed:', {
         errors: errorDetails,
         body: req.body,
-        headers: req.headers,
-      });
+        headers: req.headers
+      })
       res.status(400).json({
-        status: "error",
+        status: 'error',
         message: `❌ Validation failed: ${errorDetails}`,
         errors: errors.array(),
-        request: { body: req.body, headers: req.headers },
-      });
-      return;
+        request: { body: req.body, headers: req.headers }
+      })
+      return
     }
 
     // Start: extract senderIdentityKey once
-    let senderIdentityKey: string | undefined = (req as any).auth?.identityKey;
+    let senderIdentityKey: string | undefined = (req as any).auth?.identityKey
     const serverIdentityKey =
       process.env.SERVER_IDENTITY_KEY || // from env
-      (req.app.get("config")?.SERVER_IDENTITY_KEY as string) || // if you have config attached
-      "";
+      (req.app.get('config')?.SERVER_IDENTITY_KEY as string) || // if you have config attached
+      ''
 
     // Add fallback to x-bsv-server header if auth identityKey is missing or unknown
-    const headerServerKey = req.headers["x-bsv-server"];
+    const headerServerKey = req.headers['x-bsv-server']
     // Always accept server identity if header matches
     if (headerServerKey && headerServerKey === serverIdentityKey) {
-      senderIdentityKey = serverIdentityKey;
+      senderIdentityKey = serverIdentityKey
       logWithTimestamp(
         F,
-        "🔑 [initializeIds] Accepted server identity via header",
+        '🔑 [initializeIds] Accepted server identity via header',
         {
-          senderIdentityKey,
-        },
-      );
+          senderIdentityKey
+        }
+      )
     }
 
     // At this point senderIdentityKey and serverIdentityKey are defined
     if (!senderIdentityKey) {
       logWithTimestamp(
         F,
-        "❌ [initializeIds] Missing sender identity key from auth context",
-      );
+        '❌ [initializeIds] Missing sender identity key from auth context'
+      )
       res.status(401).json({
-        status: "error",
-        message: "❌ Unauthorized: Missing sender identity",
-      });
-      return;
+        status: 'error',
+        message: '❌ Unauthorized: Missing sender identity'
+      })
+      return
     }
-    const { buttonId, paymentId, merchantId, description } = req.body as Ids;
+    const { buttonId, paymentId, merchantId, description } = req.body as Ids
     if (!merchantId) {
       logWithTimestamp(
         F,
-        "[initializeIds] merchantId not provided in request body",
+        '[initializeIds] merchantId not provided in request body',
         {
           body: req.body,
-          headers: req.headers,
-        },
-      );
+          headers: req.headers
+        }
+      )
       res.status(400).json({
-        status: "error",
-        message: "❌ merchantId is required",
-        request: { body: req.body, headers: req.headers },
-      });
-      return;
+        status: 'error',
+        message: '❌ merchantId is required',
+        request: { body: req.body, headers: req.headers }
+      })
+      return
     }
     if (!isMerchantId(merchantId)) {
       logWithTimestamp(
         F,
-        "❌ [initializeIds] Invalid merchant identity format:",
+        '❌ [initializeIds] Invalid merchant identity format:',
         {
           merchantId,
           body: req.body,
-          headers: req.headers,
-        },
-      );
+          headers: req.headers
+        }
+      )
       res.status(400).json({
-        status: "error",
-        message: "❌ Invalid merchantId format",
-        request: { body: req.body, headers: req.headers },
-      });
-      return;
+        status: 'error',
+        message: '❌ Invalid merchantId format',
+        request: { body: req.body, headers: req.headers }
+      })
+      return
     }
 
-    const isMerchant = senderIdentityKey === merchantId;
+    const isMerchant = senderIdentityKey === merchantId
     const isServer =
-      serverIdentityKey && senderIdentityKey === serverIdentityKey;
+      serverIdentityKey && senderIdentityKey === serverIdentityKey
 
     // NEW: check fallback
-    const allowFallback = process.env.ALLOW_UNAUTH_FALLBACK === "yes";
+    const allowFallback = process.env.ALLOW_UNAUTH_FALLBACK === 'yes'
 
     if (!isMerchant && !isServer && !allowFallback) {
       logWithTimestamp(
         F,
-        "❌ [initializeIds] Sender identity does not match merchantId:",
+        '❌ [initializeIds] Sender identity does not match merchantId:',
         {
           senderIdentityKey,
           merchantId,
-          serverIdentityKey,
-        },
-      );
+          serverIdentityKey
+        }
+      )
       res.status(403).json({
-        status: "error",
-        message: "Sender identity does not match merchantId",
-        request: { body: req.body, headers: req.headers },
-      });
-      return;
+        status: 'error',
+        message: 'Sender identity does not match merchantId',
+        request: { body: req.body, headers: req.headers }
+      })
+      return
     }
 
     logWithTimestamp(
       F,
-      "✅ [initializeIds] Merchant/server identity validated",
+      '✅ [initializeIds] Merchant/server identity validated',
       {
         senderIdentityKey,
         merchantId,
         serverIdentityKey,
         isMerchant,
         isServer,
-        allowFallback,
-      },
-    );
+        allowFallback
+      }
+    )
 
     //* if (senderIdentityKey !== merchantId) {
     //   logWithTimestamp(
@@ -228,23 +228,23 @@ export default {
     //   })
     //   return
     // }
-    await ensureMerchantExists(db, merchantId);
-    logWithTimestamp(F, "✅ [initializeIds] MerchantId validated:", {
-      merchantId,
-    });
+    await ensureMerchantExists(db, merchantId)
+    logWithTimestamp(F, '✅ [initializeIds] MerchantId validated:', {
+      merchantId
+    })
     let initialGenerated =
       paymentId ||
       buttonId ||
       (await generateAndValidateUniqueId(
         merchantId,
-        paymentId ? "payment" : "button",
+        paymentId ? 'payment' : 'button',
         description,
-        paymentId,
-      ));
+        paymentId
+      ))
     let id =
-      typeof initialGenerated === "object" && initialGenerated?.id
+      typeof initialGenerated === 'object' && initialGenerated?.id
         ? initialGenerated.id
-        : initialGenerated;
+        : initialGenerated
 
     //* let id =
     //   paymentId ||
@@ -255,109 +255,109 @@ export default {
     //     description,
     //     paymentId
     //   ))
-    const targetType = paymentId ? "payment" : "button";
+    const targetType = paymentId ? 'payment' : 'button'
     try {
-      await db.transaction(async (trx) => {
-        let attempts = 0;
-        let currentId = id; // Track the ID being validated (buttonId or paymentId)
+      await db.transaction(async trx => {
+        let attempts = 0
+        let currentId = id // Track the ID being validated (buttonId or paymentId)
 
         // For paymentId requests with buttonId, verify buttonId exists
         if (paymentId && buttonId) {
-          await trx.raw("LOCK TABLES ids READ"); // Lock for reading buttonId
+          await trx.raw('LOCK TABLES ids READ') // Lock for reading buttonId
           try {
-            const existingButton = await trx("ids")
-              .where({ id: buttonId, type: "button", merchant_id: merchantId })
-              .first();
+            const existingButton = await trx('ids')
+              .where({ id: buttonId, type: 'button', merchant_id: merchantId })
+              .first()
             if (!existingButton) {
               logWithTimestamp(
                 F,
-                "❌ [initializeIds] Button ID does not exist:",
-                { buttonId, merchantId },
-              );
+                '❌ [initializeIds] Button ID does not exist:',
+                { buttonId, merchantId }
+              )
               res.status(400).json({
-                status: "error",
+                status: 'error',
                 message: `Button ID ${buttonId} does not exist`,
                 request: { body: req.body, headers: req.headers },
-                merchantId,
-              });
-              return;
+                merchantId
+              })
+              return
             }
           } finally {
-            await trx.raw("UNLOCK TABLES"); // Release read lock
+            await trx.raw('UNLOCK TABLES') // Release read lock
           }
         }
         while (attempts < 3) {
-          await trx.raw("LOCK TABLES ids WRITE, payments READ"); // Lock for insert
+          await trx.raw('LOCK TABLES ids WRITE, payments READ') // Lock for insert
           try {
-            const existingId = await trx("ids")
+            const existingId = await trx('ids')
               .where({
                 id: currentId,
                 type: targetType,
-                merchant_id: merchantId,
+                merchant_id: merchantId
               })
-              .first();
+              .first()
             // Ensure we always pass a string, not an object, into the WHERE clause
             const safePaymentId =
-              currentId && typeof currentId === "object" && "id" in currentId
+              currentId && typeof currentId === 'object' && 'id' in currentId
                 ? currentId.id
-                : currentId;
+                : currentId
 
             const existingPayment =
-              targetType === "payment"
-                ? await trx("payments")
+              targetType === 'payment'
+                ? await trx('payments')
                     .where({ payment_id: safePaymentId })
                     .first()
-                : null;
+                : null
 
             //* const existingPayment =
             //   targetType === 'payment'
             //     ? await trx('payments').where({ payment_id: currentId }).first()
             //     : null
             if (!existingId && !existingPayment) {
-              await trx("ids").insert({
+              await trx('ids').insert({
                 id: currentId,
                 merchant_id: merchantId,
                 type: targetType,
-                timestamp: trx.fn.now(),
-              });
-              logWithTimestamp(F, "✅ [initializeIds] ID inserted:", {
+                timestamp: trx.fn.now()
+              })
+              logWithTimestamp(F, '✅ [initializeIds] ID inserted:', {
                 id: currentId,
                 merchantId,
-                type: targetType,
-              });
-              await trx.raw("UNLOCK TABLES"); // Release locks
-              res.status(200).json({ status: "success", id: currentId });
-              return;
+                type: targetType
+              })
+              await trx.raw('UNLOCK TABLES') // Release locks
+              res.status(200).json({ status: 'success', id: currentId })
+              return
             }
           } catch (dbErr) {
-            await trx.raw("UNLOCK TABLES"); // Release locks on database error
+            await trx.raw('UNLOCK TABLES') // Release locks on database error
             const errorMessage =
-              dbErr instanceof Error ? dbErr.message : "Database error";
+              dbErr instanceof Error ? dbErr.message : 'Database error'
             if (
-              errorMessage.includes("ER_LOCK_DEADLOCK") ||
-              errorMessage.includes("ER_QUERY_TIMEOUT")
+              errorMessage.includes('ER_LOCK_DEADLOCK') ||
+              errorMessage.includes('ER_QUERY_TIMEOUT')
             ) {
               logWithTimestamp(
                 F,
-                "⚠️ [initializeIds] Database error (retryable):",
+                '⚠️ [initializeIds] Database error (retryable):',
                 {
                   error: errorMessage,
                   id: currentId,
-                  attempt: attempts + 1,
-                },
-              );
-              attempts++;
+                  attempt: attempts + 1
+                }
+              )
+              attempts++
               {
                 const generated = await generateAndValidateUniqueId(
                   merchantId,
                   targetType,
                   description,
-                  paymentId,
-                );
+                  paymentId
+                )
                 currentId =
-                  typeof generated === "object" && generated?.id
+                  typeof generated === 'object' && generated?.id
                     ? generated.id
-                    : generated;
+                    : generated
               }
               //* currentId = await generateAndValidateUniqueId(
               //   merchantId,
@@ -367,21 +367,21 @@ export default {
               // )
               // continue
             }
-            throw dbErr; // Non-retryable error
+            throw dbErr // Non-retryable error
           }
-          await trx.raw("UNLOCK TABLES"); // Release locks on duplicate
-          attempts++;
+          await trx.raw('UNLOCK TABLES') // Release locks on duplicate
+          attempts++
           {
             const generated = await generateAndValidateUniqueId(
               merchantId,
               targetType,
               description,
-              paymentId,
-            );
+              paymentId
+            )
             currentId =
-              typeof generated === "object" && generated?.id
+              typeof generated === 'object' && generated?.id
                 ? generated.id
-                : generated;
+                : generated
           }
           //* currentId = await generateAndValidateUniqueId(
           //   merchantId,
@@ -397,48 +397,48 @@ export default {
               newId: currentId,
               merchantId,
               type: targetType,
-              attempt: attempts,
-            },
-          );
-          id = currentId; // Update id for consistency
+              attempt: attempts
+            }
+          )
+          id = currentId // Update id for consistency
         }
-        await trx.raw("UNLOCK TABLES"); // Ensure locks are released
+        await trx.raw('UNLOCK TABLES') // Ensure locks are released
         logWithTimestamp(
           F,
-          "❌ [initializeIds] Failed to generate unique ID after 3 attempts:",
+          '❌ [initializeIds] Failed to generate unique ID after 3 attempts:',
           {
             originalId: id,
             lastAttemptedId: currentId,
             merchantId,
-            type: targetType,
-          },
-        );
+            type: targetType
+          }
+        )
         res.status(409).json({
-          status: "error",
-          message: "Failed to generate unique ID after 3 attempts",
+          status: 'error',
+          message: 'Failed to generate unique ID after 3 attempts',
           newId: currentId, // Suggest new ID for client retry
           request: { body: req.body, headers: req.headers },
-          merchantId,
-        });
-      });
+          merchantId
+        })
+      })
     } catch (err) {
-      await db.raw("UNLOCK TABLES"); // Ensure locks are released on error
+      await db.raw('UNLOCK TABLES') // Ensure locks are released on error
       const errorMessage =
-        err instanceof Error ? err.message : "❌ Unknown error";
-      logWithTimestamp(F, "❌ [initializeIds] Error pre-populating ID:", {
+        err instanceof Error ? err.message : '❌ Unknown error'
+      logWithTimestamp(F, '❌ [initializeIds] Error pre-populating ID:', {
         message: errorMessage,
         error: err,
         stack: err instanceof Error ? err.stack : undefined,
         body: req.body,
         headers: req.headers,
-        merchantId,
-      });
+        merchantId
+      })
       res.status(500).json({
-        status: "error",
+        status: 'error',
         message: `❌ ${errorMessage}`,
         request: { body: req.body, headers: req.headers },
-        merchantId,
-      });
+        merchantId
+      })
     }
-  },
-};
+  }
+}

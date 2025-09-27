@@ -136,37 +136,37 @@ Gateway ships with a colorized, elapsed-time logger you can **toggle per module*
 - Usage:
 
 ```ts
-import { logWithTimestamp as log } from "@/utils/logging";
+import { logWithTimestamp as log } from '@/utils/logging'
 
-const F = "pages/Buttons";
-log(F, "Rendering Buttons table…", { rows: data.length });
+const F = 'pages/Buttons'
+log(F, 'Rendering Buttons table…', { rows: data.length })
 ```
 
 **Enable/disable** logs by file key (hot-reloaded in dev):
 
 ```ts
 // src/utils/logging.config.ts
-const defaultLogging = false;
+const defaultLogging = false
 
 const loggingConfig: { [file: string]: boolean } = {
   default: defaultLogging,
-  "pages/Create": true,
-  "pages/Buttons": true,
-  "pages/Payments": true,
-  "routes/createButton": true,
-  "routes/buttonCode": true,
-  "routes/initializeIds": true,
-  "routes/invoice": true,
-  "routes/pay": true,
-  "routes/listButtons": true,
-  "routes/listPayments": true,
-  "utils/initializeIds": true,
+  'pages/Create': true,
+  'pages/Buttons': true,
+  'pages/Payments': true,
+  'routes/createButton': true,
+  'routes/buttonCode': true,
+  'routes/initializeIds': true,
+  'routes/invoice': true,
+  'routes/pay': true,
+  'routes/listButtons': true,
+  'routes/listPayments': true,
+  'utils/initializeIds': true,
   index: true,
   inject: true,
-  server: true,
-};
+  server: true
+}
 
-export default loggingConfig;
+export default loggingConfig
 ```
 
 ---

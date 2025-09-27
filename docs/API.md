@@ -63,10 +63,10 @@ Use this to pre-allocate a **buttonId** or **paymentId** owned by a merchant.
 
 ```ts
 interface Ids {
-  buttonId?: string;
-  paymentId?: string;
-  merchantId: string;
-  description: string; // required, max 80 chars
+  buttonId?: string
+  paymentId?: string
+  merchantId: string
+  description: string // required, max 80 chars
 }
 ```
 

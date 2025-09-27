@@ -11,9 +11,9 @@
  * Intended as a future home for managing payment-triggered workflows.
  */
 
-import React from "react";
-import { Container, Typography, Paper, Box } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import React from 'react'
+import { Container, Typography, Paper, Box } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 
 /**
  * `PaymentActionsList` is a React functional component that displays an overview section
@@ -26,16 +26,16 @@ import { useTheme } from "@mui/material/styles";
  * @returns A styled informational panel with a heading and description of payment actions.
  */
 const PaymentActionsList: React.FC = () => {
-  const theme = useTheme();
+  const theme = useTheme()
 
   return (
     <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
       <Box
         sx={{
-          textAlign: "center",
+          textAlign: 'center',
           marginBottom: theme.spacing(4),
           marginTop: theme.spacing(5),
-          color: theme.palette.mode === "dark" ? "#ffffff" : "#000000",
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
         }}
       >
         <Typography variant="h2">Payment Actions</Typography>
@@ -52,7 +52,7 @@ const PaymentActionsList: React.FC = () => {
         </Typography>
       </Paper>
     </Container>
-  );
-};
+  )
+}
 
-export default PaymentActionsList;
+export default PaymentActionsList
