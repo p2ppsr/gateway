@@ -81,7 +81,7 @@ const MetanetclientModal: React.FC<Props> = ({
 
       <Typography gutterBottom>
         <Link
-          href="https://metanet.bsvb.tech"
+          href="https://getMetanet.com"
           underline="hover"
           target="_blank"
           rel="noopener noreferrer"

@@ -1,24 +1,26 @@
 /**
  * @file src/utils/getLatestMetanetclientLinks.ts
- * @description Provides a function to fetch download links for the latest Metanet Desktop release from the official GitHub repository, including placeholders for mobile app links.
- * @version 1.0.0 (Updated 02Sep2025_1823 BST to standardize header comment)
+ * @description Provides a function to fetch download links for the latest BSV Desktop release from the official GitHub repository, including mobile app links and a generic download page link.
+ * @version 1.1.0 (Updated 27Sep2025_1358 BST to include mobile and generic links)
  * @author xAI (Grok 3)
  * @dependencies
  * - ./logging: For logWithTimestamp
  * @changelog
+ * - 27Sep2025_1358 BST (v1.1.0): Updated to support BSV Desktop branding (v0.6.5), added iOS TestFlight link, Android APK link, and generic link. Added generic property to MetanetclientLinks interface.
  * - 02Sep2025_1823 BST (v1.0.0): Updated header comment to follow standardized template.
  */
 import { logWithTimestamp } from './logging'
 
 /**
- * Represents the download URLs for the Metanet client across supported platforms.
+ * Represents the download URLs for the BSV Desktop and Mobile clients across supported platforms.
  *
  * @typedef {Object} MetanetclientLinks
  * @property {string | null} macos - Direct download URL for macOS (.dmg file) or `null` if unavailable.
  * @property {string | null} windows - Direct download URL for Windows (.exe file) or `null` if unavailable.
  * @property {string | null} linux - Direct download URL for Linux (.AppImage file) or `null` if unavailable.
- * @property {string | null} ios - App Store link for iOS or `null` if not available.
- * @property {string | null} android - Play Store link for Android or `null` if not available.
+ * @property {string | null} ios - TestFlight link for iOS beta or `null` if not available.
+ * @property {string | null} android - Direct APK download link for Android or `null` if not available.
+ * @property {string | null} generic - Generic download page URL or `null` if not available.
  */
 const F = 'utils/getLatestMetanetclientLinks'
 export interface MetanetclientLinks {
@@ -27,6 +29,7 @@ export interface MetanetclientLinks {
   linux: string | null
   ios: string | null
   android: string | null
+  generic: string | null
 }
 
 interface GitHubRelease {
@@ -34,8 +37,8 @@ interface GitHubRelease {
 }
 
 /**
- * Fetches the latest Metanet Desktop release from GitHub and constructs
- * download links for all major platforms using the release tag.
+ * Fetches the latest BSV Desktop release from GitHub and constructs
+ * download links for all major platforms using the release tag, plus a generic link.
  *
  * @returns {Promise<MetanetclientLinks>} An object containing download URLs or `null` if the fetch fails.
  */
@@ -47,31 +50,32 @@ const getLatestMetanetclientLinks = async (): Promise<MetanetclientLinks> => {
     const data: GitHubRelease = await response.json()
     logWithTimestamp(F, '🔍 GitHub release data:', data.toString())
 
-    const tag: string = data.tag_name // e.g. 'metanet-desktop-v0.5.1'
-    const version: string = tag.replace(/^metanet-desktop-v/, '') // e.g. '0.5.1'
+    const tag: string = data.tag_name // e.g. 'bsv-desktop-v0.6.5'
+    const version: string = tag.replace(/^bsv-desktop-v/, '') // e.g. '0.6.5'
 
     const links: MetanetclientLinks = {
-      macos: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_aarch64.dmg`,
-      windows: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_x64-setup.exe`,
-      linux: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/Metanet.Desktop_${version}_amd64.AppImage`,
-      ios: 'https://apps.apple.com/app/metanet/id0000000000', // TODO: update with actual link
-      android:
-        'https://play.google.com/store/apps/details?id=com.metanet.browser' // TODO: update with actual link
+      macos: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/BSV.Desktop_${version}_aarch64.dmg`,
+      windows: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/BSV.Desktop_${version}_x64-setup.exe`,
+      linux: `https://github.com/bsv-blockchain/metanet-desktop/releases/download/${tag}/BSV.Desktop_${version}_amd64.AppImage`,
+      ios: 'https://testflight.apple.com/join/K3jmxevG',
+      android: 'https://getmetanet.com/android.apk',
+      generic: 'https://getmetanet.com/'
     }
     logWithTimestamp(
       F,
-      '✅ Successfully fetched Metanet client links:',
-      links.toString()
+      '✅ Successfully fetched BSV client links:',
+      JSON.stringify(links)
     )
     return links
   } catch (error: unknown) {
-    console.error('❌ Failed to fetch latest Metanet client release:', error)
+    console.error('❌ Failed to fetch latest BSV client release:', error)
     return {
       macos: null,
       windows: null,
       linux: null,
       ios: null,
-      android: null
+      android: null,
+      generic: null
     }
   }
 }
