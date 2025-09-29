@@ -246,7 +246,6 @@ function migrateOnly() {
     process.exit(0)
   }
 })()
-
 ;(async function main() {
   try {
     console.log(

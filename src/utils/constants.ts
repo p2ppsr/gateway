@@ -70,6 +70,7 @@ const DEV_API_BASE = `${DEV_BASE}${process.env.API_ROUTING_PREFIX ?? '/api'}`
  * @property WALLET_ORIGIN - Canonical local wallet URL (primary port).
  */
 export const CONFIG = {
+  WALLET_TIMEOUT: 20000,
   SERVER_IDENTITY_KEY:
     (process as any)?.env?.SERVER_IDENTITY_KEY ??
     '03f7c1fe6aaccabb06b9897a5c1f4bfa45230556a771d5b08aec5f48b94f09b61b',

@@ -116,7 +116,6 @@ describe('routes/acknowledgePayment.ts', () => {
       data_type: 'boolean'
     })
     paymentsBuilder.update.mockResolvedValue(1) // One row updated
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -168,7 +167,6 @@ describe('routes/acknowledgePayment.ts', () => {
       data_type: 'boolean'
     })
     paymentsBuilder.update.mockResolvedValue(0) // No rows updated
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -222,7 +220,6 @@ describe('routes/acknowledgePayment.ts', () => {
       data_type: 'boolean'
     })
     paymentsBuilder.update.mockRejectedValue(new Error('Database error'))
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })

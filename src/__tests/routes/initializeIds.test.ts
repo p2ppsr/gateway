@@ -225,7 +225,6 @@ describe('routes/initializeIds.ts', () => {
     const { trx, idsBuilder } = makeTrxMock()
     idsBuilder.first.mockResolvedValue(null) // No duplicate
     idsBuilder.insert.mockResolvedValue(undefined)
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -279,7 +278,6 @@ describe('routes/initializeIds.ts', () => {
       .mockResolvedValueOnce(null) // No duplicate in ids for paymentId
     paymentsBuilder.first.mockResolvedValueOnce(null) // No duplicate in payments
     idsBuilder.insert.mockResolvedValue(undefined)
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -325,7 +323,6 @@ describe('routes/initializeIds.ts', () => {
 
     const { trx, idsBuilder } = makeTrxMock()
     idsBuilder.first.mockResolvedValueOnce(null) // Button does not exist
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -357,7 +354,6 @@ describe('routes/initializeIds.ts', () => {
       headers: {},
       auth: { identityKey: 'validMerchantId' }
     }
-
     ;(generateAndValidateUniqueId as jest.Mock)
       .mockResolvedValueOnce('duplicateId1')
       .mockResolvedValueOnce('duplicateId2')
@@ -380,7 +376,6 @@ describe('routes/initializeIds.ts', () => {
         type: 'button',
         merchant_id: 'validMerchantId'
       })
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -419,7 +414,6 @@ describe('routes/initializeIds.ts', () => {
       headers: {},
       auth: { identityKey: 'validMerchantId' }
     }
-
     ;(generateAndValidateUniqueId as jest.Mock)
       .mockResolvedValueOnce('retryId1') // Initial generated ID
       .mockResolvedValueOnce('validId') // Retry ID after deadlock
@@ -431,7 +425,6 @@ describe('routes/initializeIds.ts', () => {
         throw new Error('ER_LOCK_DEADLOCK')
       })
       .mockResolvedValueOnce(undefined)
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })
@@ -468,7 +461,6 @@ describe('routes/initializeIds.ts', () => {
     const { trx, idsBuilder } = makeTrxMock()
     idsBuilder.first.mockResolvedValue(null)
     idsBuilder.insert.mockRejectedValue(new Error('Non-retryable error'))
-
     ;(mockDb.transaction as jest.Mock).mockImplementation(async (cb: any) => {
       await cb(trx)
     })

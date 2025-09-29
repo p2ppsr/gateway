@@ -12,9 +12,11 @@
  * @date 2025-09-01
  * @version 1.18 (2025-09-08: aPdd safe URL join + clientConfig integration to avoid "Invalid URL")
  */
+const F = 'utils/general'
 
 import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
 import { CONFIG } from './constants'
+import { logWithTimestamp } from './logging'
 
 /* =============================================================================
    ID generation
@@ -155,13 +157,13 @@ export function formatId(id: string): string {
  */
 export function formatTimeLocal(dateStr: string | null | undefined): string {
   if (dateStr === null || dateStr === undefined || dateStr === '') {
-    return 'N/A';
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date string: ${dateStr}`);
-      return 'N/A';
+      console.warn(`Invalid date string: ${dateStr}`)
+      return 'N/A'
     }
     return date
       .toLocaleString(undefined, {
@@ -170,12 +172,12 @@ export function formatTimeLocal(dateStr: string | null | undefined): string {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
+        second: '2-digit'
       })
-      .replace(/,(\s)?/, ', '); // Ensure consistent comma spacing
+      .replace(/,(\s)?/, ', ') // Ensure consistent comma spacing
   } catch (error) {
-    console.warn(`Error formatting date string: ${dateStr}`, error);
-    return 'N/A';
+    console.warn(`Error formatting date string: ${dateStr}`, error)
+    return 'N/A'
   }
 }
 
@@ -347,8 +349,9 @@ export const fetchWithTimeout = async (
 
 /**
  * Validates CSS input by checking syntax, balanced parentheses, hex color formats, and linear gradients.
+ * Supports RGB, HSL, and basic CSS structure. Returns false for invalid or non-string inputs.
  * @param {string} css The CSS string to validate.
- * @returns {boolean} True if the CSS is valid, false for invalid or non-string inputs.
+ * @returns {boolean} True if the CSS is valid, false otherwise.
  */
 export const validateCSS = (css: string): boolean => {
   if (typeof css !== 'string' || css.length === 0) {
@@ -356,7 +359,8 @@ export const validateCSS = (css: string): boolean => {
   }
   try {
     const rules = css
-      .split('}')
+      .replace(/\/\*[\s\S]*?\*\//g, '') // Strip comments
+      .split(/}\s*(?![^{]*})/) // Handle nested rules
       .map(rule => rule.trim())
       .filter(rule => rule.length > 0)
     for (const rule of rules) {
@@ -371,19 +375,24 @@ export const validateCSS = (css: string): boolean => {
       for (const prop of properties) {
         const [key, value] = prop.split(':').map(part => part.trim())
         if (!key || !value) return false
-        if (value.includes('#')) {
+        if (value.includes('#') || value.match(/rgb|hsl/)) {
           const hexMatch = value.match(/#[0-9a-fA-F]{3,6}/g)
-          if (hexMatch == null) return false
+          const rgbMatch = value.match(/rgb\((\d{1,3},\s*){2}\d{1,3}\)/)
+          const hslMatch = value.match(
+            /hsl\((\d{1,3},\s*\d{1,3}%\s*,\s*\d{1,3}%)\)/
+          )
+          if (!hexMatch && !rgbMatch && !hslMatch) return false
         }
         if (value.includes('(')) {
           const openMatches = value.match(/\(/g) ?? []
           const closeMatches = value.match(/\)/g) ?? []
-          const openCount = openMatches.length
-          const closeCount = closeMatches.length
-          if (openCount !== closeCount) return false
+          if (openMatches.length !== closeMatches.length) return false
           if (value.includes('linear-gradient')) {
             if (!/linear-gradient\s*\([^)]+\)/.test(value)) return false
-            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g) ?? []
+            const colorMatches =
+              value.match(
+                /#([0-9a-fA-F]{3,6})|rgb\((\d{1,3},\s*){2}\d{1,3}\)|hsl\((\d{1,3},\s*\d{1,3}%\s*,\s*\d{1,3}%)\)/gi
+              ) ?? []
             if (colorMatches.length < 2) return false
           }
         }
@@ -391,11 +400,10 @@ export const validateCSS = (css: string): boolean => {
     }
     return true
   } catch (error) {
-    console.warn(`Invalid CSS: ${css}`, error)
+    logWithTimestamp(F, `Invalid CSS: ${css}`, error)
     return false
   }
 }
-
 /**
  * Extracts CSS content from a <style> tag.
  * @param {string} input The input string containing the CSS.

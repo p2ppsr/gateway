@@ -3,8 +3,9 @@
  * @description Component for creating and managing payment buttons in the Gateway UI.
  * Allows users to configure button settings, generate button code, and copy it to the clipboard.
  * @version 1.0.1
- * @author xAI (Grok 3)
+ * @author xAI
  * @changelog
+ * - 27Sep2025_2031 BST (v1.0.1): Initial version with payment button creation and copy functionality.
  */
 import React, {
   useState,
@@ -34,9 +35,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import { WalletClient } from '@bsv/sdk'
 import { Root, ContentWrap, CenteredHeader, TextFieldStyled } from './style'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import {
-  vscDarkPlus
-} from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from '@mui/material/styles'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import { toast, ToastContainer } from 'react-toastify'
@@ -118,18 +117,18 @@ const normalizeCSS = (css: string): string => {
 
 function formatHtml(html: string): string {
   try {
-    return (window as any).prettier
-      ? (window as any).prettier.format(html, { parser: 'html' })
-      : html
+    if ('prettier' in window) {
+      return (window as any).prettier.format(html, { parser: 'html' })
+    }
+    return html.trim() // Fallback if Prettier unavailable
   } catch {
-    return html
+    return html.trim()
   }
 }
 
 const CodeSnippet: React.FC<CodeSnippetProps> = ({ code, language }) => {
   const theme = useTheme()
   const normalizedCode = useMemo(() => {
-
     // First trim trailing whitespace, then pretty-print HTML if applicable
     let cleaned = code.replace(/\s+$/, '')
     if (language === 'html') {
@@ -171,8 +170,8 @@ const Create: React.FC = () => {
   const [fixedSatAmount, setFixedSatAmount] = useState('5')
   const [isSingleUse, setIsSingleUse] = useState(false) // Checkbox state: true = single-use, false = multi-use
   const [merchant, setMerchant] = useState('')
-  const [buttonID, setButtonID] = useState('')
-  const [paymentID, setPaymentID] = useState('')
+  const [buttonId, setButtonId] = useState('')
+  const [paymentId, setPaymentId] = useState('')
   const [showCode, setShowCode] = useState(false)
   const [hasMetanet, setHasMetanet] = useState(false)
   const [copySuccess, setCopySuccess] = useState('')
@@ -390,34 +389,34 @@ ${normalizeCSS(cssToUse)}
       spendingDescription_fixed,
       'variableDescription:',
       spendingDescription_variable,
-      'buttonID:',
-      buttonID,
-      'paymentID:',
-      paymentID
+      'buttonId:',
+      buttonId,
+      'paymentId:',
+      paymentId
     )
     const fixedDescription =
-      spendingDescription_fixed || `Payment using paymentId: ${paymentID}`
+      spendingDescription_fixed || `Payment using paymentId: ${paymentId}`
     const variableDescription =
-      spendingDescription_variable || `Payment using paymentId: ${paymentID}`
+      spendingDescription_variable || `Payment using paymentId: ${paymentId}`
     const fixedText = `${buttonText_fixed} ${fixedSatAmount} Sats`
     const fixedCode = `<style>\n${
       validateCSS(extractCSS(customCSS_fixed))
         ? extractCSS(customCSS_fixed).trim()
         : lastValidCSS_fixed.trim()
-    }\n</style>\n<div id="${buttonID}"\n class="gateway-paybutton gateway-paybutton-fixed${
+    }\n</style>\n<div id="${buttonId}"\n class="gateway-paybutton gateway-paybutton-fixed${
       isSingleUse ? ' disabled' : ''
     }"\n data-merchant="${
       merchant || 'temp-merchant'
-    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(fixedDescription)}"\n data-width="fit-content"\n data-multi-use="${!isSingleUse}">${fixedText}</div>`
+    }"\n data-buttonId="${buttonId}"\n data-paymentId="${paymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(fixedDescription)}"\n data-width="fit-content"\n data-multi-use="${!isSingleUse}">${fixedText}</div>`
     const variableCode = `<style>\n${
       validateCSS(extractCSS(customCSS_variable))
         ? extractCSS(customCSS_variable).trim()
         : lastValidCSS_variable.trim()
-    }\n</style>\n<div id="${buttonID}"\n class="gateway-paybutton gateway-paybutton-variable${
+    }\n</style>\n<div id="${buttonId}"\n class="gateway-paybutton gateway-paybutton-variable${
       isSingleUse ? ' disabled' : ''
     }"\n data-merchant="${
       merchant || 'temp-merchant'
-    }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(variableDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+    }"\n data-buttonId="${buttonId}"\n data-paymentId="${paymentId}"\n data-text="${buttonText_variable}"\n data-description="${sanitizeInput(variableDescription)}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
     logWithTimestamp(
       F,
       'updatePreviewCodes: Generated HTML code - fixed:',
@@ -472,8 +471,8 @@ ${normalizeCSS(cssToUse)}
     buttonText_variable,
     spendingDescription_fixed,
     spendingDescription_variable,
-    buttonID,
-    paymentID,
+    buttonId,
+    paymentId,
     paymentType,
     styleElement_fixed,
     styleElement_variable,
@@ -514,9 +513,9 @@ ${normalizeCSS(cssToUse)}
       const loadedCustomCSS_variable =
         localStorage.getItem(`customCSS_variable_${merchant}`) ||
         customCSS_variable
-      const loadedButtonID = localStorage.getItem(`buttonID_${merchant}`) || ''
-      const loadedPaymentID =
-        localStorage.getItem(`paymentID_${merchant}`) || ''
+      const loadedButtonId = localStorage.getItem(`buttonId_${merchant}`) || ''
+      const loadedPaymentId =
+        localStorage.getItem(`paymentId_${merchant}`) || ''
       const loadedButtonInit =
         localStorage.getItem(`idsInitializedbutton_${merchant}`) === 'true'
       const loadedPaymentInit =
@@ -547,16 +546,16 @@ ${normalizeCSS(cssToUse)}
         setCustomCSS_variable(loadedCustomCSS_variable)
         setLastValidCSS_variable(extractCSS(loadedCustomCSS_variable))
       }
-      if (loadedButtonID !== buttonID) setButtonID(loadedButtonID)
-      if (loadedPaymentID !== paymentID) setPaymentID(loadedPaymentID)
+      if (loadedButtonId !== buttonId) setButtonId(loadedButtonId)
+      if (loadedPaymentId !== paymentId) setPaymentId(loadedPaymentId)
 
       logWithTimestamp(
         F,
         'useEffect: Loaded initial values from localStorage',
         {
           merchant,
-          loadedButtonID,
-          loadedPaymentID,
+          loadedButtonId,
+          loadedPaymentId,
           loadedButtonInit,
           loadedPaymentInit,
           loadedIsSingleUse
@@ -567,6 +566,32 @@ ${normalizeCSS(cssToUse)}
 
   useEffect(() => {
     logWithTimestamp(F, 'useEffect: Starting initialization process')
+    const checkBraveShields = async () => {
+      const isBrave = (navigator as any).brave?.isBrave?.() || false
+      if (isBrave) {
+        try {
+          const testFetch = await fetch(`${CONFIG.PAY_BASE}/test`, {
+            mode: 'no-cors'
+          })
+          if (!testFetch.ok) {
+            toast.warn(
+              '⚠️ Brave Shields detected. Lower Shields for getmetanet.com to ensure wallet connectivity.',
+              { autoClose: 7000 }
+            )
+            logWithTimestamp(
+              F,
+              '⚠️ Brave Shields may be blocking network requests'
+            )
+          }
+        } catch {
+          toast.warn(
+            '⚠️ Brave Shields detected. Lower Shields for getmetanet.com to ensure wallet connectivity.',
+            { autoClose: 7000 }
+          )
+          logWithTimestamp(F, '⚠️ Brave Shields blocking detected')
+        }
+      }
+    }
     const initializeIfNeeded = async () => {
       let merchantId: string | undefined
       let wallet: WalletClient = new WalletClient('auto', CONFIG.WALLET_ORIGIN)
@@ -665,12 +690,12 @@ ${normalizeCSS(cssToUse)}
           wallet.getPublicKey({ identityKey: true }) as Promise<{
             publicKey: string
           }>,
-          new Promise((_, reject) =>
+          new Promise((_, reject) => {
             setTimeout(
               () => reject(new Error('wallet.getPublicKey timed out')),
-              5000
+              CONFIG.WALLET_TIMEOUT || 20000
             )
-          )
+          })
         ])) as { publicKey: string }
         logWithTimestamp(F, 'useEffect: Wallet public key response:', identity)
         if (!identity || !identity.publicKey) {
@@ -713,7 +738,7 @@ ${normalizeCSS(cssToUse)}
               setHasMetanet(true)
               logWithTimestamp(
                 F,
-                'useEffect: Wallet reinitialized, merchant ID:',
+                'useEffect: Wallet reinitialized, merchant Id:',
                 merchantId
               )
             } catch (retryError: any) {
@@ -727,7 +752,7 @@ ${normalizeCSS(cssToUse)}
               setMerchant(merchantId)
               logWithTimestamp(
                 F,
-                'useEffect: Using temporary merchant ID:',
+                'useEffect: Using temporary merchant Id:',
                 merchantId
               )
               toast.error(
@@ -740,7 +765,7 @@ ${normalizeCSS(cssToUse)}
             setMerchant(merchantId)
             logWithTimestamp(
               F,
-              'useEffect: Using temporary merchant ID:',
+              'useEffect: Using temporary merchant Id:',
               merchantId
             )
             toast.error(
@@ -753,7 +778,7 @@ ${normalizeCSS(cssToUse)}
           setMerchant(merchantId)
           logWithTimestamp(
             F,
-            'useEffect: Using temporary merchant ID:',
+            'useEffect: Using temporary merchant Id:',
             merchantId
           )
           toast.error(
@@ -761,7 +786,7 @@ ${normalizeCSS(cssToUse)}
           )
         }
       }
-      if (!merchantId) throw new Error('Merchant ID not set')
+      if (!merchantId) throw new Error('Merchant Id not set')
       const sessionFlag = sessionStorage.getItem('createPageLoaded')
       const navType = performance.navigation.type
       let serverStatus = { isRestarted: false }
@@ -793,27 +818,27 @@ ${normalizeCSS(cssToUse)}
         'isValidReferrer:',
         isValidReferrer
       )
-      let validButtonID = localStorage.getItem(`buttonID_${merchantId}`) || ''
-      let validPaymentID = localStorage.getItem(`paymentID_${merchantId}`) || ''
+      let validButtonId = localStorage.getItem(`buttonId_${merchantId}`) || ''
+      let validPaymentId = localStorage.getItem(`paymentId_${merchantId}`) || ''
       const buttonInitialized =
         localStorage.getItem(`idsInitializedbutton_${merchantId}`) === 'true'
       const paymentInitialized =
         localStorage.getItem(`idsInitializedpayment_${merchantId}`) === 'true'
-      logWithTimestamp(F, 'useEffect: Loaded persisted IDs:', {
-        validButtonID,
-        validPaymentID,
+      logWithTimestamp(F, 'useEffect: Loaded persisted Ids:', {
+        validButtonId,
+        validPaymentId,
         buttonInitialized,
         paymentInitialized
       })
       if (
-        !validButtonID ||
-        !validPaymentID ||
+        !validButtonId ||
+        !validPaymentId ||
         !buttonInitialized ||
         !paymentInitialized ||
         isServerRestart
       ) {
         try {
-          const defaultDescription = `Payment using ${'button'} ID: ${generateBase58(
+          const defaultDescription = `Payment using ${'button'} Id: ${generateBase58(
             12
           )}` // Temporary description
           const buttonResponse: InitializeIdsResponse = await initializeIds(
@@ -821,7 +846,7 @@ ${normalizeCSS(cssToUse)}
             wallet,
             '',
             merchantId,
-            setButtonID,
+            setButtonId,
             setSpendingDescription_fixed,
             setSpendingDescription_variable,
             undefined,
@@ -829,23 +854,23 @@ ${normalizeCSS(cssToUse)}
           )
           if (buttonResponse.status !== 'success') {
             throw new Error(
-              `Button ID initialization failed: ${buttonResponse.message}`
+              `Button Id initialization failed: ${buttonResponse.message}`
             )
           }
-          validButtonID = buttonResponse.id || generateBase58(12)
-          localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
+          validButtonId = buttonResponse.id || generateBase58(12)
+          localStorage.setItem(`buttonId_${merchantId}`, validButtonId)
           localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
           logWithTimestamp(
             F,
-            'useEffect: Button ID initialized:',
-            validButtonID
+            'useEffect: Button Id initialized:',
+            validButtonId
           )
           const paymentResponse: InitializeIdsResponse = await initializeIds(
             'payment',
             wallet,
             '',
             merchantId,
-            setPaymentID,
+            setPaymentId,
             setSpendingDescription_fixed,
             setSpendingDescription_variable,
             undefined,
@@ -853,50 +878,46 @@ ${normalizeCSS(cssToUse)}
           )
           if (paymentResponse.status !== 'success') {
             throw new Error(
-              `Payment ID initialization failed: ${paymentResponse.message}`
+              `Payment Id initialization failed: ${paymentResponse.message}`
             )
           }
-          validPaymentID = paymentResponse.id || generateBase58(12)
-          localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
+          validPaymentId = paymentResponse.id || generateBase58(12)
+          localStorage.setItem(`paymentId_${merchantId}`, validPaymentId)
           localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
 
-          // enable-copy: ensure state even on fallback init
-          setButtonID(validButtonID)
-          setPaymentID(validPaymentID)
-
-          // enable-copy: final guarantee UI reflects chosen IDs
-          setButtonID(validButtonID)
-          setPaymentID(validPaymentID)
-          setIds({ buttonId: validButtonID, paymentId: validPaymentID })
+          // enable-copy: final guarantee UI reflects chosen Ids
+          setButtonId(validButtonId)
+          setPaymentId(validPaymentId)
+          setIds({ buttonId: validButtonId, paymentId: validPaymentId })
           logWithTimestamp(
             F,
-            'useEffect: Payment ID initialized:',
-            validPaymentID
+            'useEffect: Payment Id initialized:',
+            validPaymentId
           )
         } catch (err: any) {
           logWithTimestamp(
             F,
-            '❌ useEffect: Failed to initialize IDs:',
+            '❌ useEffect: Failed to initialize Ids:',
             err.message
           )
-          validButtonID = generateBase58(12)
-          validPaymentID = generateBase58(12)
-          localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
-          localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
+          validButtonId = generateBase58(12)
+          validPaymentId = generateBase58(12)
+          localStorage.setItem(`buttonId_${merchantId}`, validButtonId)
+          localStorage.setItem(`paymentId_${merchantId}`, validPaymentId)
           localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
           localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
-          toast.error(`❌ Failed to initialize IDs: ${err.message}`)
+          toast.error(`❌ Failed to initialize Ids: ${err.message}`)
         }
       } else {
-        logWithTimestamp(F, 'useEffect: Validating persisted IDs', {
+        logWithTimestamp(F, 'useEffect: Validating persisted Ids', {
           merchant: merchantId,
-          validButtonID,
-          validPaymentID
+          validButtonId,
+          validPaymentId
         })
         const validateIds = async () => {
           try {
             const data = await fetchJsonWithAuth<ButtonCodeResponse>(
-              `/buttonCode/${encodeURIComponent(validButtonID)}`,
+              `/buttonCode/${encodeURIComponent(validButtonId)}`,
               { method: 'GET' }
             )
             logWithTimestamp(F, 'useEffect: Button code response', {
@@ -906,34 +927,34 @@ ${normalizeCSS(cssToUse)}
             })
             if (
               data.status !== 'success' ||
-              data.button_id !== validButtonID ||
-              data.payment_id !== validPaymentID
+              data.button_id !== validButtonId ||
+              data.payment_id !== validPaymentId
             ) {
               logWithTimestamp(
                 F,
-                'useEffect: Invalid persisted IDs, generating new ones',
+                'useEffect: Invalid persisted Ids, generating new ones',
                 {
-                  validButtonID,
-                  validPaymentID
+                  validButtonId,
+                  validPaymentId
                 }
               )
-              localStorage.removeItem(`buttonID_${merchantId}`)
-              localStorage.removeItem(`paymentID_${merchantId}`)
+              localStorage.removeItem(`buttonId_${merchantId}`)
+              localStorage.removeItem(`paymentId_${merchantId}`)
               localStorage.removeItem(`idsInitializedbutton_${merchantId}`)
               localStorage.removeItem(`idsInitializedpayment_${merchantId}`)
-              validButtonID = generateBase58(12)
-              validPaymentID = generateBase58(12)
-              localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
-              localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
+              validButtonId = generateBase58(12)
+              validPaymentId = generateBase58(12)
+              localStorage.setItem(`buttonId_${merchantId}`, validButtonId)
+              localStorage.setItem(`paymentId_${merchantId}`, validPaymentId)
               localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
               localStorage.setItem(
                 `idsInitializedpayment_${merchantId}`,
                 'true'
               )
-              setButtonID(validButtonID)
-              setPaymentID(validPaymentID)
-              setIds({ buttonId: validButtonID, paymentId: validPaymentID })
-              const newDescription = `Payment using paymentId: ${validPaymentID}`
+              setButtonId(validButtonId)
+              setPaymentId(validPaymentId)
+              setIds({ buttonId: validButtonId, paymentId: validPaymentId })
+              const newDescription = `Payment using paymentId: ${validPaymentId}`
               setSpendingDescription_fixed(newDescription)
               setSpendingDescription_variable(newDescription)
               localStorage.setItem(
@@ -948,12 +969,12 @@ ${normalizeCSS(cssToUse)}
               const fixedPreviewHtml = formatHtml(
                 `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
                   newDescription
-                )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
+                )}" data-buttonId="${validButtonId}" data-paymentId="${validPaymentId}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
               )
               const variablePreviewHtml = formatHtml(
                 `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
                   newDescription
-                )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+                )}" data-buttonId="${validButtonId}" data-paymentId="${validPaymentId}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
               )
               setPreviewFixedHtml(fixedPreviewHtml)
               setPreviewVariableHtml(variablePreviewHtml)
@@ -961,35 +982,35 @@ ${normalizeCSS(cssToUse)}
               setUpdateCounter(prev => prev + 1)
               logWithTimestamp(
                 F,
-                'useEffect: Reinitialized IDs and updated previews',
+                'useEffect: Reinitialized Ids and updated previews',
                 {
-                  validButtonID,
-                  validPaymentID,
+                  validButtonId,
+                  validPaymentId,
                   isSingleUse
                 }
               )
             } else {
-              logWithTimestamp(F, 'useEffect: Valid persisted IDs', {
-                validButtonID,
-                validPaymentID
+              logWithTimestamp(F, 'useEffect: Valid persisted Ids', {
+                validButtonId,
+                validPaymentId
               })
-              setIds({ buttonId: validButtonID, paymentId: validPaymentID })
+              setIds({ buttonId: validButtonId, paymentId: validPaymentId })
             }
           } catch (err: any) {
-            logWithTimestamp(F, '❌ useEffect: Failed to validate IDs', {
+            logWithTimestamp(F, '❌ useEffect: Failed to validate Ids', {
               error: err.message
             })
-            toast.error('❌ Failed to validate IDs', { autoClose: 5000 })
-            validButtonID = generateBase58(12)
-            validPaymentID = generateBase58(12)
-            localStorage.setItem(`buttonID_${merchantId}`, validButtonID)
-            localStorage.setItem(`paymentID_${merchantId}`, validPaymentID)
+            toast.error('❌ Failed to validate Ids', { autoClose: 5000 })
+            validButtonId = generateBase58(12)
+            validPaymentId = generateBase58(12)
+            localStorage.setItem(`buttonId_${merchantId}`, validButtonId)
+            localStorage.setItem(`paymentId_${merchantId}`, validPaymentId)
             localStorage.setItem(`idsInitializedbutton_${merchantId}`, 'true')
             localStorage.setItem(`idsInitializedpayment_${merchantId}`, 'true')
-            setButtonID(validButtonID)
-            setPaymentID(validPaymentID)
-            setIds({ buttonId: validButtonID, paymentId: validPaymentID })
-            const newDescription = `Payment using paymentId: ${validPaymentID}`
+            setButtonId(validButtonId)
+            setPaymentId(validPaymentId)
+            setIds({ buttonId: validButtonId, paymentId: validPaymentId })
+            const newDescription = `Payment using paymentId: ${validPaymentId}`
             setSpendingDescription_fixed(newDescription)
             setSpendingDescription_variable(newDescription)
             localStorage.setItem(
@@ -1004,12 +1025,12 @@ ${normalizeCSS(cssToUse)}
             const fixedPreviewHtml = formatHtml(
               `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
                 newDescription
-              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
+              )}" data-buttonId="${validButtonId}" data-paymentId="${validPaymentId}" data-multi-use="${!isSingleUse}">${fixedText}</div>`
             )
             const variablePreviewHtml = formatHtml(
               `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="${buttonText_variable}" data-description="${sanitizeInput(
                 newDescription
-              )}" data-buttonId="${validButtonID}" data-paymentId="${validPaymentID}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+              )}" data-buttonId="${validButtonId}" data-paymentId="${validPaymentId}" data-variable="true" data-multi-use="${!isSingleUse}">${buttonText_variable} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
             )
             setPreviewFixedHtml(fixedPreviewHtml)
             setPreviewVariableHtml(variablePreviewHtml)
@@ -1017,10 +1038,10 @@ ${normalizeCSS(cssToUse)}
             setUpdateCounter(prev => prev + 1)
             logWithTimestamp(
               F,
-              'useEffect: Reinitialized IDs and updated previews after validation failure',
+              'useEffect: Reinitialized Ids and updated previews after validation failure',
               {
-                validButtonID,
-                validPaymentID,
+                validButtonId,
+                validPaymentId,
                 isSingleUse
               }
             )
@@ -1028,19 +1049,19 @@ ${normalizeCSS(cssToUse)}
         }
         validateIds()
       }
-      setIds({ buttonId: validButtonID, paymentId: validPaymentID })
-      logWithTimestamp(F, 'useEffect: Using validated IDs:', {
-        validButtonID,
-        validPaymentID
+      setIds({ buttonId: validButtonId, paymentId: validPaymentId })
+      logWithTimestamp(F, 'useEffect: Using validated Ids:', {
+        validButtonId,
+        validPaymentId
       })
       logWithTimestamp(
         F,
         'useEffect: Evaluating Copy icon disabled state:',
-        !validButtonID || !validPaymentID
+        !validButtonId || !validPaymentId
       )
       logWithTimestamp(F, 'useEffect: Completed initialization process', {
-        finalButtonID: validButtonID,
-        finalPaymentID: validPaymentID
+        finalButtonId: validButtonId,
+        finalPaymentId: validPaymentId
       })
     }
     initializeIfNeeded().catch(err => {
@@ -1069,8 +1090,8 @@ ${normalizeCSS(cssToUse)}
       localStorage.setItem(`isSingleUse_${merchant}`, isSingleUse.toString())
       localStorage.setItem(`customCSS_fixed_${merchant}`, customCSS_fixed)
       localStorage.setItem(`customCSS_variable_${merchant}`, customCSS_variable)
-      localStorage.setItem(`buttonID_${merchant}`, buttonID)
-      localStorage.setItem(`paymentID_${merchant}`, paymentID)
+      localStorage.setItem(`buttonId_${merchant}`, buttonId)
+      localStorage.setItem(`paymentId_${merchant}`, paymentId)
       logWithTimestamp(F, 'useEffect: Persisted state to localStorage', {
         buttonText_fixed,
         buttonText_variable,
@@ -1079,8 +1100,8 @@ ${normalizeCSS(cssToUse)}
         paymentType,
         fixedSatAmount,
         isSingleUse,
-        buttonID,
-        paymentID
+        buttonId,
+        paymentId
       })
     }
   }, [
@@ -1093,8 +1114,8 @@ ${normalizeCSS(cssToUse)}
     isSingleUse,
     customCSS_fixed,
     customCSS_variable,
-    buttonID,
-    paymentID,
+    buttonId,
+    paymentId,
     merchant
   ])
 
@@ -1134,10 +1155,10 @@ ${normalizeCSS(cssToUse)}
       merchant,
       'renderKey:',
       renderKey,
-      'buttonID:',
-      buttonID,
-      'paymentID:',
-      paymentID
+      'buttonId:',
+      buttonId,
+      'paymentId:',
+      paymentId
     )
     if (merchant || !hasMetanet) {
       setRenderKey(prev => prev + 1)
@@ -1146,17 +1167,17 @@ ${normalizeCSS(cssToUse)}
     logWithTimestamp(
       F,
       'useEffect: Evaluating Copy icon disabled state:',
-      !buttonID || !paymentID,
-      'Single ID set:',
-      !!buttonID && !!paymentID
+      !buttonId || !paymentId,
+      'Single Id set:',
+      !!buttonId && !!paymentId
     )
   }, [
     paymentType,
     merchant,
     hasMetanet,
     updatePreviewCodes,
-    buttonID,
-    paymentID
+    buttonId,
+    paymentId
   ])
 
   useEffect(() => {
@@ -1179,7 +1200,7 @@ ${normalizeCSS(cssToUse)}
       generatePreviewHtml(
         'fixed',
         spendingDescription_fixed ||
-          `Payment using paymentId: ${paymentID || ''}`
+          `Payment using paymentId: ${paymentId || ''}`
       )
       logWithTimestamp(
         F,
@@ -1193,7 +1214,7 @@ ${normalizeCSS(cssToUse)}
         'useEffect: Removed fixed style element from document head'
       )
     }
-  }, [customCSS_fixed, lastValidCSS_fixed, paymentID])
+  }, [customCSS_fixed, lastValidCSS_fixed, paymentId])
 
   useEffect(() => {
     const newStyleElement = document.createElement('style')
@@ -1215,7 +1236,7 @@ ${normalizeCSS(cssToUse)}
       generatePreviewHtml(
         'variable',
         spendingDescription_variable ||
-          `Payment using paymentId: ${paymentID || ''}`
+          `Payment using paymentId: ${paymentId || ''}`
       )
       logWithTimestamp(
         F,
@@ -1229,16 +1250,16 @@ ${normalizeCSS(cssToUse)}
         'useEffect: Removed variable style element from document head'
       )
     }
-  }, [customCSS_variable, lastValidCSS_variable, paymentID])
+  }, [customCSS_variable, lastValidCSS_variable, paymentId])
 
   useEffect(() => {
-    if (copyIconRef.current != null && (!buttonID || !paymentID)) {
+    if (copyIconRef.current != null && (!buttonId || !paymentId)) {
       copyIconRef.current.classList.add('preview-flash-copy')
       logWithTimestamp(
         F,
         'useEffect: Added preview-flash-copy class to Copy Icon for visibility'
       )
-    } else if (copyIconRef.current != null && buttonID && paymentID) {
+    } else if (copyIconRef.current != null && buttonId && paymentId) {
       copyIconRef.current.classList.remove('preview-flash-copy')
       logWithTimestamp(
         F,
@@ -1255,26 +1276,26 @@ ${normalizeCSS(cssToUse)}
     updatePreviewCodes()
     logWithTimestamp(
       F,
-      'useEffect: Completed effect for buttonID and preview container updates'
+      'useEffect: Completed effect for buttonId and preview container updates'
     )
-  }, [buttonID, paymentID, previewContainerRef, updatePreviewCodes])
+  }, [buttonId, paymentId, previewContainerRef, updatePreviewCodes])
 
   useEffect(() => {
     logWithTimestamp(
       F,
-      'useEffect: Updating descriptions for paymentID change',
-      'paymentID:',
-      paymentID,
+      'useEffect: Updating descriptions for paymentId change',
+      'paymentId:',
+      paymentId,
       'fixedSatAmount:',
       fixedSatAmount || '5'
     )
-    if (paymentID && merchant) {
+    if (paymentId && merchant) {
       const persistedFixedDescription =
         localStorage.getItem(`spendingDescription_fixed_${merchant}`) ||
-        `Payment using paymentId: ${paymentID}`
+        `Payment using paymentId: ${paymentId}`
       const persistedVariableDescription =
         localStorage.getItem(`spendingDescription_variable_${merchant}`) ||
-        `Payment using paymentId: ${paymentID}`
+        `Payment using paymentId: ${paymentId}`
       if (
         persistedFixedDescription !== spendingDescription_fixed ||
         persistedVariableDescription !== spendingDescription_variable
@@ -1295,16 +1316,16 @@ ${normalizeCSS(cssToUse)}
       updatePreviewCodes()
       logWithTimestamp(
         F,
-        'useEffect: Regenerated previews for paymentID change',
+        'useEffect: Regenerated previews for paymentId change',
         {
-          paymentID,
+          paymentId,
           isSingleUse,
           multiUse: !isSingleUse
         }
       )
     }
   }, [
-    paymentID,
+    paymentId,
     merchant,
     updatePreviewCodes,
     spendingDescription_fixed,
@@ -1528,8 +1549,8 @@ ${normalizeCSS(cssToUse)}
     logWithTimestamp(F, 'resetAll: Starting full reset of page fields')
     try {
       const keysToClear = [
-        `buttonID_${merchant}`,
-        `paymentID_${merchant}`,
+        `buttonId_${merchant}`,
+        `paymentId_${merchant}`,
         `spendingDescription_fixed_${merchant}`,
         `spendingDescription_variable_${merchant}`,
         `buttonText_fixed_${merchant}`,
@@ -1538,7 +1559,7 @@ ${normalizeCSS(cssToUse)}
         `fixedSatAmount_${merchant}`,
         `isSingleUse_${merchant}`,
         `customCSS_fixed_${merchant}`,
-        `customCSS_variable_${merchant}`,
+        `customCSS_variable_${merchant}`
       ]
       keysToClear.forEach(k => localStorage.removeItem(k))
       logWithTimestamp(F, 'resetAll: Cleared merchant-scoped localStorage keys')
@@ -1548,9 +1569,9 @@ ${normalizeCSS(cssToUse)}
         return
       }
       setIds(prev => {
-        const newState = { buttonId: buttonID, paymentId: paymentID }
-        const newFixedDescription = `Payment using paymentId: ${paymentID}`
-        const newVariableDescription = `Payment using paymentId: ${paymentID}`
+        const newState = { buttonId: buttonId, paymentId: paymentId }
+        const newFixedDescription = `Payment using paymentId: ${paymentId}`
+        const newVariableDescription = `Payment using paymentId: ${paymentId}`
         setButtonText_fixed('Pay Now')
         setButtonText_variable('Pay Now')
         setSpendingDescription_fixed(newFixedDescription)
@@ -1609,8 +1630,8 @@ ${normalizeCSS(cssToUse)}
         setShowCode(false)
         setCopySuccess('')
         if (merchant) {
-          localStorage.setItem(`buttonID_${merchant}`, buttonID)
-          localStorage.setItem(`paymentID_${merchant}`, paymentID)
+          localStorage.setItem(`buttonId_${merchant}`, buttonId)
+          localStorage.setItem(`paymentId_${merchant}`, paymentId)
           localStorage.setItem(
             `spendingDescription_fixed_${merchant}`,
             newFixedDescription
@@ -1633,12 +1654,12 @@ ${normalizeCSS(cssToUse)}
         const fixedPreviewHtml = formatHtml(
           `<div class="gateway-paybutton gateway-paybutton-fixed" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
             newFixedDescription
-          )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="true">${fixedText}</div>`
+          )}" data-buttonId="${buttonId}" data-paymentId="${paymentId}" data-multi-use="true">${fixedText}</div>`
         )
         const variablePreviewHtml = formatHtml(
           `<div class="gateway-paybutton gateway-paybutton-variable" style="width: fit-content; margin: 0 auto; display: block" data-text="Pay Now" data-description="${sanitizeInput(
             newVariableDescription
-          )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+          )}" data-buttonId="${buttonId}" data-paymentId="${paymentId}" data-variable="true" data-multi-use="true">Pay Now <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
         )
         setPreviewFixedHtml(fixedPreviewHtml)
         setPreviewVariableHtml(variablePreviewHtml)
@@ -1648,8 +1669,8 @@ ${normalizeCSS(cssToUse)}
           F,
           'resetAll: Successfully reset all fields and updated localStorage',
           {
-            buttonID,
-            paymentID,
+            buttonId,
+            paymentId,
             fixedSatAmount: '5',
             paymentType: 'fixed',
             isSingleUse: false,
@@ -1691,14 +1712,14 @@ ${normalizeCSS(cssToUse)}
       })
       return
     }
-    if (!buttonID || !paymentID) {
-      toast.error('❌ Button or payment ID not initialized', {
+    if (!buttonId || !paymentId) {
+      toast.error('❌ Button or payment Id not initialized', {
         autoClose: 5000
       })
       logWithTimestamp(
         F,
-        'handleCopyCode: Button or payment ID not initialized',
-        { buttonID, paymentID }
+        'handleCopyCode: Button or payment Id not initialized',
+        { buttonId, paymentId }
       )
       return
     }
@@ -1728,13 +1749,13 @@ ${normalizeCSS(cssToUse)}
       return
     }
 
-    // Use current IDs from state
-    const currentButtonId = buttonID
-    const currentPaymentId = paymentID
+    // Use current Ids from state
+    const currentButtonId = buttonId
+    const currentPaymentId = paymentId
     const updatedDescription = sanitizeInput(
       description || `Payment using paymentId: ${currentPaymentId}`
     ).slice(0, 80)
-    logWithTimestamp(F, 'handleCopyCode: Using current IDs and description', {
+    logWithTimestamp(F, 'handleCopyCode: Using current Ids and description', {
       currentButtonId,
       currentPaymentId,
       updatedDescription
@@ -1820,7 +1841,7 @@ ${normalizeCSS(cssToUse)}
       const serverButtonId = createData.buttonId || currentButtonId
       const serverPaymentId = createData.paymentId || currentPaymentId
 
-      // Build final HTML with server-confirmed IDs
+      // Build final HTML with server-confirmed Ids
       htmlCode =
         paymentType === 'fixed'
           ? `<style>\n${cssToUse.trim()}\n</style>\n<div\n id="${serverButtonId}"\n class="${buttonClass}"\n data-merchant="${
@@ -1860,7 +1881,7 @@ ${normalizeCSS(cssToUse)}
 
       logWithTimestamp(
         F,
-        'handleCopyCode: Button registered with ID:',
+        'handleCopyCode: Button registered with Id:',
         serverButtonId,
         'and paymentId:',
         serverPaymentId,
@@ -1868,21 +1889,21 @@ ${normalizeCSS(cssToUse)}
         multiUse
       )
 
-      // Generate new IDs for the next button
+      // Generate new Ids for the next button
       try {
-        // Clear localStorage to force new ID generation
-        localStorage.removeItem(`buttonID_${merchant}`)
-        localStorage.removeItem(`paymentID_${merchant}`)
+        // Clear localStorage to force new Id generation
+        localStorage.removeItem(`buttonId_${merchant}`)
+        localStorage.removeItem(`paymentId_${merchant}`)
         localStorage.removeItem(`idsInitializedbutton_${merchant}`)
         localStorage.removeItem(`idsInitializedpayment_${merchant}`)
         logWithTimestamp(
           F,
-          'handleCopyCode: Cleared localStorage for new ID generation',
+          'handleCopyCode: Cleared localStorage for new Id generation',
           { merchant }
         )
         const newButtonId = generateBase58(12)
         const newPaymentId = generateBase58(12)
-        logWithTimestamp(F, 'handleCopyCode: Attempting to generate new IDs', {
+        logWithTimestamp(F, 'handleCopyCode: Attempting to generate new Ids', {
           newButtonId,
           newPaymentId
         })
@@ -1896,15 +1917,15 @@ ${normalizeCSS(cssToUse)}
           w,
           newButtonId,
           merchant,
-          setButtonID,
+          setButtonId,
           setSpendingDescription_fixed,
           setSpendingDescription_variable,
           undefined,
-          true // Force new ID generation
+          true // Force new Id generation
         )
         if (buttonResponse.status !== 'success') {
           throw new Error(
-            buttonResponse.message || 'Failed to initialize new button ID'
+            buttonResponse.message || 'Failed to initialize new button Id'
           )
         }
         const validatedButtonId = buttonResponse.id || newButtonId
@@ -1913,21 +1934,21 @@ ${normalizeCSS(cssToUse)}
           w,
           newPaymentId,
           merchant,
-          setPaymentID,
+          setPaymentId,
           setSpendingDescription_fixed,
           setSpendingDescription_variable,
           validatedButtonId,
-          true // Force new ID generation
+          true // Force new Id generation
         )
         if (paymentResponse.status !== 'success') {
           throw new Error(
-            paymentResponse.message || 'Failed to initialize new payment ID'
+            paymentResponse.message || 'Failed to initialize new payment Id'
           )
         }
         const validatedPaymentId = paymentResponse.id || newPaymentId
         setIds({ buttonId: validatedButtonId, paymentId: validatedPaymentId })
-        localStorage.setItem(`buttonID_${merchant}`, validatedButtonId)
-        localStorage.setItem(`paymentID_${merchant}`, validatedPaymentId)
+        localStorage.setItem(`buttonId_${merchant}`, validatedButtonId)
+        localStorage.setItem(`paymentId_${merchant}`, validatedPaymentId)
         localStorage.setItem(`idsInitializedbutton_${merchant}`, 'true')
         localStorage.setItem(`idsInitializedpayment_${merchant}`, 'true')
         const newFixedDescription = sanitizeInput(
@@ -1948,7 +1969,7 @@ ${normalizeCSS(cssToUse)}
         )
         logWithTimestamp(
           F,
-          'handleCopyCode: Generated new IDs and descriptions for next button:',
+          'handleCopyCode: Generated new Ids and descriptions for next button:',
           {
             validatedButtonId,
             validatedPaymentId,
@@ -1959,10 +1980,10 @@ ${normalizeCSS(cssToUse)}
       } catch (err: any) {
         logWithTimestamp(
           F,
-          '❌ handleCopyCode: Failed to initialize new IDs for next button:',
+          '❌ handleCopyCode: Failed to initialize new Ids for next button:',
           { error: err.message }
         )
-        toast.error('❌ Failed to initialize new IDs for next button', {
+        toast.error('❌ Failed to initialize new Ids for next button', {
           autoClose: 5000
         })
       }
@@ -2024,14 +2045,14 @@ ${normalizeCSS(cssToUse)}
         })
 
         if (res.ok) {
-          logWithTimestamp(F, '✅ handleCopyCode: Cleaned up orphaned IDs:', {
+          logWithTimestamp(F, '✅ handleCopyCode: Cleaned up orphaned Ids:', {
             currentPaymentId,
             currentButtonId
           })
         } else {
           logWithTimestamp(
             F,
-            '❌ handleCopyCode: Failed to clean up orphaned IDs:',
+            '❌ handleCopyCode: Failed to clean up orphaned Ids:',
             {
               status: res.status
             }
@@ -2040,7 +2061,7 @@ ${normalizeCSS(cssToUse)}
       } catch (cleanupErr: any) {
         logWithTimestamp(
           F,
-          '❌ handleCopyCode: Failed to clean up orphaned IDs:',
+          '❌ handleCopyCode: Failed to clean up orphaned Ids:',
           cleanupErr.message
         )
       }
@@ -2279,10 +2300,10 @@ ${normalizeCSS(cssToUse)}
                                 sanitizeInput(buttonText_variable)
                               const fixedDescription =
                                 spendingDescription_fixed ||
-                                `Payment using paymentId: ${paymentID}`
+                                `Payment using paymentId: ${paymentId}`
                               const variableDescription =
                                 spendingDescription_variable ||
-                                `Payment using paymentId: ${paymentID}`
+                                `Payment using paymentId: ${paymentId}`
                               const fixedPreviewClass =
                                 'gateway-paybutton gateway-paybutton-fixed' // No disabled class for preview
                               const variablePreviewClass =
@@ -2296,27 +2317,27 @@ ${normalizeCSS(cssToUse)}
                               const fixedPreviewHtml = formatHtml(
                                 `<div class="${fixedPreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-amount="${fixedSatAmount}" data-text="${fixedText}" data-description="${sanitizeInput(
                                   fixedDescription
-                                )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-multi-use="${!value}">${fixedText}</div>`
+                                )}" data-buttonId="${buttonId}" data-paymentId="${paymentId}" data-multi-use="${!value}">${fixedText}</div>`
                               )
                               const variablePreviewHtml = formatHtml(
                                 `<div class="${variablePreviewClass}" style="width: fit-content; margin: 0 auto; display: block" data-text="${variableText}" data-description="${sanitizeInput(
                                   variableDescription
-                                )}" data-buttonId="${buttonID}" data-paymentId="${paymentID}" data-variable="true" data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
+                                )}" data-buttonId="${buttonId}" data-paymentId="${paymentId}" data-variable="true" data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
                               )
                               const fixedCode = `<style>\n${extractCSS(
                                 value ? fixedCSS : `${fixedBaseCSS}\n</style>`
-                              ).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${fixedCodeClass}"\n data-merchant="${
+                              ).trim()}\n</style>\n<div\n id="${buttonId}"\n class="${fixedCodeClass}"\n data-merchant="${
                                 merchant || 'temp-merchant'
-                              }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
+                              }"\n data-buttonId="${buttonId}"\n data-paymentId="${paymentId}"\n data-amount="${fixedSatAmount}"\n data-text="${fixedText}"\n data-description="${sanitizeInput(
                                 fixedDescription
                               )}"\n data-width="fit-content"\n data-multi-use="${!value}">${fixedText}</div>`
                               const variableCode = `<style>\n${extractCSS(
                                 value
                                   ? variableCSS
                                   : `${variableBaseCSS}\n</style>`
-                              ).trim()}\n</style>\n<div\n id="${buttonID}"\n class="${variableCodeClass}"\n data-merchant="${
+                              ).trim()}\n</style>\n<div\n id="${buttonId}"\n class="${variableCodeClass}"\n data-merchant="${
                                 merchant || 'temp-merchant'
-                              }"\n data-buttonId="${buttonID}"\n data-paymentId="${paymentID}"\n data-text="${variableText}"\n data-description="${sanitizeInput(
+                              }"\n data-buttonId="${buttonId}"\n data-paymentId="${paymentId}"\n data-text="${variableText}"\n data-description="${sanitizeInput(
                                 variableDescription
                               )}"\n data-variable="true"\n data-width="fit-content"\n data-multi-use="${!value}">${variableText} <input type="number" value="" min="1" max="${MAX_PAYMENT_SATS}" style="width: 50px; text-align: center;" readonly /> Sats</div>`
                               setPreviewFixedHtml(fixedPreviewHtml)
@@ -2416,16 +2437,16 @@ ${normalizeCSS(cssToUse)}
                   >
                     <Tooltip
                       title={
-                        buttonID && paymentID
+                        buttonId && paymentId
                           ? 'Copy Code'
-                          : 'Requires both IDs'
+                          : 'Requires both Ids'
                       }
                       arrow
                     >
                       <span>
                         <IconButton
                           onClick={handleCopyCode}
-                          disabled={!buttonID || !paymentID}
+                          disabled={!buttonId || !paymentId}
                           sx={{
                             ...(isCopyHovered && {
                               opacity: 0.7,
