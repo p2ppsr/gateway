@@ -204,22 +204,27 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
 }
 
 /**
- * Authenticated fetch with timeout for all `/api/*` calls.
+ * Authenticated fetch with timeout for `/api/*` calls, with an automatic bypass for
+ * known **public endpoints** (e.g., `/api/getVersion`) to avoid triggering the wallet
+ * handshake during initial page load.
  *
- * Uses {@link AuthFetch} to sign the request with the provided {@link WalletClient},
- * automatically attaching the `Authorization` header. Preserves any caller-supplied
- * headers (e.g., `Content-Type`) and aborts the in-flight request if it exceeds
- * the configured timeout via `AbortController`.
+ * When `useAuth` is true (default for non-public endpoints), requests are signed using
+ * {@link AuthFetch} with the provided {@link WalletClient} (BRC-104). For public endpoints,
+ * a plain `fetch` is used (no Authorization header, no wallet dependency).
+ *
+ * **Why this matters**
+ * - Prevents "Loading…" hangs when the wallet (Metanet Desktop) is slow or in a bad state.
+ * - First paint can proceed using unauthenticated endpoints; protected actions still require auth.
  *
  * **Important**
  * - For mutual-auth to succeed, the signed URL must match the actual request origin.
- *   Prefer `API_BASE = window.location.origin` and
- *   avoid mixing hosts like `http://localhost:3001` from the browser.
- * - Do **not** set `Authorization` yourself; it is added by `AuthFetch`.
- * - Timeout cancels the request and surfaces a clear error.
+ *   Prefer `API_BASE = window.location.origin` and avoid mixing hosts (e.g., `http://localhost:3001`) in the browser.
+ * - Do **not** set `Authorization` yourself; it is added by `AuthFetch` when `useAuth` is true.
+ * - Timeout cancels the in-flight request via `AbortController`.
  *
  * @param {string} url
- *   Absolute or relative URL to fetch. Relative `/...` will be resolved using client config.
+ *   Absolute or relative URL to fetch. Relative `/...` will be resolved by the browser; the
+ *   public/secure decision is based on {@link isPublicEndpoint}.
  *
  * @param {object} options
  *   Fetch options (subset compatible with `SimplifiedFetchRequestOptions` from `@bsv/sdk`).
@@ -234,8 +239,7 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
  *   Serialized request body (e.g., `JSON.stringify(...)` for POSTs).
  *
  * @param {WalletClient} wallet
- *   Wallet instance used by `AuthFetch` to create the `Authorization` header.
- *   Required for authenticated endpoints (all `/api/*` in this app).
+ *   Wallet instance used by `AuthFetch` to create the `Authorization` header when required.
  *
  * @param {number} [timeoutMs=15000]
  *   Maximum time in milliseconds before the request is aborted.
@@ -253,14 +257,13 @@ export function formatTimestamp(dateStr: string | null | undefined): string {
  *     URL, status code/text, and any response text available.
  *
  * @remarks
- * - This helper centralizes auth + timeout for consistency with known-working
- *   flows (e.g., `/api/invoice`). Route **all** `/api/*` calls through it.
- * - Keep client and server clocks reasonably in sync to avoid time-based
- *   signature failures.
+ * - Public endpoints are defined by {@link isPublicEndpoint}. By default only `/api/getVersion`
+ *   is public; add others there if you need them to be wallet-agnostic (e.g., `/healthz`).
+ * - Keep client and server clocks reasonably in sync to avoid time-based signature failures.
  */
 export const fetchWithTimeout = async (
   url: string,
-  options: { headers?: Record<string, string>; method?: string; body?: string },
+  options: { headers?: Record<string, string>; method?: string; body?: string } = {},
   wallet: WalletClient,
   timeoutMs: number = 15_000
 ): Promise<Response> => {
@@ -271,75 +274,89 @@ export const fetchWithTimeout = async (
     throw new Error('Timeout must be a positive integer')
   }
 
-  // Resolve to a valid absolute-or-relative URL (never throws "Invalid URL")
   const resolvedUrl = `${url}`
 
-  // Build auth-capable fetch
-  const authFetch = new AuthFetch(wallet)
+  // Decide whether to sign this request (skip for public endpoints)
+  const useAuth = !isPublicEndpoint(resolvedUrl)
 
   // Abort on timeout
   const controller = new AbortController()
   const timer = setTimeout(
-    () =>
-      controller.abort(
-        new Error(`Timeout after ${timeoutMs}ms: ${CONFIG.API_BASE}`)
-      ),
+    () => controller.abort(new Error(`Timeout after ${timeoutMs}ms: ${resolvedUrl}`)),
     timeoutMs
   )
 
   try {
-    const headers = { ...(options?.headers ?? {}) }
+    const headers: Record<string, string> = { ...(options.headers ?? {}) }
 
-    // Always inject x-bsv-server header if missing
-    if (!headers['x-bsv-server']) {
+    // Only inject x-bsv-server when we're signing (keeps public calls clean)
+    if (useAuth && !headers['x-bsv-server']) {
       headers['x-bsv-server'] = (globalThis as any).SERVER_IDENTITY_KEY ?? ''
     }
 
     // Auto-add Content-Type for non-GET/HEAD with body if missing
     if (
-      options?.method &&
+      options.method &&
       !['GET', 'HEAD'].includes(options.method) &&
-      options?.body &&
+      options.body &&
       !headers['Content-Type']
     ) {
       headers['Content-Type'] = 'application/json'
     }
 
-    const reqOptions = {
+    const reqOptions: RequestInit = {
       ...options,
       headers,
       signal: controller.signal as any
     }
 
-    // // Merge headers, attach signal
-    // const reqOptions = {
-    //   ...options,
-    //   headers: { ...(options?.headers ?? {}) },
-    //   signal: controller.signal as any
-    // }
-
-    const res = await authFetch.fetch(resolvedUrl, reqOptions)
+    const res = useAuth
+      ? await new AuthFetch(wallet).fetch(resolvedUrl, reqOptions as any)
+      : await fetch(resolvedUrl, reqOptions)
 
     if (!res.ok) {
       let detail = ''
-      try {
-        detail = await res.text()
-      } catch {
-        /* ignore */
-      }
+      try { detail = await res.text() } catch { /* ignore */ }
       throw new Error(
-        `Failed ${reqOptions.method || 'GET'} ${CONFIG.API_BASE} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ''}`
+        `Failed ${options.method || 'GET'} ${resolvedUrl} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ''}`
       )
     }
     return res
   } catch (err) {
-    // If aborted, surface a clear message
     if ((err as any)?.name === 'AbortError') {
-      throw new Error(`Request aborted: ${CONFIG.API_BASE}`)
+      throw new Error(`Request aborted: ${resolvedUrl}`)
     }
     throw err instanceof Error ? err : new Error(String(err))
   } finally {
     clearTimeout(timer)
+  }
+}
+
+/**
+ * Determines whether a request should be treated as a **public endpoint**,
+ * meaning it must **NOT** trigger wallet authentication (no BRC-104 handshake).
+ *
+ * By default this exempts only `/api/getVersion` so the app can render the
+ * shell without depending on the wallet being up. Extend as needed.
+ *
+ * @param {string} url
+ *   Absolute or relative URL (relative will be resolved against CONFIG.API_BASE).
+ *
+ * @returns {boolean}
+ *   `true` if the endpoint is considered public (no wallet auth), `false` otherwise.
+ *
+ * @example
+ * isPublicEndpoint('/api/getVersion') // → true
+ * isPublicEndpoint('/api/acknowledgePayment') // → false
+ */
+function isPublicEndpoint(url: string): boolean {
+  try {
+    const u = new URL(url, CONFIG.API_BASE)
+    const path = u.pathname.replace(/\/+$/, '') // strip trailing slash
+    return path === '/api/getVersion'
+  } catch {
+    // Be conservative on parse failures: require auth
+    return false
   }
 }
 
