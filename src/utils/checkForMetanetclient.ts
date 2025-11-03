@@ -1,15 +1,11 @@
-// src/utils/checkForMetanetclient.ts
 /**
  * @file src/utils/checkForMetanetclient.ts
- * @description Utility functions to check if the Metanet Client is running and determine its network (mainnet or testnet), plus a helper to probe multiple ports.
- * @version 1.1.0 (Updated 07Sep2025: add findWalletOrigin named export for runtime port probing)
- * author xAI (Grok 3)
- * @dependencies
- * - @bsv/sdk: For WalletClient
- * @changelog
- * - 02Sep2025_1919 BST (v1.0.0): Updated header comment to follow standardized template.
- * - 07Sep2025_1830 UTC (v1.1.0): Added findWalletOrigin helper.
+ * @description Utility functions to check if the Metanet Client is running and determine its network (mainnet or testnet),
+ * plus a helper to probe multiple ports.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import { WalletClient } from "@bsv/sdk";
 
 /**

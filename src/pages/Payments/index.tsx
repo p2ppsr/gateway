@@ -1,13 +1,13 @@
 /**
  * @file src/components/PayButton/index.tsx
- * @description Renders a PayButton component for initiating blockchain payments using the Metanet client. Executes a multi-step flow: server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and single-use/multi-use buttons.
- * @version 2.58.13
- * @changelog
- * - 28Aug2025_1535 BST (v2.58.13): Enhanced invoice error handling in handleClick to log all failures; added paid state logging.
- * - 28Aug2025_1521 BST (v2.58.10): Added invoice failure logging in handleClick to debug multi-use button issue.
- * - 28Aug2025_1435 BST (v2.58.9): Added logging in fetchButtonStatus to diagnose incorrect disabling of multi-use buttons.
- * - Previous changes omitted for brevity...
+ * @description
+ * Renders a PayButton component for initiating blockchain payments using the Metanet client. Executes a multi-step flow:
+ * server verification, invoice request, transaction signing, and payment submission, with support for variable amounts and
+ * single-use/multi-use buttons.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   CircularProgress,
@@ -45,6 +45,7 @@ import {
   Beef,
   CachedKeyDeriver,
   InternalizeActionArgs,
+  ListOutputsArgs,
   PrivateKey,
   Transaction,
   Utils,
@@ -54,6 +55,8 @@ import { useTheme } from "@mui/material/styles";
 import SortableHeader from "../../components/SortableHeader";
 import { ScriptTemplateBRC29, Setup } from "@bsv/wallet-toolbox";
 const F = "pages/Payments";
+
+let merchantIdForBalance = "";
 
 interface Payment {
   payment_id: string | null;
@@ -103,7 +106,7 @@ declare const SERVER_IDENTITY_KEY: string;
 
 const wallet = new WalletClient("auto", CONFIG.WALLET_ORIGIN);
 
-const PaymentsList = () => {
+const PaymentsList: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
@@ -131,6 +134,10 @@ const PaymentsList = () => {
   const [lastClickedColumn, setLastClickedColumn] = useState<string | null>(
     null,
   );
+  const [walletSats, setWalletSats] = useState<number | null>(null);
+  const [isBulkDepositing, setIsBulkDepositing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+
   const columnRefs = useRef<Record<string, Element | null>>({
     Txid: null,
     "Payment Id": null,
@@ -191,14 +198,6 @@ const PaymentsList = () => {
           is_new: payment.is_new === null ? false : !!payment.is_new,
           created_at: payment.created_at || null,
           description: payment.description || null,
-          // payment_id: payment.payment_id || null,
-          // button_id: payment.button_id || null,
-          // payer_id: payment.payer_id || null,
-          // txid: payment.txid || null,
-          // amount: typeof payment.amount === 'string' ? parseFloat(payment.amount) : payment.amount || null,
-          // completed: payment.completed === null ? false : !!payment.completed,
-          // is_new: payment.is_new === null ? false : !!payment.is_new,
-          // created_at: payment.created_at || null,
         };
         logWithTimestamp(F, `Mapped payment ${index}:`, {
           payment_id: mappedPayment.payment_id,
@@ -256,8 +255,8 @@ const PaymentsList = () => {
       "Fetching payments due to statusFilter change:",
       statusFilter,
     );
-    setPayments([]); // Reset payments on filter change
-    setRenderKey(Date.now()); // Force re-render
+    setPayments([]);
+    setRenderKey(Date.now());
     fetchPayments();
   }, [statusFilter]);
 
@@ -287,6 +286,22 @@ const PaymentsList = () => {
     // after your payment logic succeeds in acknowledgePayment:
     setTimeout(() => fetchWalletOutputs(), 5000); // 3-second delay before fetching
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const sats = await fetchWalletSats();
+        if (!cancelled) setWalletSats(sats);
+      } catch (e) {
+        logWithTimestamp(F, "❌ fetchWalletSats error:", e);
+        if (!cancelled) setWalletSats(0);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [renderKey]);
 
   const sortedPayments = useMemo(() => {
     if (!sortConfig.key) return payments;
@@ -333,16 +348,16 @@ const PaymentsList = () => {
         is_new: p.is_new,
       })),
     );
-    const targetSorted = sorted.filter((p: Payment) =>
-      ["MZgHoSGBGbu5", "WQq5HoqKwFBS", "3rKCwcmZ7kqt"].includes(
-        p.payment_id || "",
-      ),
-    );
-    logWithTimestamp(
-      F,
-      "Sorted payments for target payments:",
-      JSON.stringify(targetSorted, null, 2),
-    );
+    // const targetSorted = sorted.filter((p: Payment) =>
+    //   ["MZgHoSGBGbu5", "WQq5HoqKwFBS", "3rKCwcmZ7kqt"].includes(
+    //     p.payment_id || "",
+    //   ),
+    // );
+    // logWithTimestamp(
+    //   F,
+    //   "Sorted payments for target payments:",
+    //   JSON.stringify(targetSorted, null, 2),
+    // );
     return sorted;
   }, [payments, sortConfig]);
 
@@ -575,6 +590,55 @@ const PaymentsList = () => {
     setLastClickedColumn(null);
   };
 
+  const MAGIC_BALANCE_BASKET =
+    "893b7646de0e1c9f741bd6e9169b76a8847ae34adef7bef1e6a285371206d2e8";
+
+  // Fetch the merchant's wallet balance (sats) from the wallet client
+  async function fetchWalletSats(): Promise<number> {
+    const args: ListOutputsArgs = { basket: MAGIC_BALANCE_BASKET };
+    const r = await wallet.listOutputs(args);
+    logWithTimestamp(F, "🔍 fetchWalletSats result:", r);
+    return r.totalOutputs;
+  }
+
+  // Derived “pending” sats from current payments list
+  const pendingSats = useMemo(() => {
+    return payments
+      .filter((p) => p.is_new && typeof p.amount === "number")
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+  }, [payments]);
+
+  const pendingPaymentIds = useMemo(() => {
+    return payments
+      .filter((p) => p.is_new && (p.amount ?? 0) > 0 && !!p.payment_id)
+      .map((p) => p.payment_id as string);
+  }, [payments]);
+
+  // --- bulk internalize handler (sequential to avoid spamming wallet prompts) ---
+  const handleBulkDeposit = async () => {
+    if (pendingPaymentIds.length === 0 || isBulkDepositing) return;
+    setIsBulkDepositing(true);
+    setBulkProgress(0);
+    try {
+      for (const id of pendingPaymentIds) {
+        try {
+          await acknowledgePayment(id); // reuse your existing single-deposit flow
+        } catch (err) {
+          logWithTimestamp(F, "❌ Bulk deposit failed for", id, err);
+          // continue with the rest
+        } finally {
+          setBulkProgress((n) => n + 1);
+        }
+      }
+      // refresh lists/balance after the batch
+      setRenderKey(Date.now());
+      await fetchPayments();
+      await fetchWalletOutputs?.();
+    } finally {
+      setIsBulkDepositing(false);
+    }
+  };
+
   const acknowledgePayment = async (paymentId: string | null) => {
     if (!paymentId) {
       logWithTimestamp(
@@ -614,7 +678,7 @@ const PaymentsList = () => {
         txid,
         derivationPrefix,
         derivationSuffix,
-        merchant_id: merchantId,
+        merchantId,
         expectedLockingScriptHex,
       } = data;
 
@@ -625,6 +689,8 @@ const PaymentsList = () => {
         derivationSuffix,
         merchantId,
       });
+
+      merchantIdForBalance = merchantId;
 
       // --- Step 2: decode BEEF TX and find correct output ---
       const txBytes: number[] = Utils.toArray(atomicBeefTx, "hex");
@@ -814,6 +880,35 @@ const PaymentsList = () => {
               <MenuItem value="new">New</MenuItem>
             </Select>
           </Stack>
+          <Box
+            sx={{
+              my: 2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 2,
+              flexWrap: "wrap",
+              textAlign: "center",
+            }}
+          >
+            <Typography variant="h6">
+              Wallet Balance: {walletSats ?? "—"}
+              {walletSats !== null ? " sats" : ""}
+              {"  "}•{"  "}
+              Pending (to deposit): {pendingSats} sats
+            </Typography>
+
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleBulkDeposit}
+              disabled={isBulkDepositing || pendingPaymentIds.length === 0}
+            >
+              {isBulkDepositing
+                ? `Depositing ${bulkProgress}/${pendingPaymentIds.length}…`
+                : `Deposit All (${pendingPaymentIds.length})`}
+            </Button>
+          </Box>
           <TableContainer key={renderKey} component={Paper} ref={tableRef}>
             <Table>
               <TableHead>

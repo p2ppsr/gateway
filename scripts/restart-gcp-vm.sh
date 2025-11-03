@@ -2,14 +2,26 @@
 # scripts/restart-gcp-vm.sh
 set -euo pipefail
 
+ENV_FILE="${ENV_FILE:-.env.prod}"
+set -a
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+set +a
+
+PROJECT=${PROJECT:-computing-with-integrity}
 VM=${VM:-gateway-box}
 ZONE=${ZONE:-us-central1-f}
-DOMAIN=${DOMAIN:-gateway.local}
+DOMAIN_RAW=${DOMAIN:-${HOSTING_DOMAIN:-gateway.local}}
+# Normalize DOMAIN to bare hostname for --resolve usage at the remote
+DOMAIN_HOST="$(printf '%s\n' "$DOMAIN_RAW" | sed -E 's#^[a-zA-Z]+://##; s#/.*$##; s#:[0-9]+$##')"
 APP_PORT=${APP_PORT:-3001}
 ARTIFACT=${ARTIFACT:-}   # optional: absolute path on VM to a .tgz
 
-gcloud compute ssh "$VM" --zone="$ZONE" \
-  --command "DOMAIN='$DOMAIN' APP_PORT='$APP_PORT' ARTIFACT='$ARTIFACT' bash -s" <<'REMOTE'
+echo "== using env =="
+echo "  ENV_FILE=$ENV_FILE"
+echo "  PROJECT=$PROJECT VM=$VM ZONE=$ZONE DOMAIN=$DOMAIN_HOST APP_PORT=$APP_PORT"
+
+gcloud compute ssh "$VM" --zone="$ZONE" --project="$PROJECT" \
+  --command "DOMAIN='$DOMAIN_HOST' APP_PORT='$APP_PORT' ARTIFACT='$ARTIFACT' bash -s" <<'REMOTE'
 set -Eeuo pipefail
 trap 'echo "❌ deploy failed on line $LINENO"' ERR
 

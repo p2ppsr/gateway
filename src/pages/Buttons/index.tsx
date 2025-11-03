@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /**
  * @file src/pages/Buttons/index.tsx
- *
+ * @description
  * Displays a paginated table of payment buttons created by the user.
  * Each row represents a button, showing ID, amount, currency, and other details.
  * For multi-use buttons, includes a collapsible sub-table of associated payments.
- *
- * Version: v3.123 (Updated 18Sep2025_0215 BST)
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import {
   CircularProgress,

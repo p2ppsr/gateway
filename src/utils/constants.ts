@@ -1,14 +1,12 @@
 /**
  * @file src/utils/constants.ts
- * @description Central configuration constants for the Gateway application.
+ * @description
+ * Central configuration constants for the Gateway application.
  * Defines schemes, hosts, ports, environment-dependent bases, and shared limits.
  * This is the single source of truth to avoid magic strings in routes or embeds.
- *
- * @version 1.6.0 (Updated 16Sep2025_UTC: Removed gateway.local fallback; prod now requires HOSTING_DOMAIN from .env)
- * @author xAI
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
-
-// ---- Core hosts/schemes/ports -------------------------------------------------
 
 /**
  * Supported URL schemes for constructing service endpoints.

@@ -1,16 +1,10 @@
 /**
  * @file src/utils/usePlatformDownloadInfo.ts
- * @description A React hook that determines the current platform (iOS, Android, or web) and provides
+ * @description
+ * A React hook that determines the current platform (iOS, Android, or web) and provides
  * the appropriate download URL for the Metanet client, using the latest GitHub release info.
- * @version 1.0.0 (Updated 02Sep2025_1227 BST to add header and improve JSDoc)
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @dependencies
- * - react: For useEffect and useState
- * - react-native: For Platform
- * - ./getLatestMetanetclientLinks: For fetching download links
- * - ./logging: For logWithTimestamp
- * @changelog
- * - 02Sep2025_1227 BST (v1.0.0): Added header and improved JSDoc for clarity and consistency.
  */
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";

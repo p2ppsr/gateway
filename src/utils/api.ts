@@ -1,4 +1,3 @@
-// src/utils/api.ts
 /**
  * @file src/utils/api.ts
  * @description
@@ -11,8 +10,8 @@
  *      fetchWithAuth(url, init, wallet)
  *      fetchWithAuth(url, init, wallet, timeoutMs)
  *    and the same for fetchJsonWithAuth
- *
- * @version 1.3.0 (2025-09-07)
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import { fetchWithTimeout } from "./general";

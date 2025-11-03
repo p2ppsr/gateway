@@ -1,19 +1,12 @@
 /**
  * @file src/routes/initializeIds.ts
- * @description POST route to validate and store client-generated payment or button IDs in the database, ensuring uniqueness and updating descriptions in payment_buttons and payments tables.
- * @version 1.0.0 (Updated 02Sep2025_1933 BST to standardize header comment)
+ * @description
+ * POST route to validate and store client-generated payment or button IDs in the database, ensuring uniqueness and
+ * updating descriptions in payment_buttons and payments tables.
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @dependencies
- * - knex: For database operations
- * - express: For Request and Response types
- * - express-validator: For request body validation
- * - ../utils/logging: For logWithTimestamp
- * - ../utils/general: For isBase58 and isMerchantId
- * - ../utils/idGenerator: For generateAndValidateUniqueId
- * - ../utils/merchant: For ensureMerchantExists
- * @changelog
- * - 02Sep2025_1933 BST (v1.0.0): Updated header comment to follow standardized template.
  */
+
 import knex, { Knex } from "knex";
 import knexConfig from "../knexfile";
 import type { Request, Response } from "express";

@@ -1,24 +1,18 @@
 /**
  * @file src/routes/createButton.ts
- *
+ * @description
  * POST route to create a new payment button in the database.
  * Validates the request, uses client-provided paymentId and buttonId pre-initialized by initializeIds,
  * and stores them in the payment_buttons table.
  * Initially integrates client-side ID generation during button creation, to be moved to page launch
  * in the next iteration.
- *
  * Used by the Gateway UI to create new payment buttons for merchants.
  * - All amounts are handled as BSV satoshis internally.
  * - IDs are client-generated 12-character Base58-encoded strings, pre-validated by initializeIds.
- *
- * Version: v2.41 (Updated 24Aug2025_1246 BST (v2.41): Added check to ensure payments.amount matches request amount for fixed buttons.)
- * Change Log:
- * - 01Sep2025_0215 BST (v3.123): Updated to use derivation_prefix and derivation_suffix instead of transaction_id.
- * - 24Aug2025_1246 BST (v2.41): Added check to ensure payments.amount matches request amount for fixed buttons.
- * - 24Aug2025_1156 BST (v2.40): Removed description from payment_buttons insert, as it’s stored in payments table; updated paymentId/buttonId validation to exactly 12 characters.
- * - 24Aug2025_1024 BST (v2.39): Fixed payments insert to include all non-nullable fields (button_id, transaction_id, completed, is_new).
- * - 24Aug2025_0315 BST (v2.38): Added insertion into payments table with payment_id and description from request payload.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import knex, { Knex } from "knex";
 import knexConfig from "../knexfile";
 import type { Request, Response } from "express";

@@ -7,10 +7,8 @@
  * - Authenticated fetch with timeout
  * - CSS validation/sanitization helpers
  * - **Auth-ready event bus** to defer protected API calls until the wallet (BRC-104) handshake completes
- *
- * @author xAI
- * @date 2025-09-01
- * @version 1.18 (2025-09-08: aPdd safe URL join + clientConfig integration to avoid "Invalid URL")
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import { WalletClient, AuthFetch, PublicKey } from "@bsv/sdk";

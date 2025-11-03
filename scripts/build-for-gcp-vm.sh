@@ -2,16 +2,16 @@
 # scripts/build-for-gcp-vm.sh
 # Build and package Gateway for deployment to GCP VM
 
-ENV_FILE=".env"
+ENV_FILE="${ENV_FILE:-.env}"
 set -euo pipefail
 
-# Load production env if present
+# Load env if present
 set -a
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
 set +a
 
-: "${SERVER_IDENTITY_KEY:?❌ SERVER_IDENTITY_KEY is not set. Please export it or put it in .env}"
-: "${HOSTING_DOMAIN:?❌ HOSTING_DOMAIN is not set. Please export it or put it in .env}"
+: "${SERVER_IDENTITY_KEY:?❌ SERVER_IDENTITY_KEY is not set. Please export it or put it in $ENV_FILE}"
+: "${HOSTING_DOMAIN:?❌ HOSTING_DOMAIN is not set. Please export it or put it in $ENV_FILE}"
 
 # Allow overrides like: VM=my-box ZONE=us-central1-f ./scripts/build-for-gcp-vm.sh
 export VM=${VM:-gateway-box}
@@ -56,19 +56,20 @@ echo "   leaving localhost:3321 and localhost:3301 untouched"
 echo "== patch API getVersion calls in bundle.js =="
 for f in dist/public/bundle.js; do
   if [ -f "$f" ]; then
-    sed -i.bak \
-      -e 's#["'"'"']\/getVersion["'"'"']#"/api/getVersion"#g' \
-      -e 's#\\\/getVersion#\\/api\\/getVersion#g' \
-      -e 's#/getVersion#/api/getVersion#g' \
-      "$f"
+    # Replace both plain and escaped variants of /getVersion with /api/getVersion
+    # Using Perl for robust, macOS/BSD-safe in-place editing.
+    perl -0777 -i.bak -pe '
+      s{\/getVersion}{/api/getVersion}g;
+      s{\\\/getVersion}{\\/api\\/getVersion}g;
+    ' "$f"
     rm -f "$f.bak"
   fi
 done
 
-# sanity check: fail if plain /getVersion still present
-if grep -q "/getVersion" dist/public/bundle.js; then
+# sanity check: fail only if *non-api* /getVersion remains
+if grep -n "/getVersion" dist/public/bundle.js | grep -v "/api/getVersion" >/dev/null 2>&1; then
   echo "❌ unpatched /getVersion calls remain in bundle.js"
-  grep -n "/getVersion" dist/public/bundle.js | head -20
+  grep -n "/getVersion" dist/public/bundle.js | grep -v "/api/getVersion" | head -20
   exit 1
 else
   echo "✅ Patched all /getVersion calls to /api/getVersion"

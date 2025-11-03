@@ -1,10 +1,12 @@
 /**
  * @file src/routes/cleanupIds.ts
+ * @description
  * POST route to clean up orphaned IDs from the ids table for a given merchant.
  * Used when createButton fails to ensure no dangling IDs remain.
- *
- * Version: v1.0.0 (Created 24Aug2025_1042 BST)
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import { Knex } from "knex";
 import type { Request, Response } from "express";
 import { body, validationResult } from "express-validator";

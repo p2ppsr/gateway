@@ -1,14 +1,11 @@
 /**
  * @file src/utils/merchant.ts
- * @description Utility functions for merchant-related operations.
- * @version 1.0.0 (Created 02Sep2025_1435 BST)
+ * @description
+ * Utility functions for merchant-related operations.
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @dependencies
- * - knex: For database operations
- * - ./logging: For logWithTimestamp
- * @changelog
- * - 02Sep2025_1435 BST (v1.0.0): Added ensureMerchantExists function.
  */
+
 import { Knex } from "knex";
 import { logWithTimestamp } from "./logging";
 

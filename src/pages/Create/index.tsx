@@ -1,13 +1,12 @@
 /**
  * @file src/pages/Create/index.tsx
- * @description Component for creating and managing payment buttons in the Gateway UI.
+ * @description
+ * Component for creating and managing payment buttons in the Gateway UI.
  * Allows users to configure button settings, generate button code, and copy it to the clipboard.
- * @version 1.0.1 (Updated 24Aug2025_2341 BST to fix ID reuse in handleCopyCode)
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @changelog
- * - 24Aug2025_1800 BST (v1.0.0): Initial creation with button creation and copy functionality.
- * - 24Aug2025_2341 BST (v1.0.1): Fixed handleCopyCode to generate new buttonId and paymentId for each copy action, removing showCode condition to prevent ID reuse.
  */
+
 import React, {
   useState,
   useEffect,

@@ -1,15 +1,15 @@
 /**
  * @file src/pages/Create/style.ts
- *
+ * @description
  * Provides styled MUI components used in the "Create Payment Button" page.
  * These components apply consistent spacing, typography, and theme-aware coloring
  * to support both light and dark modes across layout sections and form inputs.
- *
  * - Components include: `Root`, `ContentWrap`, `FormSection`, `PreviewSection`, `CodePreview`,
  *   `CenteredHeader`, `TextFieldStyled`, and `ButtonStyled`.
  * - All styles are responsive to `theme.palette.mode` and use MUI’s `styled` API.
- *
  * Used by `src/pages/Create/index.tsx` to style the UI consistently with the app theme.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import { styled } from "@mui/material/styles";

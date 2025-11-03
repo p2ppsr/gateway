@@ -1,10 +1,12 @@
-// src/routes/acknowledgePayment.ts
 /**
  * @file src/routes/acknowledgePayment.ts
- * @description POST route to acknowledge a payment after it has been paid,
+ * @description
+ * POST route to acknowledge a payment after it has been paid,
  * then internalize it into the merchant’s MNC wallet (BRC-29 style).
- * @version 3.2.0
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import knex, { Knex } from "knex";
 import knexConfig from "../knexfile";
 import { Request, Response } from "express";

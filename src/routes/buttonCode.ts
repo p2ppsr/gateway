@@ -1,8 +1,11 @@
 /**
  * @file src/routes/buttonCode.ts
- * @description GET route to retrieve payment button code details for a given paymentId.
- * @version v2.38 (Updated 12Sep2025 — fixed duplicate /api/api bug by separating script src and API base)
+ * @description
+ * GET route to retrieve payment button code details for a given paymentId.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import { Request, Response } from "express";
 import knex, { Knex } from "knex";
 import knexConfig from "../knexfile";

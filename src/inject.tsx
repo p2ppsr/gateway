@@ -1,20 +1,12 @@
 /**
  * @file src/inject.tsx
- * @description Injects Gateway payment buttons into third-party websites. Exposes a global
+ * @description
+ * Injects Gateway payment buttons into third-party websites. Exposes a global
  * `window.PayButton.render()` for programmatic rendering, and on `window.load` scans for
  * `.gateway-paybutton` elements to mount automatically. Includes a portable API-base resolver
  * so `pay.js` works when hosted from any origin.
- * @version 2.61.1 (Updated 06Sep2025_0045 UTC to add comprehensive JSDoc comments without changing runtime behavior)
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @dependencies
- * - react: For creating elements and hooks
- * - react-dom/client: For createRoot
- * - ./components/PayButton: For the PayButton component
- * - ./utils/logging: For logWithTimestamp
- * - ./utils/initializeIds: For provisioning IDs client-side
- * - @bsv/sdk: For WalletClient
- * @changelog
- * - 06Sep2025_0045 UTC (v2.61.1): Documented all public/utility APIs with JSDoc for auto-docs; no functional changes.
  */
 
 import React from "react";

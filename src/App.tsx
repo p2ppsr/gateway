@@ -1,18 +1,18 @@
 /**
  * @file src/App.tsx
- *
+ * @description
  * The main entry point for the React application.
  * It sets up global theme, routes, and continuously checks for the presence of the Metanet client.
- *
  * Fixes applied:
  * - Added explicit return type for `App` to satisfy `@typescript-eslint/explicit-function-return-type`.
  * - Rewrote `setInterval` to avoid misused Promise warning.
  * - Prefixed IIFE in `useEffect` with `void` to prevent floating promise warning.
  * - Replaced process.env with utils/constants.ts for configuration.
  * - Removed nested BrowserRouter to fix "You cannot render a <Router> inside another <Router>" error (20Aug2025_2223 BST).
- *
- * Version: v1.1 (Updated 20Aug2025_2223 BST)
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import React, { useState } from "react";
 import { Routes, Route } from "react-router-dom";
 import Theme from "./components/Theme";

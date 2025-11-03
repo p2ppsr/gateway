@@ -1,9 +1,12 @@
 /**
  * @file src/utils/initializeIds.ts
+ * @description
  * Validate/register an ID with:
  *  1) native GET /getStatus (no auth)
  *  2) auth GET /getStatus (signed; allowed to fail)
  *  3) auth POST /initializeIds (signed)
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import { logWithTimestamp } from "./logging";

@@ -1,11 +1,13 @@
-// src/routes/pay.ts
 /**
  * @file src/routes/pay.ts
- * @description POST route to complete a payment by submitting a transaction,
+ * @description
+ * POST route to complete a payment by submitting a transaction,
  * validating paymentId and buttonId, transaction format, and locking script,
  * then updating the payments table.
- * @version 4.27.1 (Added granular logging to mirror acknowledgePayment.ts)
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
+
 import knex, { Knex } from "knex";
 import knexConfig from "../knexfile";
 import { Request, Response } from "express";
@@ -72,12 +74,10 @@ export default {
         .where({ payment_id: paymentId, button_id: buttonId, completed: false })
         .first()) as Payment | undefined;
       if (!paymentRec) {
-        res
-          .status(404)
-          .json({
-            status: "error",
-            message: "Payment not found or already completed",
-          });
+        res.status(404).json({
+          status: "error",
+          message: "Payment not found or already completed",
+        });
         return;
       }
 

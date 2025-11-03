@@ -1,11 +1,12 @@
 /**
  * @file src/pages/Money/index.tsx
- *
+ * @description
  * My Money Page — Placeholder for managing fiat withdrawals and profile settings.
- *
  * This component will allow users to withdraw fiat payments to their bank account
  * and manage profile aspects like identity certificate registration.
  * Currently a minimal implementation with commented-out logic for fetching payment buttons.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import React from "react";

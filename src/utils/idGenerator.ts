@@ -1,14 +1,5 @@
 // src/utils/idGenerator.ts
-// Version: v1.0.7 (Updated 26Aug2025_0100 BST)
-// Change Log:
-// - 26Aug2025_0100 BST (v1.0.7): Updated generateAndValidateUniqueId to return { id, description } for use in invoice.ts.
-// - 24Aug2025_1645 BST (v1.0.6): Made previousId optional; handle replaceAll for payment descriptions.
-// - 24Aug2025_1159 BST (v1.0.5): Removed all payment_buttons.description updates, as they use placeholder descriptions; kept replaceAll for payments.description in duplicate case.
-// - 24Aug2025_1207 BST (v1.0.4): Removed unnecessary payment_buttons.description update for type=button; used replaceAll for payment duplicates.
-// - 24Aug2025_1200 BST (v1.0.3): Replaced regex with replaceAll using known duplicate id for description updates in payment case.
-// - 24Aug2025_1152 BST (v1.0.2): Replaced regex with replaceAll using previous ID from database; updated regex to match exactly 12 characters.
-// - 24Aug2025_1145 BST (v1.0.1): Replaced regex with replaceAll using previous ID from database for description updates.
-// - Initial version: ID generation and validation with regex-based description updates.
+
 import knex, { Knex } from "knex";
 import knexConfig from "../knexfile";
 import { generateBase58 } from "./general";

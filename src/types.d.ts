@@ -4,6 +4,8 @@
  * TypeScript module augmentation for `@bsv/sdk`, extending the `WalletInterface`
  * with custom methods and defining argument types for new SDK features such as
  * signAction, acquireCertificate, and proveCertificate.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 declare module "@bsv/sdk" {

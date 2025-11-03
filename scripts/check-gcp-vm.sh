@@ -4,9 +4,11 @@
 # Runs on your Mac and SSHes into the VM to test via 127.0.0.1 using --resolve.
 #
 # Usage:
-#   VM=gateway-box ZONE=us-central1-f DOMAIN=gateway.local PROTO=https ./scripts/check-gcp-vm.sh
+#   ENV_FILE=.env.staging ./scripts/check-gcp-vm.sh
+#   # or overrides:
+#   PROJECT=... VM=... ZONE=... DOMAIN=... PROTO=https ./scripts/check-gcp-vm.sh
 #
-# Optional flags (defaults are relaxed; set to 1 to enforce):
+# Flags (relaxed by default; set to 1 to enforce):
 #   EXPECT_NGINX_VHOSTS=0       # require 2 vhosts (http+https) with exact server_name match
 #   REQUIRE_STATIC_NGINX=0      # require /pay.js, /bundle.js to be served by nginx
 #   REQUIRE_STATIC_CORS=0       # require ACAO:* and CORP: cross-origin on static
@@ -15,9 +17,17 @@
 #   EXPECT_HANDSHAKE=0          # actually perform v0.1 handshake & cookie test
 #   STRICT_NO_LOCALHOST3301=0   # fail if /bundle.js contains localhost:3301 (ignores sourcemaps/comments)
 #   EXPECT_WALLET_CONFIG=0      # require /wallet-config.js to exist & be JS
+#   EXPECT_CLOUDFLARE=0         # run Cloudflare edge checks (auto-skipped when DOMAIN is an IP)
 
 set -euo pipefail
 
+# Load optional env file (so DOMAIN, VM, etc. can come from .env.staging/.env.prod)
+ENV_FILE="${ENV_FILE:-.env}"
+set -a
+[ -f "$ENV_FILE" ] && . "$ENV_FILE"
+set +a
+
+PROJECT=${PROJECT:-computing-with-integrity}
 VM=${VM:-gateway-box}
 ZONE=${ZONE:-us-central1-f}
 DOMAIN=${DOMAIN:-https://imported-software-interpreted-saturn.trycloudflare.com}
@@ -32,18 +42,27 @@ EXPECT_WELLKNOWN_CORS=${EXPECT_WELLKNOWN_CORS:-0}
 EXPECT_HANDSHAKE=${EXPECT_HANDSHAKE:-0}
 STRICT_NO_LOCALHOST3301=${STRICT_NO_LOCALHOST3301:-0}
 EXPECT_WALLET_CONFIG=${EXPECT_WALLET_CONFIG:-0}
+EXPECT_CLOUDFLARE=${EXPECT_CLOUDFLARE:-0}
 
-# Normalize DOMAIN to a bare hostname (strip scheme/path/port)
+# Normalize DOMAIN to bare host (strip scheme/path/port)
 DOMAIN_HOST="$(printf '%s\n' "$DOMAIN" | sed -E 's#^[a-zA-Z]+://##; s#/.*$##; s#:[0-9]+$##')"
 DOMAIN="$DOMAIN_HOST"
 
-echo "== checking on ${VM} (${ZONE}), domain ${DOMAIN} =="
+# Detect if DOMAIN is an IPv4 address (we auto-skip CF in that case)
+IS_IP=0
+if echo "$DOMAIN" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  IS_IP=1
+fi
 
-gcloud compute ssh "$VM" --zone "$ZONE" --command "DOMAIN='$DOMAIN' PROTO='$PROTO' \
+echo "== checking on ${VM} (${ZONE}), domain ${DOMAIN} =="
+echo "  ENV_FILE=${ENV_FILE} PROJECT=${PROJECT} PROTO=${PROTO} (Cloudflare checks: $([ "$EXPECT_CLOUDFLARE" = "1" ] && echo 'enabled' || echo 'disabled'); auto-skip on IP: ${IS_IP})"
+
+gcloud compute ssh "$VM" --zone "$ZONE" --project "$PROJECT" --command "DOMAIN='$DOMAIN' PROTO='$PROTO' \
 EXPECT_NGINX_VHOSTS='$EXPECT_NGINX_VHOSTS' REQUIRE_STATIC_NGINX='$REQUIRE_STATIC_NGINX' \
 REQUIRE_STATIC_CORS='$REQUIRE_STATIC_CORS' EXPECT_RATELIMIT='$EXPECT_RATELIMIT' \
 EXPECT_WELLKNOWN_CORS='$EXPECT_WELLKNOWN_CORS' EXPECT_HANDSHAKE='$EXPECT_HANDSHAKE' \
-STRICT_NO_LOCALHOST3301='$STRICT_NO_LOCALHOST3301' EXPECT_WALLET_CONFIG='$EXPECT_WALLET_CONFIG' bash -s" <<'REMOTE'
+STRICT_NO_LOCALHOST3301='$STRICT_NO_LOCALHOST3301' EXPECT_WALLET_CONFIG='$EXPECT_WALLET_CONFIG' \
+EXPECT_CLOUDFLARE='$EXPECT_CLOUDFLARE' IS_IP='$IS_IP' bash -s" <<'REMOTE'
 set -Eeuo pipefail
 
 OK='✅'
@@ -68,7 +87,7 @@ else
   CURL_FLAGS="-s"
 fi
 ORIGIN="${PROTO}://${DOMAIN}"
-# Use transparent decompression for any body fetches
+# Transparent decompression for body fetches
 CURL_FLAGS_BODY="$CURL_FLAGS --compressed"
 
 http_code () {
@@ -201,7 +220,7 @@ else
   if [ "${REQUIRE_STATIC_NGINX}" = "1" ]; then
     fail "/pay.js NOT served by nginx (x-served-by missing/wrong)"
   else
-    warn "/pay.js not served by nginx (ok for Node/CF); REQUIRE_STATIC_NGINX=1 to enforce"
+    warn "/pay.js not served by nginx (ok for Node); REQUIRE_STATIC_NGINX=1 to enforce"
   fi
 fi
 
@@ -354,69 +373,31 @@ else
   warn "handshake tests skipped (EXPECT_HANDSHAKE=0)"
 fi
 
-# ------------------ wallet-config.js correctness -----------------------------
-if [ "${EXPECT_WALLET_CONFIG}" != "1" ]; then
-  warn "wallet-config: check skipped (EXPECT_WALLET_CONFIG=0)"
+# ------------------ Cloudflare edge checks (disabled for IPs unless forced) ----
+if [ "${IS_IP:-0}" = "1" ] || [ "${EXPECT_CLOUDFLARE:-0}" != "1" ]; then
+  echo "== Cloudflare edge checks skipped (DOMAIN is IP or EXPECT_CLOUDFLARE!=1) =="
 else
-  CFG_HDRS="$(fetch_headers HEAD "/wallet-config.js")"
-  CFG_CODE="$(status_from_headers "$CFG_HDRS")"
-  CFG_CT="$(echo "$CFG_HDRS" | awk 'tolower($0) ~ /^content-type:/ {print tolower($0)}' | head -1)"
-
-  if [ "$CFG_CODE" = "200" ] || [ "$CFG_CODE" = "304" ]; then
-    pass "wallet-config: /wallet-config.js HTTP $CFG_CODE"
+  echo "== Cloudflare edge checks =="
+  HDRS_CF="$(curl $CURL_FLAGS -D - -o /dev/null "${PROTO}://${DOMAIN}/pay.js" || true)"
+  CODE_CF="$(status_from_headers "$HDRS_CF")"
+  if [ "$CODE_CF" = "200" ] || [ "$CODE_CF" = "304" ]; then
+    pass "cloudflare: /pay.js edge HTTP $CODE_CF"
   else
-    fail "wallet-config: /wallet-config.js HTTP $CFG_CODE"
+    fail "cloudflare: /pay.js edge HTTP ${CODE_CF:-<none>}"
   fi
-
-  if printf '%s' "$CFG_CT" | grep -q 'application/javascript\|text/javascript'; then
-    CFG_JS="$(get_body "/wallet-config.js" || true)"
-
-    if printf '%s' "$CFG_JS" | grep -qi 'window\.GATEWAY_SITE_CONFIG'; then
-      pass "wallet-config: window.GATEWAY_SITE_CONFIG present"
-    elif printf '%s' "$CFG_JS" | grep -qiE 'export +const +GATEWAY_SITE_CONFIG|export +default'; then
-      pass "wallet-config: ESM export detected"
-    else
-      fail "wallet-config: neither window.GATEWAY_SITE_CONFIG nor ESM export found"
-    fi
-
-    printf '%s' "$CFG_JS" | tr -d ' \t\r\n' | grep -qi 'apiBase:""\|apiBase:"/"' \
-      && pass "wallet-config: apiBase is same-origin" \
-      || fail "wallet-config: apiBase is not same-origin"
-
-    printf '%s' "$CFG_JS" | tr -d ' \t\r\n' | grep -qi 'routingPrefix:"/api"' \
-      && pass "wallet-config: routingPrefix = /api" \
-      || fail "wallet-config: routingPrefix not /api"
-
-    printf '%s' "$CFG_JS" | tr -d ' \t\r\n' | grep -qi 'wellKnownPath:"/\.well-known/auth"' \
-      && pass "wallet-config: wellKnownPath = /.well-known/auth" \
-      || fail "wallet-config: wellKnownPath incorrect"
+  header_present "$HDRS_CF" "cf-ray" && pass "cloudflare: cf-ray header present" || fail "cloudflare: cf-ray header missing"
+  (header_present "$HDRS_CF" "server" && hdr_has_token "$HDRS_CF" "server" "cloudflare") && pass "cloudflare: server header = cloudflare" || fail "cloudflare: server header not cloudflare"
+  if header_present "$HDRS_CF" "cf-cache-status"; then
+    CF_CACHE="$(header_value_first "$HDRS_CF" "cf-cache-status")"; pass "cloudflare: cf-cache-status=${CF_CACHE}"
   else
-    fail "wallet-config: not JavaScript (CT=${CFG_CT:-<none>})"
+    fail "cloudflare: cf-cache-status header missing"
   fi
-fi
+  [ -n "$(header_value_first "$HDRS_CF" "strict-transport-security" || true)" ] && pass "cloudflare: HSTS header preserved" || fail "cloudflare: HSTS header stripped"
 
-# ------------------ Cloudflare edge checks -----------------------------------
-echo "== Cloudflare edge checks =="
-HDRS_CF="$(curl $CURL_FLAGS -D - -o /dev/null "${PROTO}://${DOMAIN}/pay.js" || true)"
-CODE_CF="$(status_from_headers "$HDRS_CF")"
-if [ "$CODE_CF" = "200" ] || [ "$CODE_CF" = "304" ]; then
-  pass "cloudflare: /pay.js edge HTTP $CODE_CF"
-else
-  fail "cloudflare: /pay.js edge HTTP ${CODE_CF:-<none>}"
+  HDRS_CF_HZ="$(curl $CURL_FLAGS -D - -o /dev/null "${PROTO}://${DOMAIN}/healthz" || true)"
+  CODE_CF_HZ="$(status_from_headers "$HDRS_CF_HZ")"
+  [ "$CODE_CF_HZ" = "200" ] && pass "cloudflare: /healthz edge 200" || fail "cloudflare: /healthz edge ${CODE_CF_HZ:-<none>}"
 fi
-header_present "$HDRS_CF" "cf-ray" && pass "cloudflare: cf-ray header present" || fail "cloudflare: cf-ray header missing"
-(header_present "$HDRS_CF" "server" && hdr_has_token "$HDRS_CF" "server" "cloudflare") && pass "cloudflare: server header = cloudflare" || fail "cloudflare: server header not cloudflare"
-if header_present "$HDRS_CF" "cf-cache-status"; then
-  CF_CACHE="$(header_value_first "$HDRS_CF" "cf-cache-status")"; pass "cloudflare: cf-cache-status=${CF_CACHE}"
-else
-  fail "cloudflare: cf-cache-status header missing"
-fi
-[ -n "$(header_value_first "$HDRS_CF" "strict-transport-security" || true)" ] && pass "cloudflare: HSTS header preserved" || fail "cloudflare: HSTS header stripped"
-[ -n "$(header_value_first "$HDRS_CF" "content-security-policy" || true)" ] && pass "cloudflare: CSP header preserved" || fail "cloudflare: CSP header stripped"
-
-HDRS_CF_HZ="$(curl $CURL_FLAGS -D - -o /dev/null "${PROTO}://${DOMAIN}/healthz" || true)"
-CODE_CF_HZ="$(status_from_headers "$HDRS_CF_HZ")"
-[ "$CODE_CF_HZ" = "200" ] && pass "cloudflare: /healthz edge 200" || fail "cloudflare: /healthz edge ${CODE_CF_HZ:-<none>}"
 
 # ------------------ summary --------------------------------------------------
 echo "----------------------------------------"

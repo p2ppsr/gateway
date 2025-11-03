@@ -1,14 +1,14 @@
 /**
  * @file src/components/MetanetclientModal.tsx
- *
+ * @description
  * Displays a platform-specific modal prompting the user to install the Metanet client.
- *
  * Depending on the provided `platformLabel`, this modal adjusts to:
  * - Show "Metanet Mobile" with a QR code for Android/iOS.
  * - Show "Metanet Desktop" without a QR code for other platforms.
- *
  * It includes a direct download link, a fallback to all client releases, and styled
  * layout using MUI and `react-qr-code`.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import React from "react";

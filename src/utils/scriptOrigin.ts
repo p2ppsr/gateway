@@ -5,13 +5,8 @@
  * loaded `pay.js` script at runtime. This ensures that all relative API calls
  * (e.g. `/invoice`, `/getStatus`) are resolved against the same host that
  * delivered the script, avoiding CORS and mixed-origin handshake issues.
- *
- * @author xAI
- * @date 2025-09-15
- * @version 1.0
- * @changelog
- * - 2025-09-15 (v1.0): Initial extraction from discussions around PayButton
- *   injection and handshake mismatches.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 let _scriptOrigin: string | null = null;

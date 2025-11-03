@@ -1,14 +1,14 @@
 /**
  * @file src/routes/getStatus.ts
- *
+ * @description
  * GET route to return the current server status including:
  * - The active BSV network (e.g. mainnet or testnet).
  * - Whether the authenticated user is an admin.
- *
  * This is used by the frontend to detect environment context
  * and display admin-only UI features when appropriate.
- *
  * Requires authentication middleware to populate `req.auth.identityKey`.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import knex, { Knex } from "knex";

@@ -1,12 +1,13 @@
 /**
  * @file src/types/theme.d.ts
- *
+ * @description
  * Module augmentation for MUI's Theme and ThemeOptions types.
  * This extends the default MUI theme to support custom layout fields
  * such as `maxContentWidth` and reusable `templates` for styling page elements.
- *
  * These theme additions can be used throughout your application with
  * `useTheme()` or `styled()` components.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import { Theme as MUITheme } from "@mui/material/styles";

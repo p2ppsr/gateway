@@ -1,8 +1,7 @@
-// src/server.ts
 /**
  * @file src/server.ts
- * @description Express server entrypoint for the Gateway application.
- *
+ * @description
+ * Express server entrypoint for the Gateway application.
  * Middleware sequencing is carefully ordered:
  * 1. Parse request body (JSON, urlencoded, raw)
  * 2. Apply security headers (Helmet) and rate limiting
@@ -12,9 +11,8 @@
  * 6. Apply payment middleware
  * 7. Serve static assets (including pay.js under CONFIG.PAY_BASE)
  * 8. Register API routes under ROUTING_PREFIX
- *
- * @version 1.10.4 (Updated 13Sep2025_UTC: fixed body parsing order for /.well-known and authMiddleware order)
- * @author xAI
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import fs from "fs";
@@ -33,7 +31,7 @@ import { createPaymentMiddleware } from "@bsv/payment-express-middleware";
 import routes from "./routes";
 import knexConfig from "./knexfile";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { MAX_PAYMENT_SATS } from "./utils/constants";
 import { logWithTimestamp } from "./utils/logging";
 
@@ -160,8 +158,6 @@ async function initializeServer(): Promise<void> {
       logWithTimestamp(F, "⚙️ trust proxy set to 1 (dev)");
     }
 
-    // app.set('trust proxy', 1)
-
     // --- Global preflight/trace
     app.use(tap("00 - request received"));
 
@@ -253,12 +249,14 @@ async function initializeServer(): Promise<void> {
         if (req.path === "/healthz") return true; // don’t throttle healthz
         return false;
       },
-      keyGenerator: (req: Request) =>
-        req.ip || (req.headers["x-forwarded-for"] as string) || "unknown",
+      keyGenerator: (req: Request) => {
+        const ip =
+          req.ip || (req.headers["x-forwarded-for"] as string) || "unknown";
+        return ipKeyGenerator(ip);
+      },
       handler: (_req: Request, res: Response) =>
         res.status(429).json({ error: "Too Many Requests" }),
     };
-
     const wellKnownLimiter = rateLimit({
       ...commonLimiterOpts,
       windowMs: 60_000,
@@ -354,7 +352,7 @@ async function initializeServer(): Promise<void> {
       res.header("Access-Control-Allow-Methods", "*");
       res.header("Access-Control-Expose-Headers", "*");
       res.header("Access-Control-Allow-Credentials", "true");
-      res.header("Access-Control-Allow-Private-Network", "true");
+      // NOTE: staging did NOT send Access-Control-Allow-Private-Network, so we omit it here
 
       if (req.method === "OPTIONS") {
         return res.sendStatus(200);

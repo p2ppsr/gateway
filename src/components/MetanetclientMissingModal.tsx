@@ -1,11 +1,12 @@
 /**
  * @file src/components/MetanetclientMissingModal.tsx
- *
+ * @description
  * Displays a full-screen blocking modal when the Metanet client is not detected.
- *
  * This component uses `usePlatformDownloadInfo` to determine which platform-specific
  * Metanet client installer to suggest to the user. It renders a translucent overlay
  * with a centered modal if `open` is true and valid download info is available.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import React from "react";

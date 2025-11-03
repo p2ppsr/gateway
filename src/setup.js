@@ -31,6 +31,8 @@
  * - SQL_DATABASE_PASSWORD
  * - SQL_DATABASE_DB_NAME
  * - SPAWN_NGINX
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 const readline = require("readline");

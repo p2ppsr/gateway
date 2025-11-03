@@ -1,14 +1,11 @@
 /**
  * @file src/components/Navbar/index.tsx
- * @description Renders the main navigation bar for the Gateway application, providing responsive navigation links
- *              including 'Create a Button', 'Your Buttons', 'Actions', 'Payments', and an optional 'Admin Dashboard'
- *              for admins. Utilizes a drawer menu on mobile devices and adapts to light/dark themes.
- * @version 1.0.1
+ * @description
+ * Renders the main navigation bar for the Gateway application, providing responsive navigation links
+ * including 'Create a Button', 'Your Buttons', 'Actions', 'Payments', and an optional 'Admin Dashboard'
+ * for admins. Utilizes a drawer menu on mobile devices and adapts to light/dark themes.
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @dependencies
- * - @mui/material: For UI components (AppBar, Button, etc.)
- * - @mui/icons-material: For Menu and AccountBalanceWallet icons
- * - react-router-dom: For navigation routing
  */
 import React, { useState, useCallback } from "react";
 import {

@@ -6,13 +6,8 @@
  * - Conservative pool sizing for small VMs
  * - TypeScript migrations support via `ts-node` (`loadExtensions: ['.ts']`)
  * - Basic environment validation with helpful error messages
- *
- * @author xAI
- * @date 2025-09-04
- * @version 1.17
- * @changelog
- * - 2025-09-04 (v1.17): Added strict env validation, enabled TS migrations with
- *   `loadExtensions`, documented config with JSDoc, and left seeds as JS by default.
+ * @version 1.0.0
+ * @author xAI (Grok 3)
  */
 
 import "dotenv/config";

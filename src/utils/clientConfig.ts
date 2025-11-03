@@ -1,4 +1,4 @@
-// // src/utils/clientConfig.ts
+// src/utils/clientConfig.ts
 import { PORTS, CONFIG } from "./constants";
 import { logWithTimestamp } from "./logging";
 

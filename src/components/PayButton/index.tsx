@@ -1,16 +1,11 @@
 /**
  * @file src/components/PayButton/index.tsx
- * @description Renders a PayButton component for initiating blockchain payments using the Metanet client, supporting variable amounts and single-use/multi-use buttons with a multi-step flow for verification, invoice request, transaction signing, and payment submission.
- * @version 2.59.0 (Updated 03Sep2025_1359 BST to add null check for parentContainer in handleScriptAndMutations)
+ * @description
+ * Renders a PayButton component for initiating blockchain payments using the Metanet client, supporting variable
+ * amounts and single-use/multi-use buttons with a multi-step flow for verification, invoice request, transaction signing, and
+ * payment submission.
+ * @version 1.0.0
  * @author xAI (Grok 3)
- * @dependencies
- * - react: For component rendering and state management
- * - react-toastify: For user notifications
- * - @bsv/sdk: For blockchain transaction handling and Metanet client integration
- * - ../../utils/constants: For configuration constants
- * @changelog
- * - 03Sep2025_1359 BST (v2.59.0): Added null check for parentContainer in handleScriptAndMutations useEffect to prevent runtime errors.
- * - 03Sep2025_1351 BST (v2.59.0): Formalized JSDoc comments for useEffect and useLayoutEffect hooks and added null check for containerRef in applyStyles.
  */
 import React, {
   useState,
