@@ -20,12 +20,5 @@
     "strict": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "public",
-    "migrations",
-    "tests",
-    "knexfile.ts"
-  ]
+  "exclude": ["node_modules", "dist", "public", "migrations", "tests", "knexfile.ts"]
 }

@@ -9,12 +9,12 @@
  * @author xAI (Grok 3)
  */
 
-import React from "react";
-import { Container, Typography, Paper, Box } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import React from 'react'
+import { Container, Typography, Paper, Box } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
 
 const MyMoney: React.FC = (): JSX.Element => {
-  const theme = useTheme();
+  const theme = useTheme()
   // const [loading, setLoading] = useState(true)
   // const [error, setError] = useState('')
   // const [page, setPage] = useState(1)
@@ -60,26 +60,23 @@ const MyMoney: React.FC = (): JSX.Element => {
     <Container sx={{ ...(theme.templates?.page_wrap || {}) }}>
       <Box
         sx={{
-          textAlign: "center",
+          textAlign: 'center',
           marginBottom: theme.spacing(4),
           marginTop: theme.spacing(5),
-          color: theme.palette.mode === "dark" ? "#ffffff" : "#000000",
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
         }}
       >
         <Typography variant="h2">My Money</Typography>
-        <Typography variant="subtitle1">
-          Withdraw funds and manage your profile.
-        </Typography>
+        <Typography variant="subtitle1">Withdraw funds and manage your profile.</Typography>
       </Box>
       <Paper elevation={3} sx={{ p: 3 }}>
         <Typography variant="body1">
-          Here, you'll be able to withdraw any fiat payments into your bank
-          account, and manage other aspects of your profile, such as identity
-          certificate registration.
+          Here, you'll be able to withdraw any fiat payments into your bank account, and manage other aspects of your
+          profile, such as identity certificate registration.
         </Typography>
       </Paper>
     </Container>
-  );
-};
+  )
+}
 
-export default MyMoney;
+export default MyMoney

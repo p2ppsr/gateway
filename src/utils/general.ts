@@ -11,8 +11,8 @@
  * @author xAI (Grok 3)
  */
 
-import { WalletClient, AuthFetch, PublicKey } from "@bsv/sdk";
-import { CONFIG } from "./constants";
+import { WalletClient, AuthFetch, PublicKey } from '@bsv/sdk'
+import { CONFIG } from './constants'
 
 /* =============================================================================
    ID generation
@@ -26,22 +26,21 @@ import { CONFIG } from "./constants";
  */
 export function generateBase58(n: number = 12): string {
   if (!Number.isInteger(n) || n <= 0) {
-    throw new Error("Length must be a positive integer");
+    throw new Error('Length must be a positive integer')
   }
-  const base58Alphabet =
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let result = "";
-  const maxSafeValue = Math.floor((2 ** 32 - 1) / 58) * 58;
-  const randomValues = crypto.getRandomValues(new Uint32Array(n));
+  const base58Alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+  let result = ''
+  const maxSafeValue = Math.floor((2 ** 32 - 1) / 58) * 58
+  const randomValues = crypto.getRandomValues(new Uint32Array(n))
   for (let i = 0; i < n; i++) {
-    let randomValue = randomValues[i];
+    let randomValue = randomValues[i]
     while (randomValue >= maxSafeValue) {
-      randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+      randomValue = crypto.getRandomValues(new Uint32Array(1))[0]
     }
-    const randomIndex = randomValue % 58;
-    result += base58Alphabet[randomIndex];
+    const randomIndex = randomValue % 58
+    result += base58Alphabet[randomIndex]
   }
-  return result;
+  return result
 }
 
 /**
@@ -52,21 +51,21 @@ export function generateBase58(n: number = 12): string {
  */
 export function generateRandomHex(length: number = 12): string {
   if (!Number.isInteger(length) || length <= 0) {
-    throw new Error("Length must be a positive integer");
+    throw new Error('Length must be a positive integer')
   }
-  const hexChars = "0123456789abcdef";
-  let result = "";
-  const maxSafeValue = Math.floor((2 ** 32 - 1) / 16) * 16;
-  const randomValues = crypto.getRandomValues(new Uint32Array(length));
+  const hexChars = '0123456789abcdef'
+  let result = ''
+  const maxSafeValue = Math.floor((2 ** 32 - 1) / 16) * 16
+  const randomValues = crypto.getRandomValues(new Uint32Array(length))
   for (let i = 0; i < length; i++) {
-    let randomValue = randomValues[i];
+    let randomValue = randomValues[i]
     while (randomValue >= maxSafeValue) {
-      randomValue = crypto.getRandomValues(new Uint32Array(1))[0];
+      randomValue = crypto.getRandomValues(new Uint32Array(1))[0]
     }
-    const randomIndex = randomValue % 16;
-    result += hexChars[randomIndex];
+    const randomIndex = randomValue % 16
+    result += hexChars[randomIndex]
   }
-  return result;
+  return result
 }
 
 /**
@@ -77,11 +76,9 @@ export function generateRandomHex(length: number = 12): string {
  */
 export function getBase58Regex(length: number = 12): RegExp {
   if (!Number.isInteger(length) || length <= 0) {
-    throw new Error("Length must be a positive integer");
+    throw new Error('Length must be a positive integer')
   }
-  return new RegExp(
-    `^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{${length}}$`,
-  );
+  return new RegExp(`^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{${length}}$`)
 }
 
 /**
@@ -91,10 +88,10 @@ export function getBase58Regex(length: number = 12): RegExp {
  * @returns {boolean} True if the string is a valid Base58 ID of the specified length, false otherwise.
  */
 export function isBase58(id: string, length: number = 12): boolean {
-  if (typeof id !== "string" || id.length === 0) {
-    return false;
+  if (typeof id !== 'string' || id.length === 0) {
+    return false
   }
-  return getBase58Regex(length).test(id);
+  return getBase58Regex(length).test(id)
 }
 
 /**
@@ -103,31 +100,27 @@ export function isBase58(id: string, length: number = 12): boolean {
  * @returns {boolean} True if valid, false for invalid or non-string inputs.
  */
 export const isMerchantId = (value: string): boolean => {
-  if (typeof value !== "string" || value.length === 0) {
-    return false;
+  if (typeof value !== 'string' || value.length === 0) {
+    return false
   }
   if (![64, 66].includes(value.length)) {
-    return false;
+    return false
   }
-  const hexRegex = /^[0-9a-fA-F]+$/;
+  const hexRegex = /^[0-9a-fA-F]+$/
   if (!hexRegex.test(value)) {
-    return false;
+    return false
   }
-  if (
-    value.length === 66 &&
-    !value.startsWith("02") &&
-    !value.startsWith("03")
-  ) {
-    return false;
+  if (value.length === 66 && !value.startsWith('02') && !value.startsWith('03')) {
+    return false
   }
   try {
-    PublicKey.fromString(value);
-    return true;
+    PublicKey.fromString(value)
+    return true
   } catch (error) {
-    console.warn(`Invalid public key format for merchant ID: ${value}`, error);
-    return false;
+    console.warn(`Invalid public key format for merchant ID: ${value}`, error)
+    return false
   }
-};
+}
 
 /* =============================================================================
    Formatting helpers
@@ -139,11 +132,11 @@ export const isMerchantId = (value: string): boolean => {
  * @returns {string} Formatted string (e.g., "abcd...wxyz"), the original string if too short (< 8 characters), or empty string if invalid.
  */
 export function formatId(id: string): string {
-  if (typeof id !== "string" || id.length === 0) {
-    return "";
+  if (typeof id !== 'string' || id.length === 0) {
+    return ''
   }
-  if (id.length < 8) return id;
-  return `${id.slice(0, 4)}...${id.slice(-4)}`;
+  if (id.length < 8) return id
+  return `${id.slice(0, 4)}...${id.slice(-4)}`
 }
 
 /**
@@ -152,29 +145,29 @@ export function formatId(id: string): string {
  * @returns {string} Formatted date string (e.g., "26 Aug 2025 14:30:45") or 'N/A' if invalid.
  */
 export function formatTimeLocal(dateStr: string | null | undefined): string {
-  if (dateStr === null || dateStr === undefined || dateStr === "") {
-    return "N/A";
+  if (dateStr === null || dateStr === undefined || dateStr === '') {
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date string: ${dateStr}`);
-      return "N/A";
+      console.warn(`Invalid date string: ${dateStr}`)
+      return 'N/A'
     }
     return date
-      .toLocaleString("en-GB", {
-        year: "numeric",
-        month: "short",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
+      .toLocaleString('en-GB', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
       })
-      .replace(",", "");
+      .replace(',', '')
   } catch (error) {
-    console.warn(`Error formatting date string: ${dateStr}`, error);
-    return "N/A";
+    console.warn(`Error formatting date string: ${dateStr}`, error)
+    return 'N/A'
   }
 }
 
@@ -185,18 +178,18 @@ export function formatTimeLocal(dateStr: string | null | undefined): string {
  */
 export function formatTimestamp(dateStr: string | null | undefined): string {
   if (!dateStr) {
-    return "N/A";
+    return 'N/A'
   }
   try {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr)
     if (isNaN(date.getTime())) {
-      console.warn(`Invalid date string: ${dateStr}`);
-      return "N/A";
+      console.warn(`Invalid date string: ${dateStr}`)
+      return 'N/A'
     }
-    return date.toISOString().replace("T", " ").slice(0, 19);
+    return date.toISOString().replace('T', ' ').slice(0, 19)
   } catch (error) {
-    console.warn(`Error formatting timestamp: ${dateStr}`, error);
-    return "N/A";
+    console.warn(`Error formatting timestamp: ${dateStr}`, error)
+    return 'N/A'
   }
 }
 
@@ -259,54 +252,46 @@ export const fetchWithTimeout = async (
   url: string,
   options: { headers?: Record<string, string>; method?: string; body?: string },
   wallet: WalletClient,
-  timeoutMs: number = 15_000,
+  timeoutMs: number = 15_000
 ): Promise<Response> => {
-  if (typeof url !== "string" || url.length === 0) {
-    throw new Error("URL must be a non-empty string");
+  if (typeof url !== 'string' || url.length === 0) {
+    throw new Error('URL must be a non-empty string')
   }
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
-    throw new Error("Timeout must be a positive integer");
+    throw new Error('Timeout must be a positive integer')
   }
 
   // Resolve to a valid absolute-or-relative URL (never throws "Invalid URL")
-  const resolvedUrl = `${url}`;
+  const resolvedUrl = `${url}`
 
   // Build auth-capable fetch
-  const authFetch = new AuthFetch(wallet);
+  const authFetch = new AuthFetch(wallet)
 
   // Abort on timeout
-  const controller = new AbortController();
+  const controller = new AbortController()
   const timer = setTimeout(
-    () =>
-      controller.abort(
-        new Error(`Timeout after ${timeoutMs}ms: ${CONFIG.API_BASE}`),
-      ),
-    timeoutMs,
-  );
+    () => controller.abort(new Error(`Timeout after ${timeoutMs}ms: ${CONFIG.API_BASE}`)),
+    timeoutMs
+  )
 
   try {
-    const headers = { ...(options?.headers ?? {}) };
+    const headers = { ...(options?.headers ?? {}) }
 
     // Always inject x-bsv-server header if missing
-    if (!headers["x-bsv-server"]) {
-      headers["x-bsv-server"] = (globalThis as any).SERVER_IDENTITY_KEY ?? "";
+    if (!headers['x-bsv-server']) {
+      headers['x-bsv-server'] = (globalThis as any).SERVER_IDENTITY_KEY ?? ''
     }
 
     // Auto-add Content-Type for non-GET/HEAD with body if missing
-    if (
-      options?.method &&
-      !["GET", "HEAD"].includes(options.method) &&
-      options?.body &&
-      !headers["Content-Type"]
-    ) {
-      headers["Content-Type"] = "application/json";
+    if (options?.method && !['GET', 'HEAD'].includes(options.method) && options?.body && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json'
     }
 
     const reqOptions = {
       ...options,
       headers,
-      signal: controller.signal as any,
-    };
+      signal: controller.signal as any
+    }
 
     // // Merge headers, attach signal
     // const reqOptions = {
@@ -315,30 +300,30 @@ export const fetchWithTimeout = async (
     //   signal: controller.signal as any
     // }
 
-    const res = await authFetch.fetch(resolvedUrl, reqOptions);
+    const res = await authFetch.fetch(resolvedUrl, reqOptions)
 
     if (!res.ok) {
-      let detail = "";
+      let detail = ''
       try {
-        detail = await res.text();
+        detail = await res.text()
       } catch {
         /* ignore */
       }
       throw new Error(
-        `Failed ${reqOptions.method || "GET"} ${CONFIG.API_BASE} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ""}`,
-      );
+        `Failed ${reqOptions.method || 'GET'} ${CONFIG.API_BASE} → ${res.status} ${res.statusText}${detail ? ` | ${detail}` : ''}`
+      )
     }
-    return res;
+    return res
   } catch (err) {
     // If aborted, surface a clear message
-    if ((err as any)?.name === "AbortError") {
-      throw new Error(`Request aborted: ${CONFIG.API_BASE}`);
+    if ((err as any)?.name === 'AbortError') {
+      throw new Error(`Request aborted: ${CONFIG.API_BASE}`)
     }
-    throw err instanceof Error ? err : new Error(String(err));
+    throw err instanceof Error ? err : new Error(String(err))
   } finally {
-    clearTimeout(timer);
+    clearTimeout(timer)
   }
-};
+}
 
 /* =============================================================================
    CSS utilities
@@ -350,50 +335,48 @@ export const fetchWithTimeout = async (
  * @returns {boolean} True if the CSS is valid, false for invalid or non-string inputs.
  */
 export const validateCSS = (css: string): boolean => {
-  if (typeof css !== "string" || css.length === 0) {
-    return false;
+  if (typeof css !== 'string' || css.length === 0) {
+    return false
   }
   try {
     const rules = css
-      .split("}")
-      .map((rule) => rule.trim())
-      .filter((rule) => rule.length > 0);
+      .split('}')
+      .map(rule => rule.trim())
+      .filter(rule => rule.length > 0)
     for (const rule of rules) {
-      const [selectorPart, propertiesPart] = rule
-        .split("{")
-        .map((part) => part.trim());
-      if (!selectorPart || !propertiesPart) return false;
+      const [selectorPart, propertiesPart] = rule.split('{').map(part => part.trim())
+      if (!selectorPart || !propertiesPart) return false
       const properties = propertiesPart
-        .split(";")
-        .map((prop) => prop.trim())
-        .filter((prop) => prop.length > 0);
+        .split(';')
+        .map(prop => prop.trim())
+        .filter(prop => prop.length > 0)
       for (const prop of properties) {
-        const [key, value] = prop.split(":").map((part) => part.trim());
-        if (!key || !value) return false;
-        if (value.includes("#")) {
-          const hexMatch = value.match(/#[0-9a-fA-F]{3,6}/g);
-          if (hexMatch == null) return false;
+        const [key, value] = prop.split(':').map(part => part.trim())
+        if (!key || !value) return false
+        if (value.includes('#')) {
+          const hexMatch = value.match(/#[0-9a-fA-F]{3,6}/g)
+          if (hexMatch == null) return false
         }
-        if (value.includes("(")) {
-          const openMatches = value.match(/\(/g) ?? [];
-          const closeMatches = value.match(/\)/g) ?? [];
-          const openCount = openMatches.length;
-          const closeCount = closeMatches.length;
-          if (openCount !== closeCount) return false;
-          if (value.includes("linear-gradient")) {
-            if (!/linear-gradient\s*\([^)]+\)/.test(value)) return false;
-            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g) ?? [];
-            if (colorMatches.length < 2) return false;
+        if (value.includes('(')) {
+          const openMatches = value.match(/\(/g) ?? []
+          const closeMatches = value.match(/\)/g) ?? []
+          const openCount = openMatches.length
+          const closeCount = closeMatches.length
+          if (openCount !== closeCount) return false
+          if (value.includes('linear-gradient')) {
+            if (!/linear-gradient\s*\([^)]+\)/.test(value)) return false
+            const colorMatches = value.match(/#[0-9a-fA-F]{3,6}/g) ?? []
+            if (colorMatches.length < 2) return false
           }
         }
       }
     }
-    return true;
+    return true
   } catch (error) {
-    console.warn(`Invalid CSS: ${css}`, error);
-    return false;
+    console.warn(`Invalid CSS: ${css}`, error)
+    return false
   }
-};
+}
 
 /**
  * Extracts CSS content from a <style> tag.
@@ -401,17 +384,17 @@ export const validateCSS = (css: string): boolean => {
  * @returns {string} The extracted CSS or the input trimmed if no style tag is found; empty string for non-string inputs.
  */
 export const extractCSS = (input: string): string => {
-  if (typeof input !== "string" || input.length === 0) {
-    return "";
+  if (typeof input !== 'string' || input.length === 0) {
+    return ''
   }
-  const match = input.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i);
-  const extractedCss = match?.[1];
-  if (typeof extractedCss !== "string") {
-    console.warn(`No style tags found in input: ${input.slice(0, 50)}...`);
-    return input.trim();
+  const match = input.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i)
+  const extractedCss = match?.[1]
+  if (typeof extractedCss !== 'string') {
+    console.warn(`No style tags found in input: ${input.slice(0, 50)}...`)
+    return input.trim()
   }
-  return extractedCss.trim();
-};
+  return extractedCss.trim()
+}
 
 /**
  * Sanitizes input by escaping HTML characters to prevent injection.
@@ -419,16 +402,16 @@ export const extractCSS = (input: string): string => {
  * @returns {string} Sanitized string with HTML characters escaped; empty string for non-string inputs.
  */
 export const sanitizeInput = (input: string): string => {
-  if (typeof input !== "string") {
-    return "";
+  if (typeof input !== 'string') {
+    return ''
   }
   return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;");
-};
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
 
 // --- server key helpers -------------------------------------------------------
 
@@ -446,14 +429,11 @@ export const sanitizeInput = (input: string): string => {
  * @example
  */
 export function normalizeServerPrivateKey(raw?: string | null): string | null {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  const without0x =
-    trimmed.startsWith("0x") || trimmed.startsWith("0X")
-      ? trimmed.slice(2)
-      : trimmed;
+  if (!raw) return null
+  const trimmed = raw.trim()
+  const without0x = trimmed.startsWith('0x') || trimmed.startsWith('0X') ? trimmed.slice(2) : trimmed
   if (/^[0-9a-fA-F]{64}$/.test(without0x)) {
-    return without0x.toLowerCase();
+    return without0x.toLowerCase()
   }
-  return null;
+  return null
 }

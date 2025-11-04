@@ -19,11 +19,6 @@
     "allowImportingTsExtensions": false, // 👈 override the base
     "composite": false
   },
-  "include": [
-    "src/**/*.ts",
-    "knexfile.ts",
-    "migrations/**/*.ts",
-    "seeds/**/*.ts"
-  ],
+  "include": ["src/**/*.ts", "knexfile.ts", "migrations/**/*.ts", "seeds/**/*.ts"],
   "exclude": ["**/*.test.ts", "src/**/*.tsx"]
 }

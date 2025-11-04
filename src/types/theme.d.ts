@@ -10,9 +10,9 @@
  * @author xAI (Grok 3)
  */
 
-import { Theme as MUITheme } from "@mui/material/styles";
+import { Theme as MUITheme } from '@mui/material/styles'
 
-declare module "@mui/material/styles" {
+declare module '@mui/material/styles' {
   /**
    * Extends the MUI Theme interface to include additional layout and template fields.
    *
@@ -24,13 +24,13 @@ declare module "@mui/material/styles" {
    * @property {any} [templates.centeredHeader] - Template for a centered header section.
    */
   interface Theme extends MUITheme {
-    maxContentWidth?: string;
+    maxContentWidth?: string
     templates?: {
-      page_wrap?: any;
-      subheading?: any;
-      subheading_f?: any;
-      centeredHeader?: any;
-    };
+      page_wrap?: any
+      subheading?: any
+      subheading_f?: any
+      centeredHeader?: any
+    }
   }
 
   /**
@@ -40,12 +40,12 @@ declare module "@mui/material/styles" {
    * @property {object} [templates] - Optional default style templates to include.
    */
   interface ThemeOptions {
-    maxContentWidth?: string;
+    maxContentWidth?: string
     templates?: {
-      page_wrap?: any;
-      subheading?: any;
-      subheading_f?: any;
-      centeredHeader?: any;
-    };
+      page_wrap?: any
+      subheading?: any
+      subheading_f?: any
+      centeredHeader?: any
+    }
   }
 }

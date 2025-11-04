@@ -7,16 +7,16 @@
  * @author xAI (Grok 3)
  */
 
-import createButton from "./createButton";
-import buttonCode from "./buttonCode";
-import acknowledgePayment from "./acknowledgePayment";
-import getStatus from "./getStatus";
-import invoice from "./invoice";
-import listButtons from "./listButtons";
-import listPayments from "./listPayments";
-import pay from "./pay";
-import initializeIds from "./initializeIds";
-import cleanupIds from "./cleanupIds";
+import createButton from './createButton'
+import buttonCode from './buttonCode'
+import acknowledgePayment from './acknowledgePayment'
+import getStatus from './getStatus'
+import invoice from './invoice'
+import listButtons from './listButtons'
+import listPayments from './listPayments'
+import pay from './pay'
+import initializeIds from './initializeIds'
+import cleanupIds from './cleanupIds'
 
 export default [
   createButton,
@@ -28,5 +28,5 @@ export default [
   listPayments,
   pay,
   initializeIds,
-  cleanupIds,
-];
+  cleanupIds
+]

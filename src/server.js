@@ -16,5 +16,5 @@
  * @author xAI (Grok 3)
  */
 
-require("ts-node/register");
-require("./server.ts");
+require('ts-node/register')
+require('./server.ts')
