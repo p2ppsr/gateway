@@ -40,6 +40,7 @@ jobs:
       REGISTRY_PUSH: ${{ vars.LOCAL_REGISTRY_PUSH || '10.152.183.28:5000' }}
       REGISTRY_PULL: ${{ vars.LOCAL_REGISTRY_PULL || 'registry.cars-operator-system.svc.cluster.local:5000' }}
       KUBECTL: ${{ vars.LOCAL_KUBECTL || 'kubectl' }}
+      WAIT_FOR_CERT: "false"
       SERVER_PRIVATE_KEY: ${{ secrets.STAGING_SERVER_PRIVATE_KEY }}
       SQL_DATABASE_HOST: ${{ secrets.STAGING_SQL_DATABASE_HOST }}
       SQL_DATABASE_PORT: ${{ secrets.STAGING_SQL_DATABASE_PORT }}
@@ -67,7 +68,7 @@ jobs:
       - name: Deploy staging to local Kubernetes
         run: |
           set -euo pipefail
-          ENVIRONMENT=staging IMAGE_TAG="${{ steps.build.outputs.image_tag }}" scripts/k8s/deploy-local.sh
+          ENVIRONMENT=staging IMAGE_TAG="${{ steps.build.outputs.image_tag }}" WAIT_FOR_CERT="${WAIT_FOR_CERT}" scripts/k8s/deploy-local.sh
       - uses: actions/upload-artifact@v4
         with:
           name: local-release-manifest-staging-${{ steps.build.outputs.image_tag }}
