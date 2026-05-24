@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-app
+  labels:
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: []
+      secretName: gateway-app-tls
+  rules: []
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-app-tls
+  labels:
+    app.kubernetes.io/component: tls
+spec:
+  secretName: gateway-app-tls
+  dnsNames: []
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-nginx

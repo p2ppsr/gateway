@@ -45,7 +45,7 @@ interface Route {
  * Port for the Express server to listen on.
  * @default 3001
  */
-const HTTP_PORT = Number(process.env.HTTP_PORT ?? '3001')
+const HTTP_PORT = Number(process.env.HTTP_PORT ?? process.env.PORT ?? '3001')
 
 /**
  * Prefix for API routes.
@@ -66,6 +66,7 @@ const SPAWN_NGINX = process.env.SPAWN_NGINX
 const WALLET_STORAGE_URL = process.env.WALLET_STORAGE_URL ?? ''
 
 const app = express()
+const db = knex(knexConfig)
 
 app.use(bodyParser.json({ limit: '1gb' }))
 
@@ -78,6 +79,23 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Private-Network', 'true')
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
+})
+
+app.get('/healthz', async (_req: Request, res: Response) => {
+  let database = 'ok'
+  try {
+    await db.raw('select 1')
+  } catch {
+    database = 'error'
+  }
+
+  res.status(database === 'ok' ? 200 : 503).json({
+    ok: database === 'ok',
+    service: 'gateway-app',
+    network: process.env.BSV_NETWORK,
+    routingPrefix: ROUTING_PREFIX,
+    database
+  })
 })
 
 /**
@@ -174,14 +192,15 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
     app.use(ROUTING_PREFIX, apiRouter)
 
+    await db.migrate.latest()
+
     /**
-     * Starts the Express server and optionally spawns NGINX and runs database migrations.
+     * Starts the Express server and optionally spawns NGINX.
      */
     app.listen(HTTP_PORT, () => {
       console.log('✅ Gateway Payment Server listening on', HTTP_PORT)
       if (SPAWN_NGINX === 'yes') {
         spawn('nginx', [], { stdio: 'inherit' })
-        void knex(knexConfig).migrate.latest()
       }
     })
   } catch (err: unknown) {

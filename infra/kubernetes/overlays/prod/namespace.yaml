@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gateway-prod
+  labels:
+    app.kubernetes.io/name: gateway-app
+    app.kubernetes.io/part-of: gateway
+    environment: production
