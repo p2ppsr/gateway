@@ -18,6 +18,7 @@ configMapGenerator:
     literals:
       - BSV_NETWORK=mainnet
       - HOSTING_DOMAIN=https://app.gateway.cash
+      - WALLET_STORAGE_URL=http://wallet-storage.wallet-storage-prod.svc.cluster.local:8080
       - SQL_DATABASE_DB_NAME=gateway
 
 patches:

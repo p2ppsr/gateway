@@ -52,6 +52,8 @@ const HTTP_PORT = Number(process.env.HTTP_PORT ?? process.env.PORT ?? '3001')
  * @default '/api'
  */
 const ROUTING_PREFIX = process.env.ROUTING_PREFIX ?? '/api'
+const BSV_NETWORK = process.env.BSV_NETWORK ?? 'mainnet'
+const CHAIN = BSV_NETWORK === 'testnet' || BSV_NETWORK === 'test' ? 'test' : 'main'
 
 /**
  * Flag to spawn NGINX and run database migrations.
@@ -92,7 +94,8 @@ app.get('/healthz', async (_req: Request, res: Response) => {
   res.status(database === 'ok' ? 200 : 503).json({
     ok: database === 'ok',
     service: 'gateway-app',
-    network: process.env.BSV_NETWORK,
+    network: BSV_NETWORK,
+    chain: CHAIN,
     routingPrefix: ROUTING_PREFIX,
     database
   })
@@ -128,7 +131,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     const wallet = await Setup.createWalletClientNoEnv({
       rootKeyHex: process.env.SERVER_PRIVATE_KEY ?? '',
       storageUrl: WALLET_STORAGE_URL,
-      chain: 'main'
+      chain: CHAIN
     })
     console.log('🔍 Wallet initialized:', wallet)
 
