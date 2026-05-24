@@ -2,7 +2,9 @@ require('dotenv').config()
 
 module.exports = {
     client: 'mysql2',
-    migrations: './src/migrations',
+    migrations: {
+        directory: './migrations'
+    },
     connection: {
         host: process.env.SQL_DATABASE_HOST,
         port: process.env.SQL_DATABASE_PORT,

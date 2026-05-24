@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gateway-staging
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+images:
+  - name: gateway-app
+    newName: registry.cars-operator-system.svc.cluster.local:5000/p2ppsr/gateway
+    newTag: local
+
+configMapGenerator:
+  - name: gateway-app-config
+    behavior: merge
+    literals:
+      - BSV_NETWORK=testnet
+      - HOSTING_DOMAIN=https://staging-app.gateway.cash
+      - SQL_DATABASE_DB_NAME=staging_gateway
+
+patches:
+  - target:
+      kind: Ingress
+      name: gateway-app
+    patch: |-
+      - op: replace
+        path: /spec/tls/0/hosts
+        value:
+          - staging-app.gateway.cash
+      - op: replace
+        path: /spec/rules
+        value:
+          - host: staging-app.gateway.cash
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: gateway-app
+                      port:
+                        number: 8080
+  - target:
+      kind: Certificate
+      name: gateway-app-tls
+    patch: |-
+      - op: replace
+        path: /spec/dnsNames
+        value:
+          - staging-app.gateway.cash

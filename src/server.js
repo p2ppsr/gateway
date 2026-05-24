@@ -8,7 +8,7 @@ const { SERVER_PRIVATE_KEY, SPAWN_NGINX } = process.env
 const path = require('path')
 const knex = require('knex')(require('../knexfile.js'))
 
-const HTTP_PORT = process.env.HTTP_PORT || 3001
+const HTTP_PORT = process.env.HTTP_PORT || process.env.PORT || 3001
 const ROUTING_PREFIX = process.env.ROUTING_PREFIX || '/api'
 const HOSTING_DOMAIN = process.env.HOSTING_DOMAIN || 'http://localhost:3001'
 
@@ -27,6 +27,22 @@ app.use((req, res, next) => {
     } else {
         next()
     }
+})
+app.get('/healthz', async (req, res) => {
+    let database = 'ok'
+    try {
+        await knex.raw('select 1')
+    } catch (error) {
+        database = 'error'
+    }
+
+    res.status(database === 'ok' ? 200 : 503).json({
+        ok: database === 'ok',
+        service: 'gateway-app',
+        network: process.env.BSV_NETWORK,
+        routingPrefix: ROUTING_PREFIX,
+        database
+    })
 })
 app.use((req, res, next) => {
     console.log('[' + req.method + '] <- ' + req._parsedUrl.pathname)
@@ -79,10 +95,20 @@ routes.forEach((route) => {
 })
 app.use(ROUTING_PREFIX, apiRouter)
 
-app.listen(HTTP_PORT, async () => {
-    console.log('Gateway Payment Server listening on port', HTTP_PORT)
-    if (SPAWN_NGINX === 'yes') {
-        spawn('nginx', [], { stdio: [process.stdin, process.stdout, process.stderr] })
+async function start () {
+    try {
         await knex.migrate.latest()
+    } catch (error) {
+        console.error('Gateway database migration failed:', error)
+        process.exit(1)
     }
-})
+
+    app.listen(HTTP_PORT, () => {
+        console.log('Gateway Payment Server listening on port', HTTP_PORT)
+        if (SPAWN_NGINX === 'yes') {
+            spawn('nginx', [], { stdio: [process.stdin, process.stdout, process.stderr] })
+        }
+    })
+}
+
+start()

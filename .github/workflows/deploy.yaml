@@ -1,55 +1,22 @@
-name: Deployment
-on:
-  push:
-    branches:
-      - master
-      - production
+name: Retired Cloud Run Rollback
 
-env:
-  CURRENT_BRANCH: ${{ github.ref_name =='production' && 'production' || 'master' }}
-  CWI_NPM_TOKEN: ${{ secrets.CWI_NPM_TOKEN }}
-  GCR_HOST: us.gcr.io
-  GOOGLE_PROJECT_ID: babbage-private
-  GCR_IMAGE_NAME: gatewayapp
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type RETIRED-CLOUD-RUN-ROLLBACK to acknowledge that local Kubernetes is the primary deployment path.
+        required: true
+        type: string
 
 jobs:
-  build:
-    name: Deploy
+  retired:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 20
-      - run: npm ci
-      - uses: RafikFarhad/push-to-gcr-github-action@v4.1
-        with:
-          gcloud_service_key: ${{ secrets.DOCKER_REGISTRY_PUSH_KEY }}
-          registry: ${{ env.GCR_HOST }}
-          project_id: ${{ env.GOOGLE_PROJECT_ID }}
-          image_name: ${{ env.GCR_IMAGE_NAME }}
-          image_tag: latest,${{ env.CURRENT_BRANCH }}-${{ github.sha }}
-      - name: "Create service description file"
-        run: "./scripts/mkenv.sh service.${{ env.CURRENT_BRANCH }}.yaml"
-        env:
-          IMAGE: "${{ env.GCR_HOST }}/${{ env.GOOGLE_PROJECT_ID }}/${{ env.GCR_IMAGE_NAME }}:${{ env.CURRENT_BRANCH }}-${{ github.sha }}"
-          SERVICE: ${{ env.CURRENT_BRANCH =='production' && 'prod-gatewayapp' || 'staging-gatewayapp' }}
-          BSV_NETWORK: ${{ env.CURRENT_BRANCH =='production' && 'mainnet' || 'testnet' }}
-          NODE_ENV: 'production'
-          SPAWN_NGINX: 'yes'
-          HOSTING_DOMAIN: ${{                env.CURRENT_BRANCH =='production' && secrets.PROD_HOSTING_DOMAIN || secrets.STAGING_HOSTING_DOMAIN }}
-          ROUTING_PREFIX: ${{          env.CURRENT_BRANCH =='production' && secrets.PROD_ROUTING_PREFIX || secrets.STAGING_ROUTING_PREFIX }}
-          SQL_DATABASE_HOST: ${{      env.CURRENT_BRANCH =='production' && secrets.PROD_SQL_DATABASE_HOST || secrets.STAGING_SQL_DATABASE_HOST }}
-          SQL_DATABASE_PORT: ${{          env.CURRENT_BRANCH =='production' && secrets.PROD_SQL_DATABASE_PORT || secrets.STAGING_SQL_DATABASE_PORT }}
-          SQL_DATABASE_USER: ${{             env.CURRENT_BRANCH =='production' && secrets.PROD_SQL_DATABASE_USER || secrets.STAGING_SQL_DATABASE_USER }}
-          SQL_DATABASE_PASSWORD: ${{ env.CURRENT_BRANCH =='production' && secrets.PROD_SQL_DATABASE_PASSWORD || secrets.STAGING_SQL_DATABASE_PASSWORD }}
-          SQL_DATABASE_DB_NAME: ${{  env.CURRENT_BRANCH =='production' && secrets.PROD_SQL_DATABASE_DB_NAME || secrets.STAGING_SQL_DATABASE_DB_NAME }}
-          SERVER_PRIVATE_KEY: ${{      env.CURRENT_BRANCH =='production' && secrets.PROD_SERVER_PRIVATE_KEY || secrets.STAGING_SERVER_PRIVATE_KEY }}
-          HTTP_PORT: '8081'
-      - uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.gcp_deploy_creds }}
-      - uses: google-github-actions/deploy-cloudrun@v1
-        with:
-          metadata: "service.${{ env.CURRENT_BRANCH }}.yaml"
-          region: us-west1
+      - name: Retired deployment path
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.confirm }}" != "RETIRED-CLOUD-RUN-ROLLBACK" ]; then
+            echo "Cloud Run deployment is retired. Use the local Kubernetes workflows."
+            exit 1
+          fi
+          echo "This workflow is intentionally retired. Restore a known-good historical workflow only for an explicit rollback plan."

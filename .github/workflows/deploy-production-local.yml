@@ -1,0 +1,87 @@
+name: Deploy Production Local Kubernetes
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Approved production commit SHA validated in staging, or a previous approved SHA to roll back to
+        required: true
+        type: string
+      wait_for_cert:
+        description: Wait for public TLS certificate readiness after deploying
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production-local
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on:
+      - self-hosted
+      - gateway-local-deploy
+      - private-production-local-deploy
+      - linux-amd64
+      - docker
+      - kubectl
+      - local-registry
+    environment: production
+    env:
+      SOURCE_SHA: ${{ github.event.inputs.source_sha }}
+      REGISTRY_PUSH: ${{ vars.LOCAL_REGISTRY_PUSH || '10.152.183.28:5000' }}
+      REGISTRY_PULL: ${{ vars.LOCAL_REGISTRY_PULL || 'registry.cars-operator-system.svc.cluster.local:5000' }}
+      KUBECTL: ${{ vars.LOCAL_KUBECTL || 'kubectl' }}
+      WAIT_FOR_CERT: ${{ github.event.inputs.wait_for_cert || 'true' }}
+      SERVER_PRIVATE_KEY: ${{ secrets.PROD_SERVER_PRIVATE_KEY }}
+      SQL_DATABASE_HOST: ${{ secrets.PROD_SQL_DATABASE_HOST }}
+      SQL_DATABASE_PORT: ${{ secrets.PROD_SQL_DATABASE_PORT }}
+      SQL_DATABASE_USER: ${{ secrets.PROD_SQL_DATABASE_USER }}
+      SQL_DATABASE_PASSWORD: ${{ secrets.PROD_SQL_DATABASE_PASSWORD }}
+      SQL_DATABASE_DB_NAME: ${{ secrets.PROD_SQL_DATABASE_DB_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: production
+          fetch-depth: 0
+      - name: Checkout deploy SHA
+        run: git checkout --detach "${SOURCE_SHA}"
+      - name: Verify deploy SHA is on production
+        run: git merge-base --is-ancestor "${SOURCE_SHA}" origin/production
+      - name: Local deploy preflight
+        run: |
+          set -euo pipefail
+          docker version
+          "${KUBECTL}" version --client
+          "${KUBECTL}" get nodes -o wide
+      - name: Build and publish production image
+        id: build
+        run: |
+          set -euo pipefail
+          ENVIRONMENT=production scripts/k8s/build-local-image.sh
+      - name: Deploy production to local Kubernetes
+        run: |
+          set -euo pipefail
+          ENVIRONMENT=production IMAGE_TAG="${{ steps.build.outputs.image_tag }}" WAIT_FOR_CERT="${WAIT_FOR_CERT}" scripts/k8s/deploy-local.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-release-manifest-production-${{ steps.build.outputs.image_tag }}
+          path: release-manifest.json
+      - name: Deployment summary
+        run: |
+          {
+            echo "### Production local deployment"
+            echo ""
+            echo "- Commit: \`${SOURCE_SHA}\`"
+            echo "- Image tag: \`${{ steps.build.outputs.image_tag }}\`"
+            echo "- Image: \`${{ steps.build.outputs.image }}\`"
+            echo "- Namespace: \`gateway-prod\`"
+            echo "- Rollback: run this workflow again with a previous approved production SHA."
+          } >> "$GITHUB_STEP_SUMMARY"
