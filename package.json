@@ -10,7 +10,7 @@
     "build:site": "webpack --config webpack.site.ts",
     "build:inject": "webpack --config webpack.inject.ts",
     "build": "concurrently \"npm run build:site\" \"npm run build:inject\"",
-    "setup:db": "node scripts/mkenv.sh && knex migrate:latest && knex seed:run",
+    "setup:db": "knex migrate:latest && knex seed:run",
     "lint": "ts-standard --fix .",
     "prettier": "prettier --write \"**/*.{ts,tsx,js,json,css,md}\"",
     "clean": "rimraf dist node_modules && npm install",
