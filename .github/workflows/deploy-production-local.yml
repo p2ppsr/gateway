@@ -28,7 +28,6 @@ jobs:
     runs-on:
       - self-hosted
       - gateway-local-deploy
-      - private-production-local-deploy
       - linux-amd64
       - docker
       - kubectl
@@ -55,7 +54,7 @@ jobs:
         run: git checkout --detach "${SOURCE_SHA}"
       - name: Verify deploy SHA is on production
         run: git merge-base --is-ancestor "${SOURCE_SHA}" origin/production
-      - name: Local deploy preflight
+      - name: Deploy preflight
         run: |
           set -euo pipefail
           docker version
@@ -66,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           ENVIRONMENT=production scripts/k8s/build-local-image.sh
-      - name: Deploy production to local Kubernetes
+      - name: Deploy production to Kubernetes
         run: |
           set -euo pipefail
           ENVIRONMENT=production IMAGE_TAG="${{ steps.build.outputs.image_tag }}" WAIT_FOR_CERT="${WAIT_FOR_CERT}" scripts/k8s/deploy-local.sh

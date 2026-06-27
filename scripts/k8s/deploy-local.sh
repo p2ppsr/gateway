@@ -5,7 +5,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage: ENVIRONMENT=staging|prod IMAGE_TAG=<tag> scripts/k8s/deploy-local.sh
 
-Applies the Gateway Kubernetes overlay to the Project Babbage private infrastructure cluster with a
+Applies the Gateway Kubernetes overlay to the private production cluster with a
 runtime image tag override and creates/updates the gateway-secrets Secret.
 
 Environment:
