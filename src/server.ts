@@ -101,6 +101,15 @@ app.get('/healthz', async (_req: Request, res: Response) => {
   })
 })
 
+// Public frontend assets must bypass BRC-103 payment enforcement. The hardened
+// payment middleware intentionally rejects requests that have not completed
+// authentication, while the SPA shell and its static assets are public.
+app.use(express.static('build'))
+const spaPaths = ['/', '/buttons', '/payments', '/actions', '/money', '/admin']
+spaPaths.forEach(p => {
+  app.get(p, (_, res) => res.sendFile(path.join(__dirname, '../build', 'index.html')))
+})
+
 /**
  * Middleware to log JSON requests and responses (disabled by default).
  * @param req - Express request object.
@@ -161,13 +170,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         }
       } as unknown as PaymentMiddlewareOptions)
     )
-
-    // Serve static files and route SPA paths to index.html
-    app.use(express.static('build'))
-    const spaPaths = ['/', '/buttons', '/payments', '/actions', '/money', '/admin']
-    spaPaths.forEach(p => {
-      app.get(p, (_, res) => res.sendFile(path.join(__dirname, '../build', 'index.html')))
-    })
 
     /**
      * Registers API routes from `src/routes/index.ts`.
