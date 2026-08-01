@@ -29,7 +29,6 @@ jobs:
     runs-on:
       - self-hosted
       - gateway-local-deploy
-      - private-production-local-deploy
       - linux-amd64
       - docker
       - kubectl
@@ -54,7 +53,7 @@ jobs:
           fetch-depth: 0
       - name: Checkout deploy SHA
         run: git checkout --detach "${SOURCE_SHA}"
-      - name: Local deploy preflight
+      - name: Deploy preflight
         run: |
           set -euo pipefail
           docker version
@@ -65,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           ENVIRONMENT=staging scripts/k8s/build-local-image.sh
-      - name: Deploy staging to local Kubernetes
+      - name: Deploy staging to Kubernetes
         run: |
           set -euo pipefail
           ENVIRONMENT=staging IMAGE_TAG="${{ steps.build.outputs.image_tag }}" WAIT_FOR_CERT="${WAIT_FOR_CERT}" scripts/k8s/deploy-local.sh

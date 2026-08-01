@@ -24,7 +24,7 @@ We define a new open-source ecosystem component, a Payment Server. It is similar
 - [ ] Buttons clicked can call a client-side callback after submitting payment to the payment server
 - [ ] Payment submission can be wired up to various actions like sending emails to payee
 - [ ] Admin dashboard for Payment Server admin, to configure server parameters like private key and Sendgrid credentials for email notifications
-- [ ] Admin dashboard enables owner to delegate other identity keys of MetaNet users as server admins
+- [ ] Admin dashboard enables owner to delegate other identity keys of Metanet users as server admins
 - [ ] Admin dashboard enables admins to enforce a fee on all payments through the server
 - [ ] Support for WebHooks that call back to a custom URL as a Payment Action, authenticating with Authrite
 - [ ] Support for bearer token authentication of WebHooks if Authrite is not enabled on the target server

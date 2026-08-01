@@ -1,26 +1,34 @@
-import { merge } from "webpack-merge"
-import common from "./webpack.common.ts"
-import { Configuration } from "webpack"
-import "webpack-dev-server"
+// webpack.dev.ts
+import { merge } from 'webpack-merge'
+import common from './webpack.common.ts'
+import type { Configuration as WebpackConfiguration } from 'webpack'
+import type { Configuration as DevServerConfiguration } from 'webpack-dev-server'
 
-const developmentConfig: Configuration = {
-  mode: "development",
-  devServer: {
-    open: true,
-    port: 3000, // you can change the port
-    client: {
-      overlay: true, // Show application errors
-    },
-    historyApiFallback: {
-      index: "index.html",
-    },
-    proxy: {
-      '/api': 'http://localhost:3001',
-      '/authrite': 'http://localhost:3001'
-    },
-    static: "./public",
-  },
-  devtool: "inline-source-map",
+import 'dotenv/config' // ← still load .env
+const API_HOST = process.env.API_HOST ?? 'localhost'
+const API_PORT = process.env.API_PORT ?? process.env.HTTP_PORT ?? '3001'
+
+const devServer: DevServerConfiguration = {
+  open: true,
+  port: 3000,
+  client: { overlay: true },
+  historyApiFallback: { index: 'index.html' },
+
+  proxy: [
+    {
+      context: ['/api', '/.well-known'], // proxy REST + BRC-104
+      target: `http://${API_HOST}:${API_PORT}`,
+      changeOrigin: true
+    }
+  ],
+
+  static: './public'
 }
 
-module.exports = merge<Configuration>(common, developmentConfig)
+const developmentConfig: WebpackConfiguration = {
+  mode: 'development',
+  devtool: 'inline-source-map',
+  devServer
+}
+
+export default merge<WebpackConfiguration>(common, developmentConfig)

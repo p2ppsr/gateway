@@ -1,67 +1,86 @@
+/**
+ * @file src/App.tsx
+ *
+ * The main entry point for the React application.
+ * It sets up global theme, routes, and continuously checks for the presence of the Metanet client.
+ *
+ * Fixes applied:
+ * - Added explicit return type for `App` to satisfy `@typescript-eslint/explicit-function-return-type`.
+ * - Rewrote `setInterval` to avoid misused Promise warning.
+ * - Prefixed IIFE in `useEffect` with `void` to prevent floating promise warning.
+ */
+
 import React, { useState, useEffect } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 import Theme from './components/Theme'
-import Authrite from './utils/Authrite'
-import { getNetwork } from '@babbage/sdk-ts'
 import Navbar from './components/Navbar'
 import Create from './pages/Create'
 import Buttons from './pages/Buttons'
 import Payments from './pages/Payments'
 import Actions from './pages/Actions'
 import Money from './pages/Money'
-import useAsyncEffect from 'use-async-effect'
-import { NoMncModal, checkForMetaNetClient } from 'metanet-react-prompt'
+import checkForMetanetclient from './utils/checkForMetanetclient'
 import { CssBaseline } from '@mui/material'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
+import useAsyncEffect from 'use-async-effect'
+import MetanetclientMissingModal from './components/MetanetclientMissingModal'
 
-const App = () => {
+// AuthFetch – constructed once per session
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const wallet = new WalletClient('auto', WALLET_ORIGIN)
+const authFetch = new AuthFetch(wallet)
+
+const API_BASE =
+  process.env.API_BASE ??
+  `${window.location.protocol}//${window.location.hostname}:${process.env.API_PORT ?? process.env.HTTP_PORT ?? 3001}`
+
+/**
+ * The main React component for the application.
+ *
+ * - Applies global MUI theming.
+ * - Loads admin status using `/api/getStatus`.
+ * - Checks every 2 seconds whether the Metanet client is running and sets `isMncMissing` accordingly.
+ * - Displays a modal if Metanet client is not detected.
+ * - Defines all app routes using React Router.
+ *
+ * @component
+ * @returns {JSX.Element} The rendered application component.
+ */
+const App: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false)
   const [isMncMissing, setIsMncMissing] = useState(false)
 
-  // Run a 1s interval for checking if MNC is running
-  useAsyncEffect(async () => {
-    const intervalId = setInterval(async () => {
-      const hasMNC = await checkForMetaNetClient()
-      if (hasMNC === 0) {
-        setIsMncMissing(true)
-      } else {
-        setIsMncMissing(false)
-      }
-    }, 1000)
+  // Run a periodic check for Metanet client
+  useAsyncEffect(() => {
+    const intervalId = setInterval(() => {
+      void (async () => {
+        const hasMNC = await checkForMetanetclient(WALLET_ORIGIN)
+        setIsMncMissing(hasMNC === 0)
+      })()
+    }, 2000)
 
-    return () => {
-      clearInterval(intervalId)
-    }
+    return () => clearInterval(intervalId)
   }, [])
 
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
-        const statusResponse = await Authrite.request(
-          `${window.location.protocol}//${window.location.host}/api/getStatus`, {
+        const res = await authFetch.fetch(`${API_BASE}/api/getStatus`, {
           method: 'GET'
         })
-        const status = JSON.parse(
-          new TextDecoder().decode(statusResponse.body)
-        )
-        setIsAdmin(status.isAdmin)
-        const metanetNetwork = await getNetwork()
-        if (status.network !== metanetNetwork) {
-          window.alert(`WARNING! Your MetaNet Client is using ${metanetNetwork} but the payment server is using ${status.network}!\n\nPlease be aware of which network you are using.`)
-        }
-      } catch (e) {
-        console.error(e)
+        if (!res.ok) throw new Error(`❌ HTTP ${res.status}`)
+        const { isAdmin } = await res.json()
+        setIsAdmin(isAdmin)
+      } catch (err) {
+        console.error('❌ getStatus failed:', err)
       }
     })()
   }, [])
 
   return (
     <Theme>
-      <ToastContainer position='top-center' containerId='alertToast' autoClose={5000} />
-      <NoMncModal appName='Gateway' open={isMncMissing} onClose={() => setIsMncMissing(false)} />
       <CssBaseline />
-      {/* <Container maxWidth='xl' sx={{ padding: '0 !important' }}> */}
+      <MetanetclientMissingModal open={isMncMissing} />
       <Router>
         <Navbar isAdmin={isAdmin} />
         <Routes>
@@ -72,7 +91,6 @@ const App = () => {
           <Route path='/money' element={<Money />} />
         </Routes>
       </Router>
-      {/* </Container> */}
     </Theme>
   )
 }

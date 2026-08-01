@@ -1,3 +1,16 @@
+/**
+ * @file src/pages/Payments/index.tsx
+ *
+ * Displays a paginated table of received payments tied to user payment buttons.
+ * Each row represents a payment, showing ID, amount, currency, completion status, and more.
+ *
+ * - Fetches payments from the backend using `authFetch` and the Metanet client.
+ * - Highlights and allows acknowledging of "new" payments.
+ * - Includes pagination controls and responsive styling via MUI.
+ *
+ * Used by the Gateway UI to manage incoming payment activity.
+ */
+
 import React, { useState, useEffect } from 'react'
 import {
   CircularProgress,
@@ -5,148 +18,149 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Typography,
   Button,
   Paper,
-  TableContainer,
   IconButton,
-  Box,
+  Box
 } from '@mui/material'
-import { ArrowBack, ArrowForward, Sort } from '@mui/icons-material'
-import authrite from '../../utils/Authrite'
-import { submitDirectTransaction } from '@babbage/sdk-ts'
-import { getPaymentAddress } from 'sendover'
-import { Transaction, P2PKH, PrivateKey, PublicKey } from '@bsv/sdk'
-import { useTheme } from '@emotion/react'
+import { ArrowBack, ArrowForward } from '@mui/icons-material'
+import { WalletClient, AuthFetch } from '@bsv/sdk'
+import { useTheme } from '@mui/material/styles'
 
+const formatBSV = (value: number | string): string => {
+  return parseFloat(value.toString()).toFixed(8)
+}
+
+/**
+ * Represents a payment received through a payment button.
+ *
+ * @property {string} payment_id - Unique identifier for the payment.
+ * @property {string} payment_button_id - ID of the button that received this payment.
+ * @property {number | string} amount - Amount paid (can be a number or numeric string).
+ * @property {string} currency - Currency type used for the payment (e.g., "BSV").
+ * @property {boolean} completed - Whether the payment has been fully processed.
+ * @property {boolean} is_new - Whether the payment has not yet been acknowledged.
+ * @property {string} [transaction_info] - Optional string containing extra transaction metadata.
+ * @property {string} [merchant_id] - Optional identifier for the merchant receiving the payment.
+ */
 interface Payment {
   payment_id: string
-  button_id: string
-  amount: number
+  payment_button_id: string
+  amount: number | string
   currency: string
   completed: boolean
   is_new: boolean
-  transaction_info: string
-  merchant_id: string
+  transaction_info?: string
+  merchant_id?: string
 }
+
+interface PaymentResponse {
+  status: string
+  message?: string
+  data: Payment[]
+}
+
+const WALLET_ORIGIN = process.env.WALLET_ORIGIN ?? 'localhost:3321'
+const wallet = new WalletClient('auto', WALLET_ORIGIN)
+const authFetch = new AuthFetch(wallet)
 
 const PaymentsList: React.FC = () => {
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [page, setPage] = useState(1)
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const sortOrder = 'desc'
+
   const theme = useTheme()
 
-  const fetchPayments = async () => {
+  const fetchPayments = async (): Promise<void> => {
     setLoading(true)
     setError('')
     try {
       const url = `${location.protocol}//${location.host}/api/listPayments?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
-      const response = await authrite.request(url, { method: 'GET' })
-      const data = JSON.parse(new TextDecoder().decode(response.body))
+      const response = await authFetch.fetch(url, { method: 'GET' })
+      if (!response.ok) {
+        throw new Error(`❌ HTTP error! status: ${response.status.toString()}`)
+      }
+      const data: PaymentResponse = await response.json()
       if (data.status === 'error') {
-        throw new Error(response.message)
+        throw new Error(`❌ ${data.message ?? 'Failed to fetch payments'}`)
       }
       setPayments(data.data)
-    } catch (err: any) {
-      setError(`Fetching payments failed: ${err.message}`)
+      console.log(`✅ Successfully fetched ${data.data.length} payments`)
+      console.log('🔍 Payment data:', data.data)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`❌ Fetching payments failed: ${message}`)
+      console.error('❌ Error fetching payments:', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const acknowledgePayment = async (payment: Payment) => {
+  const acknowledgePayment = async (paymentId: string): Promise<void> => {
     try {
-      const transaction = JSON.parse(payment.transaction_info)
-      const derivedPubKey = getPaymentAddress({
-        senderPrivateKey: '0000000000000000000000000000000000000000000000000000000000000001',
-        recipientPublicKey: payment.merchant_id,
-        invoiceNumber: `2-3241645161d8-${payment.payment_id} 1`,
-        returnType: 'publicKey',
-      })
-      const expectedAmount = Math.round(payment.amount * 100000000)
-
-      const pkh = new P2PKH()
-      const derivedScript = pkh.lock(PublicKey.fromString(derivedPubKey).toHash()).toHex()
-      const bsvtx = Transaction.fromHex(transaction.rawTx)
-      const index = bsvtx.outputs.findIndex(
-        (x) => x.lockingScript.toHex() === derivedScript && x.satoshis === expectedAmount
-      )
-      if (index === -1) {
-        throw new Error('Could not discover our output of this transaction.')
-      }
-      const anyonePub = new PrivateKey('0000000000000000000000000000000000000000000000000000000000000001', 'hex')
-        .toPublicKey()
-        .toDER()
-      transaction.outputs = [
-        {
-          vout: index,
-          satoshis: expectedAmount,
-          derivationPrefix: payment.payment_id,
-          derivationSuffix: '1',
-          senderIdentityKey: anyonePub,
-        },
-      ]
-
-      const success = await submitDirectTransaction({
-        protocol: '3241645161d8',
-        senderIdentityKey: anyonePub,
-        derivationPrefix: payment.payment_id,
-        transaction,
-        note: 'Receive a payment',
-        amount: Math.round(payment.amount * 100000000),
-      })
-      if (!success.referenceNumber) {
-        throw new Error('Unable to submit incoming payment.')
-      }
-      const response = await authrite.request(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
+      const response = await authFetch.fetch(`${location.protocol}//${location.host}/api/acknowledgePayment`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ paymentId: payment.payment_id }),
+        body: JSON.stringify({ paymentId })
       })
-      const data = JSON.parse(new TextDecoder().decode(response.body))
-      if (data.status === 'error') {
-        throw new Error(response.message)
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`❌ HTTP error! status: ${response.status.toString()}, body: ${errorText}`)
       }
-      await fetchPayments() // Refresh the list to show the updated status
-    } catch (err: any) {
-      setError(`Acknowledging payment failed: ${err.message}`)
+      const data: PaymentResponse = await response.json()
+      if (data.status === 'error') {
+        throw new Error(`❌ ${data.message ?? 'Failed to acknowledge payment'}`)
+      }
+      console.log(`✅ Successfully acknowledged payment: ${paymentId}`)
+      console.log('🔍 Acknowledgment response:', data)
+      await fetchPayments() // Refresh the list
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`❌ Acknowledging payment failed: ${message}`)
+      console.error('❌ Error acknowledging payment:', message)
     }
   }
 
   useEffect(() => {
-    fetchPayments()
-  }, [page, sortOrder])
+    void fetchPayments()
+  }, [page])
 
-  if (loading) return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      minHeight: '100vh'
-    }}>
-      <CircularProgress />
-    </div>
-  )
-  if (error) return <Typography color="error">{error}</Typography>
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh'
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    )
+  }
+  if (error !== '') return <Typography color='error'>{error}</Typography>
 
   return (
     <Container>
-      <Box style={{
-        textAlign: 'center',
-        marginBottom: theme.spacing(4),
-        marginTop: theme.spacing(5),
-        color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-      }}>
-        <Typography variant="h2">Payments</Typography>
-        <Typography variant="subtitle1">
-          Acknowledge your incoming payments
-        </Typography>
+      <Box
+        sx={{
+          textAlign: 'center',
+          marginBottom: theme.spacing(4),
+          marginTop: theme.spacing(5),
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+        }}
+      >
+        <Typography variant='h2'>Payments</Typography>
+        <Typography variant='subtitle1'>Acknowledge your incoming payments</Typography>
       </Box>
       <TableContainer component={Paper}>
         <Table>
@@ -162,21 +176,17 @@ const PaymentsList: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {payments.map((payment) => (
+            {payments.map(payment => (
               <TableRow key={payment.payment_id}>
                 <TableCell>{payment.payment_id}</TableCell>
-                <TableCell>{payment.button_id}</TableCell>
-                <TableCell>{payment.amount}</TableCell>
+                <TableCell>{payment.payment_button_id}</TableCell>
+                <TableCell>{formatBSV(payment.amount)}</TableCell>
                 <TableCell>{payment.currency}</TableCell>
                 <TableCell>{payment.completed ? 'Yes' : 'No'}</TableCell>
                 <TableCell>{payment.is_new ? 'Yes' : 'No'}</TableCell>
                 <TableCell>
                   {payment.is_new && (
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => acknowledgePayment(payment)}
-                    >
+                    <Button variant='contained' color='primary' onClick={() => { acknowledgePayment(payment.payment_id).catch(() => {}) }}>
                       Acknowledge
                     </Button>
                   )}
@@ -186,21 +196,21 @@ const PaymentsList: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-      {payments.length === 0 && <Typography paddingTop='1em'>No payments found.</Typography>}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
+      {payments.length === 0 && <Typography sx={{ paddingTop: '1em' }}>No payments found.</Typography>}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mt: 2
+        }}
+      >
         <IconButton onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
           <ArrowBack />
         </IconButton>
         <IconButton onClick={() => setPage(page + 1)}>
           <ArrowForward />
         </IconButton>
-        <Button
-          variant="outlined"
-          startIcon={<Sort />}
-          onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-        >
-          Sort Order: {sortOrder.toUpperCase()}
-        </Button>
       </Box>
     </Container>
   )

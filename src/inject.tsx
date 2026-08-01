@@ -1,73 +1,89 @@
+/**
+ * @file src/inject.tsx
+ *
+ * Injects Gateway payment buttons into third-party websites.
+ *
+ * This script does two main things:
+ * 1. Defines a global `window.PayButton.render()` method to render a single payment button inside a given DOM element.
+ * 2. Automatically scans the page on `window.load` for any element with `class="gateway-paybutton"` and renders a button into it
+ *    using any `data-*` attributes as props.
+ *
+ * This file is intended to be included via a `<script>` tag on external sites.
+ */
+
 import React from 'react'
-import ReactDOM from 'react-dom'
+import { createRoot } from 'react-dom/client'
 import PayButton from './components/PayButton'
+
+// Define props interface for PayButton, matching the PayButton component's expected props
+interface PayButtonProps {
+  text?: string
+  amount: number
+  merchant: string
+  button: string
+  currency?: string
+  server: string
+  loadingtext?: string
+  [key: string]: string | number | undefined
+}
 
 // fail when there is no window object
 if (typeof window !== 'object') {
-  throw {
-    message: 'Window must be defined in order to use the Gateway inject script'
+  throw new Error('❌ Window must be defined in order to use the Gateway inject script')
+}
+
+/**
+ * Render a PayButton component into the specified DOM element.
+ *
+ * @param {string} elementID - The ID of the DOM element to inject the PayButton into.
+ * @param {PayButtonProps} props - Props to pass to the PayButton component, typically parsed from `data-*` attributes.
+ */
+;(window as any).PayButton = {}
+;(window as any).PayButton.render = (elementID: string, props: PayButtonProps): void => {
+  const element = document.getElementById(elementID)
+  if (element != null) {
+    const root = createRoot(element)
+    root.render(<PayButton {...props} />)
+    console.log(`✅ Rendered PayButton for ID: ${elementID}`)
+  } else {
+    console.error(`❌ Failed to render PayButton: Element with ID ${elementID} not found`)
   }
 }
 
-// create a local .render() function accessible from the window object
-(window as any).PayButton = {};
+/**
+ * Automatically finds and injects PayButton components into all elements with `class="gateway-paybutton"`.
+ * Props are extracted from each element’s `data-*` attributes.
+ */
+const bootstrapPayButtons = (): void => {
+  const buttons = document.getElementsByClassName('gateway-paybutton')
+  console.log('🔍 Gateway: Found', buttons.length, buttons.length === 1 ? 'PayButton' : 'PayButtons', 'on this page.')
 
-(window as any).PayButton.render = (elementID: string, props: any) => {
-  // first, we clear anything that might be in the element
-  ReactDOM.render(
-    <div />,
-    document.getElementById(elementID),
-    () => {
-      // then, we render the actual PayButton
-      ReactDOM.render(
-        <PayButton {...props} />,
-        document.getElementById(elementID)
-      )
-    }
-  )
-}
-
-// this function uses the above renderer to load all buttons where
-// class="payButton" automatically
-let bootstrapPayButtons = () => {
-  // query the DOM and console-log however many buttons we found
-  let buttons = document.getElementsByClassName('gateway-paybutton')
-  console.log(
-    'Gateway: Found',
-    buttons.length,
-    buttons.length === 1 ? 'PayButton' : 'PayButtons',
-    'on this page.'
-  )
-
-  // for each of those buttons, use the renderer to display the button
   for (let i = 0; i < buttons.length; i++) {
-    let button = buttons.item(i)
-    if (!button) {
+    const button = buttons.item(i)
+    if (button == null) {
       continue
     }
 
-    // set a random ID for the button so we can keep track of it
-    let buttonID = 'pay-' + Math.floor(Math.random() * 100000)
+    const buttonID = `pay-${Math.floor(Math.random() * 100000)}`
     button.id = buttonID
     button.setAttribute('id', buttonID)
 
-    // store all element attributes in a JSON object
-    let props: Record<string, any> = {}
+    const props: PayButtonProps = { amount: 0, merchant: '', button: '', server: '' }
     if (button.hasAttributes()) {
-      let attrs = button.attributes
+      const attrs = button.attributes
       for (let j = 0; j < attrs.length; j++) {
         if (!attrs[j].name.startsWith('data-')) {
           continue
         }
-        props[attrs[j].name.substring(5)] = attrs[j].value
+        const propName = attrs[j].name.substring(5)
+        // Convert 'amount' to number, others remain strings
+        props[propName] = propName === 'amount' ? Number(attrs[j].value) : attrs[j].value
       }
     }
 
-    console.log(props);
-    // render the button
-    (window as any).PayButton.render(buttonID, props)
+    console.log('🔍 PayButton props for pay-', props.button ?? 'unknown', props)
+    ;(window as any).PayButton.render(buttonID, props)
   }
 }
 
-// on page load, call the automatic button loader defined above
 window.addEventListener('load', bootstrapPayButtons)

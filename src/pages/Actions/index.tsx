@@ -1,71 +1,51 @@
-import React, { useState, useEffect } from 'react'
-import {
-  CircularProgress,
-  Container,
-  Typography,
-  Paper,
-  Box,
-} from '@mui/material'
-import { useTheme } from '@emotion/react'
-// import authrite from '../../utils/Authrite'
+/**
+ * @file src/pages/Actions/index.tsx
+ *
+ * Displays the "Payment Actions" informational page in the app. This component introduces
+ * the idea of user-defined payment actions that can be triggered upon receiving payments.
+ *
+ * - Uses MUI theming to apply dynamic styles for light and dark mode.
+ * - Presents a heading, subtitle, and a brief explanatory paragraph.
+ * - Currently static and non-interactive; serves as a placeholder for future action management UI.
+ *
+ * Intended as a future home for managing payment-triggered workflows.
+ */
 
+import React from 'react'
+import { Container, Typography, Paper, Box } from '@mui/material'
+import { useTheme } from '@mui/material/styles'
+
+/**
+ * `PaymentActionsList` is a React functional component that displays an overview section
+ * describing the purpose and future functionality of user-defined payment actions.
+ *
+ * It uses the current MUI theme to apply dynamic styles based on light or dark mode.
+ *
+ * This component is purely presentational and does not currently render any actionable items.
+ *
+ * @returns A styled informational panel with a heading and description of payment actions.
+ */
 const PaymentActionsList: React.FC = () => {
   const theme = useTheme()
-  // const [loading, setLoading] = useState(true)
-  // const [error, setError] = useState('')
-  // const [page, setPage] = useState(1)
-  // const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  // const [usedFilter, setUsedFilter] = useState<string>('all')
-  // const [buttons, setButtons] = useState<Button[]>([])
-
-  // const fetchButtons = async () => {
-  //     setLoading(true)
-  //     setError('')
-  //     try {
-  //         let url = `${location.protocol}//${location.host}/api/listButtons?limit=25&offset=${(page - 1) * 25}&sort=${sortOrder}`
-  //         if (usedFilter !== 'all') {
-  //             url += `&usage=${usedFilter}`
-  //         }
-  //         const response = await authrite.request(url, {
-  //             method: 'GET',
-  //             // Include headers as necessary, e.g., for authentication
-  //         })
-  //         const data = JSON.parse(new TextDecoder().decode(response.body))
-  //         if (data.status === 'error') {
-  //             throw new Error(response.message)
-  //         }
-  //         setButtons(data.data)
-  //     } catch (err: any) {
-  //         setError(`Fetching buttons failed: ${err.message}`)
-  //     } finally {
-  //         setLoading(false)
-  //     }
-  // }
-
-  // useEffect(() => {
-  //     fetchButtons()
-  // }, [page, sortOrder, usedFilter])
-
-  // if (loading) return <CircularProgress />
-  // if (error) return <Typography color="error">{error}</Typography>
 
   return (
     <Container>
-      <Box style={{
-        textAlign: 'center',
-        marginBottom: theme.spacing(4),
-        marginTop: theme.spacing(5),
-        color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000',
-      }}>
-        <Typography variant="h2">Payment Actions</Typography>
-        <Typography variant="subtitle1">
-          Manage the specialized payment actions you have created.
-        </Typography>
+      <Box
+        style={{
+          textAlign: 'center',
+          marginBottom: theme.spacing(4),
+          marginTop: theme.spacing(5),
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#000000'
+        }}
+      >
+        <Typography variant='h2'>Payment Actions</Typography>
+        <Typography variant='subtitle1'>Manage the specialized payment actions you have created.</Typography>
       </Box>
       <Paper elevation={3}>
         <Box p={3}>
-          <Typography variant="body1">
-            Here, you will be able to create actions that get triggered when one of your buttons receives a payment. Things like sending an email, hitting a webhook, or maybe even sending another payment somewhere else!
+          <Typography variant='body1'>
+            Here, you will be able to create actions that get triggered when one of your buttons receives a payment.
+            Things like sending an email, hitting a webhook, or maybe even sending another payment somewhere else!
           </Typography>
         </Box>
       </Paper>

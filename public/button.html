@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tip with BSV</title>
+
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
+          'Helvetica Neue', sans-serif;
+        background-color: #fff;
+        color: #000;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        text-align: center;
+      }
+
+      .container {
+        max-width: 600px;
+        padding: 2em;
+      }
+
+      h1 {
+        font-size: 2em;
+        margin-bottom: 0.2em;
+      }
+
+      .benefits p {
+        font-weight: bold;
+        margin-bottom: 0.5em;
+      }
+
+      ul {
+        list-style: none;
+        padding-left: 0;
+        margin-top: 0;
+      }
+
+      li {
+        text-align: left;
+        margin: 0.4em 0;
+      }
+
+      .button-container {
+        margin-top: 2em;
+      }
+
+      .gateway-button-styles {
+        border-radius: 2em;
+        border: none;
+        padding: 0.7em 1em;
+        min-width: 10em;
+        background: linear-gradient(145deg, #8484fa, #5050f2);
+        color: white;
+        box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+        user-select: none;
+        transition: all 0.3s;
+        font-weight: bold;
+      }
+
+      .gateway-button-styles:hover {
+        cursor: pointer;
+        box-shadow: 4px 8px 12px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(145deg, #ababff, #5050f2);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Support Us with BSV</h1>
+
+      <div class="benefits">
+        <p>Why tip using BSV?</p>
+        <ul>
+          <li>✅ Ultra-low fees — less than a fraction of a cent per transaction</li>
+          <li>✅ Instant finality — payments settle in seconds</li>
+          <li>✅ Global currency — send anywhere in the world</li>
+          <li>✅ Developer-friendly — smart contracts and token support</li>
+          <li>✅ On-chain scalability — supports micro and nano payments</li>
+        </ul>
+      </div>
+
+      <div class="button-container">
+        <div
+          class="gateway-paybutton"
+          data-merchant="0282f7effd932d9d2a3774c287eacb9ace3728a753a0339e2f16998153e5d65963"
+          data-button="c9fc1a237b9866d654d09798"
+          data-amount="5"
+          data-currency="BSV"
+          data-text="Tip 5 sats"
+          data-server="http://localhost:3000"
+        ></div>
+      </div>
+    </div>
+
+    <script src="pay.js"></script>
+  </body>
+</html>

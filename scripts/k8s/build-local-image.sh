@@ -5,7 +5,7 @@ usage() {
   cat >&2 <<'EOF'
 Usage: ENVIRONMENT=staging|prod scripts/k8s/build-local-image.sh
 
-Builds a Linux/amd64 Gateway image on the Project Babbage private infrastructure runner and pushes it to
+Builds a Linux/amd64 Gateway image on a private deploy runner and pushes it to
 the in-cluster registry.
 
 Environment:

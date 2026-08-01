@@ -13,7 +13,7 @@
   "babbage": {
     "protocolPermissions": {
       "3241645161d8": "Needs permission to derive a public key used in payment for an invoice.",
-      "authrite message signature": "Needs permission to make authenticated requests to the payment server.",
+      "auth message signature": "Needs permission to make authenticated requests to the payment server.",
       "identity key": "Needs permission to identify you to the payment server."
     }
   }

@@ -1,149 +1,217 @@
 /**
- * API Environment Setup Script
+ * @file setup.js
+ * @description
+ * Gateway API Environment Setup Script.
+ *
+ * This interactive script helps developers or operators configure a `.env` file
+ * for the Gateway API server by collecting MySQL credentials, web server details,
+ * and environment settings. It also verifies the MySQL connection, writes to `.env`,
+ * runs database migrations, and optionally seeds the database.
+ *
+ * Steps performed:
+ * 1. Prompt user for SQL and web server information.
+ * 2. Test MySQL connection using provided credentials.
+ * 3. Save configuration to `.env` file.
+ * 4. Run Knex.js migrations.
+ * 5. Optionally seed the database for development use.
+ *
+ * Requirements:
+ * - Node.js
+ * - MySQL Server running and reachable
+ * - knexfile.js present and configured properly
+ *
+ * Environment variables written:
+ * - HTTP_PORT
+ * - BSV_NETWORK
+ * - SERVER_PRIVATE_KEY
+ * - HOSTING_DOMAIN
+ * - SQL_DATABASE_HOST
+ * - SQL_DATABASE_PORT
+ * - SQL_DATABASE_USER
+ * - SQL_DATABASE_PASSWORD
+ * - SQL_DATABASE_DB_NAME
+ * - SPAWN_NGINX
  */
+
 const readline = require('readline')
 const fs = require('fs')
 const mysql = require('mysql2')
 const promisify = require('util').promisify
 
+/**
+ * Collects user input from the terminal for server/database configuration.
+ * Prompts for SQL host, port, user, password, database name, HTTP port, etc.
+ * Once input is collected, calls `testDatabaseConnection`.
+ */
 const collectInformation = async () => {
-    // create a new readline query stream
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
+  // create a new readline query stream
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+
+  // promisify the readline callback
+  rl.question[promisify.custom] = query => {
+    return new Promise(resolve => {
+      rl.question(query, resolve)
     })
+  }
+  const question = promisify(rl.question)
 
-    // promisify the readline callback
-    rl.question[promisify.custom] = (query) => {
-        return new Promise((resolve) => {
-            rl.question(query, resolve)
-        })
-    }
-    let question = promisify(rl.question)
+  // get the hostname
+  let dbHostname = await question('\nSQL database hostname (ENTER for 127.0.0.1): ')
+  dbHostname = dbHostname || '127.0.0.1'
 
-    // get the hostname
-    let dbHostname = await question(
-        '\nSQL database hostname (ENTER for 127.0.0.1): ',
-    )
-    dbHostname = dbHostname || '127.0.0.1'
+  // get the DB port
+  let dbPort = await question('SQL database port (normally 3306) (ENTER for 3306): ')
+  dbPort = dbPort || '3306'
 
-    // get the DB port
-    let dbPort = await question(
-        'SQL database port (normally 3306) (ENTER for 3306): '
-    )
-    dbPort = dbPort || '3306'
+  // get the username
+  let dbUser = await question('SQL user name (ENTER for gateway): ')
+  dbUser = dbUser || 'gateway'
 
-    // get the username
-    let dbUser = await question('SQL user name (ENTER for gateway): ')
-    dbUser = dbUser || 'gateway'
+  // get the password
+  let dbPass = await question('SQL user password (ENTER for gateway123): ')
+  dbPass = dbPass || 'gateway123'
 
-    // get the password
-    let dbPass = await question('SQL user password (ENTER for gateway123): ')
-    dbPass = dbPass || 'gateway123'
+  // get the database name
+  let db = await question('SQL database name (ENTER for gateway): ')
+  db = db || 'gateway'
 
-    // get the database name
-    let db = await question('SQL database name (ENTER for gateway): ')
-    db = db || 'gateway'
+  // grab the port to host the API on
+  let httpPort = await question('Web server port (ENTER for 3001): ')
+  httpPort = httpPort || '3001'
 
-    // grab the port to host the API on
-    let httpPort = await question('Web server port (ENTER for 3001): ')
-    httpPort = httpPort || '3001'
+  // grab the domain to host the API on
+  let domain = await question(
+    'Web server hosting domain including http(s):// (ENTER for http://localhost:3000, which is what you want for frontend compatibility in development): '
+  )
+  domain = domain || 'http://localhost:3000'
 
-    // grab the domain to host the API on
-    let domain = await question('Web server hosting domain including http(s):// (ENTER for http://localhost:3000, which is what you want for frontend compatibility in development): ')
-    domain = domain || 'http://localhost:3000'
+  // determine whether to start nginx
+  let spawnNginx = await question(
+    'Start the local NGINX server process after the payment server starts listening? (generally only useful in production) [yes/no]: '
+  )
+  spawnNginx = spawnNginx || 'no'
 
-    // determine whether to start nginx
-    let spawnNginx = await question('Start the local NGINX server process after the payment server starts listening? (generally only useful in production) [yes/no]: ')
-    spawnNginx = spawnNginx || 'no'
+  // determine the BSV net
+  let bsvNet = await question(
+    'Select the BSV network on which this server will run. (ENTER for mainnet) [mainnet/testnet]: '
+  )
+  bsvNet = bsvNet || 'mainnet'
 
-    // determine the BSV net
-    let bsvNet = await question('Select the BSV network on which this server will run. (ENTER for mainnet) [mainnet/testnet]: ')
-    bsvNet = bsvNet || 'mainnet'
-
-    // close the readline stream
-    rl.close()
-    testDatabaseConnection(dbHostname, dbPort, dbUser, dbPass, db, httpPort, domain, spawnNginx, bsvNet)
+  // close the readline stream
+  rl.close()
+  testDatabaseConnection(dbHostname, dbPort, dbUser, dbPass, db, httpPort, domain, spawnNginx, bsvNet)
 }
 
-const testDatabaseConnection = async (
+/**
+ * Tests the MySQL database connection with the provided credentials.
+ * If successful, writes environment config to `.env` and calls `setupDatabase`.
+ * If unsuccessful, re-prompts via `collectInformation`.
+ *
+ * @param {string} host - MySQL hostname
+ * @param {string} port - MySQL port
+ * @param {string} user - MySQL username
+ * @param {string} pass - MySQL password
+ * @param {string} db - MySQL database name
+ * @param {string} listen - HTTP port for the Gateway server
+ * @param {string} domain - Public domain of the Gateway server
+ * @param {string} spawnNginx - Whether to start NGINX automatically
+ * @param {string} bsvNet - BSV network name ("mainnet" or "testnet")
+ */
+const testDatabaseConnection = async (host, port, user, pass, db, listen, domain, spawnNginx, bsvNet) => {
+  console.log('\nTesting MySQL credentials...')
+  const conn = mysql.createConnection({
     host,
     port,
     user,
-    pass,
-    db,
-    listen,
-    domain,
-    spawnNginx,
-    bsvNet
-) => {
-    console.log('\nTesting MySQL credentials...')
-    const conn = mysql.createConnection({
-        host: host,
-        port: port,
-        user: user,
-        password: pass,
-        database: db,
-        multipleStatements: true,
-    })
-    conn.connect((err) => {
-        if (err) {
-            console.log('Error connecting to database! The error was:')
-            console.log(err)
-            console.log('Check your credentials and try again.')
-            console.log('For help setting up a MySQL database, please see here:')
-            console.log('https://dev.mysql.com/doc/refman/8.0/en/installing.html')
-            collectInformation()
-            return
-        }
+    password: pass,
+    database: db,
+    multipleStatements: true
+  })
+  conn.connect(err => {
+    if (err) {
+      console.log('Error connecting to database! The error was:')
+      console.log(err)
+      console.log('Check your credentials and try again.')
+      console.log('For help setting up a MySQL database, please see here:')
+      console.log('https://dev.mysql.com/doc/refman/8.0/en/installing.html')
+      collectInformation()
+      return
+    }
 
-        console.log('Your MySQL credentials look good!')
-        console.log('\nSaving your new configuration...')
-        fs.writeFile(
-            './.env',
-            'HTTP_PORT=' + listen + '\n' +
-            'BSV_NETWORK=' + bsvNet + '\n' +
-            'SERVER_PRIVATE_KEY=' + require('crypto').randomBytes(32).toString('hex') + '\n' +
-            'HOSTING_DOMAIN=' + domain + '\n' +
-            'SQL_DATABASE_HOST=' + host + '\n' +
-            'SQL_DATABASE_PORT=' + port + '\n' +
-            'SQL_DATABASE_USER=' + user + '\n' +
-            'SQL_DATABASE_PASSWORD=' + pass + '\n' +
-            'SQL_DATABASE_DB_NAME=' + db + '\n' +
-            'SPAWN_NGINX=' + spawnNginx + '\n',
-            (err) => {
-                if (err) {
-                    console.log('Could not save configuration to .env')
-                    throw err
-                } else {
-                    console.log('New API configuration saved to .env')
-                    conn.end()
-                    setupDatabase()
-                }
-            },
-        )
-    })
+    console.log('Your MySQL credentials look good!')
+    console.log('\nSaving your new configuration...')
+    fs.writeFile(
+      './.env',
+      'HTTP_PORT=' +
+        listen +
+        '\n' +
+        'BSV_NETWORK=' +
+        bsvNet +
+        '\n' +
+        'SERVER_PRIVATE_KEY=' +
+        require('crypto').randomBytes(32).toString('hex') +
+        '\n' +
+        'HOSTING_DOMAIN=' +
+        domain +
+        '\n' +
+        'SQL_DATABASE_HOST=' +
+        host +
+        '\n' +
+        'SQL_DATABASE_PORT=' +
+        port +
+        '\n' +
+        'SQL_DATABASE_USER=' +
+        user +
+        '\n' +
+        'SQL_DATABASE_PASSWORD=' +
+        pass +
+        '\n' +
+        'SQL_DATABASE_DB_NAME=' +
+        db +
+        '\n' +
+        'SPAWN_NGINX=' +
+        spawnNginx +
+        '\n',
+      err => {
+        if (err) {
+          console.log('Could not save configuration to .env')
+          throw err
+        } else {
+          console.log('New API configuration saved to .env')
+          conn.end()
+          setupDatabase()
+        }
+      }
+    )
+  })
 }
 
+/**
+ * Runs Knex migrations and optionally seeds the database based on user input.
+ * Warns the user that seeding will erase existing data.
+ */
 const setupDatabase = async () => {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  })
+
+  // promisify the readline callback
+  rl.question[promisify.custom] = query => {
+    return new Promise(resolve => {
+      rl.question(query, resolve)
     })
+  }
+  const question = promisify(rl.question)
 
-    // promisify the readline callback
-    rl.question[promisify.custom] = (query) => {
-        return new Promise((resolve) => {
-            rl.question(query, resolve)
-        })
-    }
-    let question = promisify(rl.question)
+  console.log('Migrating your database...')
+  const knex = require('knex')(require('../knexfile.js'))
+  await knex.migrate.latest()
 
-    console.log('Migrating your database...')
-    const knex = require('knex')(require('../knexfile.js'))
-    await knex.migrate.latest()
-
-    console.log(`
+  console.log(`
 Seeding a new test database will erase all data, including users, transactions
 and payment buttons, from the database server you just entered. This action cannot
 be undone.
@@ -153,38 +221,30 @@ YES and your new database will be set up automatically.
 
 If you are running a production server or if you already have a working
 database you want to keep, answer NO.
-`
-    )
+`)
 
-    let setup = await question(
-        'ERASE and re-seed the database for development? [Y/N]: '
-    )
+  const setup = await question('ERASE and re-seed the database for development? [Y/N]: ')
 
-    if (setup === 'N' || setup === 'n' || setup === 'no' || setup === 'NO') {
-        rl.close()
-        console.log('Thank you for helping build Gateway.')
-    } else if (
-        setup === 'Y' ||
-        setup === 'y' ||
-        setup === 'yes' ||
-        setup === 'YES'
-    ) {
-        console.log('Seeding a new database...')
-        await knex.seed.run()
-        console.log('Your new database has been successfully created!')
-        console.log('Thank you for helping build Gateway.')
-        rl.close()
-    } else {
-        console.log('Please answer with either "Y" or "N"')
-        rl.close()
-        setupDatabase()
-    }
-    process.exit(0)
+  if (setup === 'N' || setup === 'n' || setup === 'no' || setup === 'NO') {
+    rl.close()
+    console.log('Thank you for helping build Gateway.')
+  } else if (setup === 'Y' || setup === 'y' || setup === 'yes' || setup === 'YES') {
+    console.log('Seeding a new database...')
+    await knex.seed.run()
+    console.log('Your new database has been successfully created!')
+    console.log('Thank you for helping build Gateway.')
+    rl.close()
+  } else {
+    console.log('Please answer with either "Y" or "N"')
+    rl.close()
+    setupDatabase()
+  }
+  process.exit(0)
 }
 
-// print some informational text
+// Show introductory setup guidance
 console.log(
-    `The Gateway API server uses a MySQL database to store and manage user
+  `The Gateway API server uses a MySQL database to store and manage user
 buttons, payments and other data. To set up the API server (required for both
 development and production deployments), follow these steps prior to continuing:
 

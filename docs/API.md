@@ -9,6 +9,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 **Function:** Allows a merchant to create a new payment button with specified attributes.
 
 **Parameters:**
+
 - `amount` (float): The payment amount.
 - `currency` (string): Currency code (e.g., USD, EUR).
 - `variableAmount` (boolean): Whether the button accepts variable payment amounts.
@@ -16,9 +17,10 @@ This document provides a comprehensive overview of the API endpoints designed fo
 - `accepts` (enum): Type of payment accepted ('BSV', 'fiat', 'both').
 
 **Example Request:**
+
 ```json
 {
-  "amount": 50.00,
+  "amount": 50.0,
   "currency": "USD",
   "variableAmount": false,
   "multiUse": true,
@@ -27,6 +29,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -40,22 +43,25 @@ This document provides a comprehensive overview of the API endpoints designed fo
 **Function:** Generates an invoice for a payment button, specifying a merchant, amount, and currency.
 
 **Parameters:**
+
 - `paymentButtonId` (string): ID of the payment button.
 - `merchantId` (string): Merchant's ID.
 - `currency` (string): Currency code.
 - `amount` (float): Payment amount.
 
 **Example Request:**
+
 ```json
 {
   "paymentButtonId": "btn_123456789",
   "merchantId": "merchant1",
   "currency": "USD",
-  "amount": 25.00
+  "amount": 25.0
 }
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -69,10 +75,12 @@ This document provides a comprehensive overview of the API endpoints designed fo
 **Function:** Completes a payment for an invoice, marking it as paid.
 
 **Parameters:**
+
 - `paymentId` (string): ID of the payment.
 - `transaction` (string): Transaction details.
 
 **Example Request:**
+
 ```json
 {
   "paymentId": "pay_987654321",
@@ -81,6 +89,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -93,6 +102,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 **Function:** Lists all payments for a given merchant, with optional filtering by button ID.
 
 **Parameters:**
+
 - `buttonId` (string, optional): Filter payments by button ID.
 - `limit` (int, optional): Number of payments per page.
 - `offset` (int, optional): Pagination offset.
@@ -102,6 +112,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 `/listPayments?buttonId=btn_123456789&limit=10&offset=0&sort=desc`
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -109,7 +120,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
     {
       "payment_id": "pay_987654321",
       "merchant_id": "merchant1",
-      "amount": 25.00,
+      "amount": 25.0,
       "currency": "USD",
       "completed": false,
       "is_new": true
@@ -124,6 +135,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 **Function:** Lists all payment buttons for a merchant, with options to exclude single-use buttons and filter by usage.
 
 **Parameters:**
+
 - `excludeSingleUse` (string, optional): Exclude single-use buttons ('true' or 'false').
 - `usage` (string, optional): Filter buttons by usage ('used', 'unused', 'all').
 - `limit` (int, optional): Number of buttons per page.
@@ -134,13 +146,14 @@ This document provides a comprehensive overview of the API endpoints designed fo
 `/listButtons?excludeSingleUse=true&usage=unused&limit=10&offset=0&sort=desc`
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
   "data": [
     {
       "button_id": "btn_123456789",
-      "amount": 50.00,
+      "amount": 50.0,
       "currency": "USD",
       "variable_amount": false,
       "multi_use": true,
@@ -157,9 +170,11 @@ This document provides a comprehensive overview of the API endpoints designed fo
 **Function:** Allows a merchant to acknowledge a payment, marking it as no longer new.
 
 **Parameters:**
+
 - `paymentId` (string): ID of the payment to acknowledge.
 
 **Example Request:**
+
 ```json
 {
   "paymentId": "pay_987654321"
@@ -167,6 +182,7 @@ This document provides a comprehensive overview of the API endpoints designed fo
 ```
 
 **Example Response:**
+
 ```json
 {
   "status": "success",
@@ -184,6 +200,7 @@ The API uses standard HTTP status codes to indicate the success or failure of re
 - `500 Internal Server Error`: The server encountered an unexpected condition that prevented it from fulfilling the request.
 
 **Example Error Response:**
+
 ```json
 {
   "status": "error",
