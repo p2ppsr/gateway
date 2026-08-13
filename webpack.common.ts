@@ -85,6 +85,10 @@ const common: Configuration = {
     extensions: ['.web.tsx', '.web.ts', '.ts', '.tsx', '.js', '.jsx', '.json'],
     alias: {
       'react-native$': 'react-native-web',
+      '@bsv/wallet-toolbox-client/out/src/WalletSettingsManager$': path.resolve(
+        __dirname,
+        'node_modules/@bsv/wallet-toolbox-client/out/index.client.cjs'
+      ),
       fs: false
     }
   }
