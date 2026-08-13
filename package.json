@@ -36,10 +36,10 @@
     ]
   },
   "dependencies": {
-    "@bsv/auth-express-middleware": "^2.1.7",
+    "@bsv/auth-express-middleware": "^2.2.1",
     "@bsv/payment-express-middleware": "^2.1.5",
-    "@bsv/sdk": "^2.2.17",
-    "@bsv/wallet-toolbox": "^2.4.20",
+    "@bsv/sdk": "^2.4.0",
+    "@bsv/wallet-toolbox": "^2.9.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.17",
@@ -104,7 +104,7 @@
   },
   "overrides": {
     "amountinator": {
-      "@bsv/wallet-toolbox-client": "2.0.19"
+      "@bsv/wallet-toolbox-client": "2.9.0"
     }
   },
   "engines": {
