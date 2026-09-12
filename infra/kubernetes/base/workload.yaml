@@ -5,7 +5,12 @@ metadata:
   labels:
     app.kubernetes.io/component: api
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: gateway-app
@@ -16,10 +21,23 @@ spec:
         app.kubernetes.io/name: gateway-app
         app.kubernetes.io/component: api
     spec:
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: gateway-app
+                  app.kubernetes.io/component: api
+              topologyKey: kubernetes.io/hostname
       containers:
         - name: gateway-app
           image: gateway-app:local
           imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 10
           ports:
             - name: http
               containerPort: 8080
