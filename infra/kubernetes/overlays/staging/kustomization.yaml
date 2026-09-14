@@ -18,7 +18,7 @@ configMapGenerator:
     literals:
       - BSV_NETWORK=testnet
       - HOSTING_DOMAIN=https://staging-app.gateway.cash
-      - WALLET_STORAGE_URL=http://wallet-storage.wallet-storage-staging.svc.cluster.local:8080
+      - WALLET_STORAGE_URL=https://staging-storage.babbage.systems
       - SQL_DATABASE_DB_NAME=staging_gateway
 
 patches:
