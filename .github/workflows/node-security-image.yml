@@ -1,0 +1,23 @@
+name: Production Node security qualification
+on:
+  pull_request:
+    branches: [production]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dockerfile: Dockerfile
+          - dockerfile: Dockerfile.local
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the pinned production recipe
+        run: docker build --pull -f "${{ matrix.dockerfile }}" -t production-node-security .
+      - name: Verify its final native interpreter
+        run: test "$(docker run --rm --network none --entrypoint node production-node-security --version)" = v22.23.4
